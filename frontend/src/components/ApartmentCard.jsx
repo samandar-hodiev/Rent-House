@@ -75,9 +75,9 @@ function ApartmentCard({ apartment }) {
       onClick={handleCardClick}
       onKeyDown={handleKeyDown}
       aria-label={t('apartmentCard.detailsAriaLabel', { title: apartment.title })}
-      className="group flex cursor-pointer flex-col overflow-hidden rounded-lg border border-border bg-surface transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      className="group flex cursor-pointer flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
-      <div className="relative aspect-[6/5] w-full overflow-hidden bg-surface-secondary">
+      <div className="relative aspect-4/3 w-full overflow-hidden bg-surface-secondary">
         <img
           src={apartment.image}
           alt={apartment.title}
@@ -102,7 +102,7 @@ function ApartmentCard({ apartment }) {
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-5">
-        <p className="text-xl font-semibold text-text-primary">
+        <p className="text-xl font-bold text-text-primary">
           {formatUzsAmount(apartment.price)} {t('currency.somPerMonth')}
         </p>
 

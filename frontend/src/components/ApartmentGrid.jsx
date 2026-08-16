@@ -10,7 +10,7 @@ function ApartmentGrid({ apartments, loading, onClearFilters }) {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
           // eslint-disable-next-line react/no-array-index-key
           <ApartmentCardSkeleton key={index} />
@@ -31,7 +31,7 @@ function ApartmentGrid({ apartments, loading, onClearFilters }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
       {apartments.map((apartment) => (
         <ApartmentCard key={apartment.id} apartment={apartment} />
       ))}

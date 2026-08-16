@@ -22,7 +22,7 @@ function HomePage() {
   )
 
   return (
-    <Container className="py-8">
+    <Container className="pt-10 pb-12 lg:pt-14">
       <div className="mb-6 flex flex-col gap-1">
         <h1 className="text-2xl font-semibold text-text-primary">{t('apartments.title')}</h1>
         <p className="text-sm text-text-muted">
