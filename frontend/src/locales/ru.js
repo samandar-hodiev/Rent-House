@@ -24,7 +24,16 @@ export default {
   'search.button': 'Искать',
 
   'apartments.title': 'Квартиры в аренду',
+  'apartments.defaultCount': '{count} квартир',
   'apartments.foundCount': 'Найдено {count} квартир',
+  'apartments.noResultsCount': 'Квартиры не найдены',
+
+  'sort.ariaLabel': 'Сортировка',
+  'sort.newest': 'Сначала новые',
+  'sort.cheapest': 'Сначала дешевле',
+  'sort.expensive': 'Сначала дороже',
+  'sort.areaLarge': 'Площадь: больше',
+  'sort.areaSmall': 'Площадь: меньше',
 
   'filters.button': 'Фильтры',
   'filters.clearAll': 'Сбросить все',

@@ -24,7 +24,16 @@ export default {
   'search.button': 'Qidirish',
 
   'apartments.title': 'Ijara uchun uylar',
+  'apartments.defaultCount': '{count} ta uy bor',
   'apartments.foundCount': '{count} ta uy topildi',
+  'apartments.noResultsCount': 'Uylar topilmadi',
+
+  'sort.ariaLabel': 'Saralash',
+  'sort.newest': 'Eng yangi',
+  'sort.cheapest': 'Eng arzon',
+  'sort.expensive': 'Eng qimmat',
+  'sort.areaLarge': 'Maydoni katta',
+  'sort.areaSmall': 'Maydoni kichik',
 
   'filters.button': 'Filtrlar',
   'filters.clearAll': 'Barchasini tozalash',

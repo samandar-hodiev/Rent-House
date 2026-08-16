@@ -12,10 +12,13 @@ const EMPTY_FILTERS = {
 
 const SearchContext = createContext(null)
 
+export const DEFAULT_SORT = 'newest'
+
 export function SearchProvider({ children }) {
   const [districtId, setDistrictId] = useState(null)
   const [keyword, setKeyword] = useState('')
   const [filters, setFiltersState] = useState(EMPTY_FILTERS)
+  const [sort, setSort] = useState(DEFAULT_SORT)
 
   const submitKeyword = useCallback((value) => {
     setKeyword(value.trim())
@@ -51,6 +54,8 @@ export function SearchProvider({ children }) {
       clearFilters,
       resetSearch,
       activeFilterCount,
+      sort,
+      setSort,
     }),
     [
       districtId,
@@ -61,6 +66,7 @@ export function SearchProvider({ children }) {
       clearFilters,
       resetSearch,
       activeFilterCount,
+      sort,
     ],
   )
 

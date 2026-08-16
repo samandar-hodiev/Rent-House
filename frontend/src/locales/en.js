@@ -24,7 +24,16 @@ export default {
   'search.button': 'Search',
 
   'apartments.title': 'Apartments for rent',
+  'apartments.defaultCount': '{count} homes available',
   'apartments.foundCount': '{count} apartments found',
+  'apartments.noResultsCount': 'No apartments found',
+
+  'sort.ariaLabel': 'Sort',
+  'sort.newest': 'Newest',
+  'sort.cheapest': 'Cheapest first',
+  'sort.expensive': 'Most expensive',
+  'sort.areaLarge': 'Largest area',
+  'sort.areaSmall': 'Smallest area',
 
   'filters.button': 'Filters',
   'filters.clearAll': 'Clear all',
