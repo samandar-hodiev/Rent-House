@@ -77,6 +77,17 @@ export default {
   'apartmentCard.wishlistRemove': 'Убрать из избранного',
   'apartmentCard.detailsAriaLabel': 'Подробнее: {title}',
 
+  'apartmentTitle.1': 'Уютная 2-комнатная квартира',
+  'apartmentTitle.2': '3-комнатная семейная квартира',
+  'apartmentTitle.3': 'Новый ремонт, 1-комнатная',
+  'apartmentTitle.4': 'Квартира рядом с Magic City',
+  'apartmentTitle.5': 'Дом с двориком, тихий район',
+  'apartmentTitle.6': '2-комнатная рядом с центром',
+  'apartmentTitle.7': '4-комнатная с широким балконом',
+  'apartmentTitle.8': 'Небольшая комната студийного типа',
+  'apartmentTitle.9': 'Юнусобод, новая квартира 3 комнаты',
+  'apartmentTitle.10': 'Сергели, новостройка',
+
   'posted.minutesAgo': '{count} мин назад',
   'posted.hoursAgo': '{count} ч назад',
   'posted.today': 'Опубликовано сегодня',

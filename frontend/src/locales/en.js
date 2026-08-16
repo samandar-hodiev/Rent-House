@@ -77,6 +77,17 @@ export default {
   'apartmentCard.wishlistRemove': 'Remove from saved',
   'apartmentCard.detailsAriaLabel': 'View details: {title}',
 
+  'apartmentTitle.1': 'Cozy 2-room apartment',
+  'apartmentTitle.2': '3-room family apartment',
+  'apartmentTitle.3': 'Newly renovated 1-room apartment',
+  'apartmentTitle.4': 'Apartment near Magic City',
+  'apartmentTitle.5': 'House with a yard, quiet area',
+  'apartmentTitle.6': '2-room apartment near the center',
+  'apartmentTitle.7': '4-room apartment with a wide balcony',
+  'apartmentTitle.8': 'Small studio-style room',
+  'apartmentTitle.9': 'Yunusobod, new 3-room apartment',
+  'apartmentTitle.10': 'Sergeli, newly built housing',
+
   'posted.minutesAgo': '{count} minutes ago',
   'posted.hoursAgo': '{count} hours ago',
   'posted.today': 'Posted today',

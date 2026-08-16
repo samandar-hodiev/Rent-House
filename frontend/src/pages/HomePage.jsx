@@ -40,7 +40,7 @@ function HomePage() {
   }
 
   return (
-    <Container className="pt-10 pb-12 lg:pt-14">
+    <Container className="pt-10 pb-12 lg:pt-12">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold text-text-primary">{t('apartments.title')}</h1>

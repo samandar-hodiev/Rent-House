@@ -77,6 +77,17 @@ export default {
   'apartmentCard.wishlistRemove': "Saqlangandan olib tashlash",
   'apartmentCard.detailsAriaLabel': "{title}, batafsil ma'lumot",
 
+  'apartmentTitle.1': '2 xonali shinam kvartira',
+  'apartmentTitle.2': '3 xonali oilaviy kvartira',
+  'apartmentTitle.3': "Yangi ta'mirlangan 1 xonali",
+  'apartmentTitle.4': 'Magic City yaqinidagi kvartira',
+  'apartmentTitle.5': 'Hovlili uy, tinch hudud',
+  'apartmentTitle.6': 'Markazga yaqin 2 xonali',
+  'apartmentTitle.7': 'Keng balkonli 4 xonali',
+  'apartmentTitle.8': 'Yotoqxona turidagi kichik xona',
+  'apartmentTitle.9': 'Yunusobod, yangi uy 3 xona',
+  'apartmentTitle.10': 'Sergeli, yangi qurilgan turar-joy',
+
   'posted.minutesAgo': '{count} daqiqa oldin',
   'posted.hoursAgo': '{count} soat oldin',
   'posted.today': 'Bugun joylandi',
