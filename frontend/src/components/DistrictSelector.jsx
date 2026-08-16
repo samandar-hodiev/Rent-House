@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import { DISTRICTS, getDistrictById } from '../data/districts'
 import { useDismiss } from '../hooks/useDismiss'
 import { useLocale } from '../context/LocaleContext'
@@ -28,6 +28,7 @@ function DistrictSelector({ districtId, onChange }) {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
   const containerRef = useRef(null)
+  const searchInputId = useId()
 
   const selectedDistrict = getDistrictById(districtId)
 
@@ -88,11 +89,11 @@ function DistrictSelector({ districtId, onChange }) {
           aria-label={t('search.districtLabel')}
           className="absolute left-0 top-full z-40 mt-2 w-72 rounded-md border border-border bg-surface p-2 shadow-md"
         >
-          <label htmlFor="district-search-input" className="sr-only">
+          <label htmlFor={searchInputId} className="sr-only">
             {t('search.districtSearchLabel')}
           </label>
           <input
-            id="district-search-input"
+            id={searchInputId}
             type="text"
             autoFocus
             value={query}

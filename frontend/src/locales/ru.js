@@ -6,6 +6,7 @@ export default {
   'header.login': 'Войти',
   'header.register': 'Регистрация',
   'header.languageLabel': 'Выбрать язык',
+  'header.menuLabel': 'Меню',
 
   'footer.tagline': 'Удобный способ найти жильё в аренду в Ташкенте.',
   'footer.linkSearch': 'Поиск',

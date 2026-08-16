@@ -6,6 +6,7 @@ export default {
   'header.login': 'Log in',
   'header.register': 'Sign up',
   'header.languageLabel': 'Select language',
+  'header.menuLabel': 'Menu',
 
   'footer.tagline': 'An easy way to find a rental home in Tashkent.',
   'footer.linkSearch': 'Search',

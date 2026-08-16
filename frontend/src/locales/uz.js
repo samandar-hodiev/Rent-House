@@ -6,6 +6,7 @@ export default {
   'header.login': 'Kirish',
   'header.register': "Ro'yxatdan o'tish",
   'header.languageLabel': 'Tilni tanlash',
+  'header.menuLabel': 'Menyu',
 
   'footer.tagline': 'Toshkentda uy-joy ijarasini qidirishning qulay usuli.',
   'footer.linkSearch': 'Qidiruv',

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useSearch } from '../context/SearchContext'
 import { useLocale } from '../context/LocaleContext'
 import DistrictSelector from './DistrictSelector'
@@ -7,6 +7,7 @@ function SearchBar() {
   const { t } = useLocale()
   const { districtId, setDistrictId, keyword, submitKeyword } = useSearch()
   const [keywordInput, setKeywordInput] = useState(keyword)
+  const keywordInputId = useId()
 
   useEffect(() => {
     setKeywordInput(keyword)
@@ -21,15 +22,15 @@ function SearchBar() {
     <form
       role="search"
       onSubmit={handleSubmit}
-      className="flex min-w-0 flex-1 items-center overflow-hidden rounded-md border border-border bg-surface focus-within:ring-2 focus-within:ring-primary/40 lg:overflow-visible"
+      className="flex min-w-0 flex-1 items-center rounded-md border border-border bg-surface focus-within:ring-2 focus-within:ring-primary/40"
     >
       <DistrictSelector districtId={districtId} onChange={setDistrictId} />
 
-      <label htmlFor="header-keyword-search" className="sr-only">
+      <label htmlFor={keywordInputId} className="sr-only">
         {t('search.keywordLabel')}
       </label>
       <input
-        id="header-keyword-search"
+        id={keywordInputId}
         type="search"
         value={keywordInput}
         onChange={(event) => setKeywordInput(event.target.value)}
