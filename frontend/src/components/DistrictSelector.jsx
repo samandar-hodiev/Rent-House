@@ -63,7 +63,7 @@ function DistrictSelector({ districtId, onChange }) {
         onClick={() => setIsOpen((open) => !open)}
         aria-haspopup="true"
         aria-expanded={isOpen}
-        className="flex h-full items-center gap-1.5 px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:px-4 lg:py-2.5"
+        className="flex h-full items-center gap-1.5 rounded-l-md px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:px-4 lg:py-2.5"
       >
         <span className="max-w-[9rem] truncate">
           {selectedDistrict ? selectedDistrict.name : t('search.districtAll')}

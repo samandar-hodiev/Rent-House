@@ -21,7 +21,7 @@ function SearchBar() {
     <form
       role="search"
       onSubmit={handleSubmit}
-      className="flex min-w-0 flex-1 items-center overflow-hidden rounded-md border border-border bg-surface focus-within:ring-2 focus-within:ring-primary/40"
+      className="flex min-w-0 flex-1 items-center overflow-hidden rounded-md border border-border bg-surface focus-within:ring-2 focus-within:ring-primary/40 lg:overflow-visible"
     >
       <DistrictSelector districtId={districtId} onChange={setDistrictId} />
 
@@ -39,7 +39,7 @@ function SearchBar() {
 
       <button
         type="submit"
-        className="shrink-0 bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:px-5 lg:py-2.5"
+        className="shrink-0 rounded-r-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:px-5 lg:py-2.5"
       >
         {t('search.button')}
       </button>
