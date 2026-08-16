@@ -77,7 +77,7 @@ function ApartmentCard({ apartment }) {
       aria-label={t('apartmentCard.detailsAriaLabel', { title: apartment.title })}
       className="group flex cursor-pointer flex-col overflow-hidden rounded-lg border border-border bg-surface transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-secondary">
+      <div className="relative aspect-[6/5] w-full overflow-hidden bg-surface-secondary">
         <img
           src={apartment.image}
           alt={apartment.title}
@@ -91,20 +91,22 @@ function ApartmentCard({ apartment }) {
           aria-label={
             isWishlisted ? t('apartmentCard.wishlistRemove') : t('apartmentCard.wishlistAdd')
           }
-          className={`absolute right-3 top-3 flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur-sm hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-            isWishlisted ? 'text-error' : 'text-text-secondary'
+          className={`absolute right-3 top-3 flex size-10 items-center justify-center rounded-full shadow-[0_2px_10px_rgba(15,23,42,0.10)] ring-1 backdrop-blur-md transition-all duration-150 hover:scale-105 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+            isWishlisted
+              ? 'bg-primary-light/80 text-primary ring-primary/30'
+              : 'bg-white/70 text-text-secondary ring-white/60 hover:bg-white/90'
           }`}
         >
           <HeartIcon filled={isWishlisted} />
         </button>
       </div>
 
-      <div className="flex flex-1 flex-col gap-1.5 p-4">
-        <p className="text-lg font-semibold text-text-primary">
+      <div className="flex flex-1 flex-col gap-2 p-5">
+        <p className="text-xl font-semibold text-text-primary">
           {formatUzsAmount(apartment.price)} {t('currency.somPerMonth')}
         </p>
 
-        <h3 className="truncate text-sm font-medium text-text-primary">{apartment.title}</h3>
+        <h3 className="truncate text-base font-medium text-text-primary">{apartment.title}</h3>
 
         <p className="flex items-center gap-1 text-sm text-text-secondary">
           <PinIcon />
@@ -120,7 +122,7 @@ function ApartmentCard({ apartment }) {
           })}
         </p>
 
-        <div className="mt-auto flex items-center justify-between pt-2 text-sm">
+        <div className="mt-auto flex items-center justify-between pt-3 text-sm">
           <span className="text-text-muted">{formatPostedAt(apartment.postedAt, t)}</span>
           <button
             type="button"

@@ -34,12 +34,12 @@ function SearchBar() {
         value={keywordInput}
         onChange={(event) => setKeywordInput(event.target.value)}
         placeholder={t('search.keywordPlaceholder')}
-        className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
+        className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none lg:px-4 lg:py-2.5"
       />
 
       <button
         type="submit"
-        className="shrink-0 bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="shrink-0 bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:px-5 lg:py-2.5"
       >
         {t('search.button')}
       </button>

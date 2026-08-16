@@ -15,7 +15,7 @@ function Header() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-surface">
-      <Container className="flex h-16 items-center gap-6">
+      <Container className="flex h-16 items-center gap-6 lg:h-20 lg:gap-10">
         <Link
           to={ROUTES.home}
           className="shrink-0 text-lg font-semibold tracking-tight text-text-primary"
@@ -25,7 +25,10 @@ function Header() {
 
         <SearchBar />
 
-        <nav aria-label="Asosiy navigatsiya" className="flex shrink-0 items-center gap-5">
+        <nav
+          aria-label="Asosiy navigatsiya"
+          className="flex shrink-0 items-center gap-5 lg:gap-7"
+        >
           <NavLink to={ROUTES.map} className={navLinkClass}>
             {t('header.mapNav')}
           </NavLink>
