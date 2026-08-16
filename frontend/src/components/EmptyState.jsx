@@ -1,6 +1,7 @@
-function EmptyState({ title, description, actionLabel, onAction }) {
+function EmptyState({ icon, title, description, actionLabel, onAction }) {
   return (
     <div className="flex flex-col items-center rounded-md border border-dashed border-border bg-surface px-6 py-16 text-center">
+      {icon ? <div className="mb-4 text-text-muted">{icon}</div> : null}
       <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
       {description ? (
         <p className="mt-1.5 max-w-sm text-sm text-text-secondary">{description}</p>

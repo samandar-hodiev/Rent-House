@@ -35,8 +35,11 @@ export default {
   'sort.expensive': 'Most expensive',
   'sort.areaLarge': 'Largest area',
   'sort.areaSmall': 'Smallest area',
+  'sort.savedNewest': 'Saved: newest first',
+  'sort.savedOldest': 'Saved: oldest first',
 
   'filters.button': 'Filters',
+  'filters.district': 'District',
   'filters.clearAll': 'Clear all',
   'filters.price': 'Price',
   'filters.priceMin': 'Min',
@@ -97,4 +100,9 @@ export default {
   'emptyState.title': 'No apartments found',
   'emptyState.description': 'Try adjusting your filters or choosing another district.',
   'emptyState.action': 'Clear filters',
+
+  'wishlist.resultCount': '{count} saved homes',
+  'wishlist.emptyTitle': 'No saved apartments',
+  'wishlist.emptyDescription': 'Save the apartments you like using the heart button.',
+  'wishlist.emptyAction': 'Search apartments',
 }

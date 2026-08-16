@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MapPin, Map } from 'lucide-react'
 import { useLocale } from '../context/LocaleContext'
+import { useWishlist } from '../context/WishlistContext'
 import { getDistrictById } from '../data/districts'
 import { apartmentDetailsPath } from '../routes/paths'
 import { formatUzsAmount } from '../utils/formatPrice'
@@ -31,7 +31,8 @@ function HeartIcon({ filled }) {
 function ApartmentCard({ apartment }) {
   const { t } = useLocale()
   const navigate = useNavigate()
-  const [isWishlisted, setIsWishlisted] = useState(false)
+  const { isSaved, toggleWishlist } = useWishlist()
+  const isWishlisted = isSaved(apartment.id)
 
   const district = getDistrictById(apartment.districtId)
   const title = t(`apartmentTitle.${apartment.id}`)
@@ -50,7 +51,7 @@ function ApartmentCard({ apartment }) {
 
   const handleWishlistClick = (event) => {
     event.stopPropagation()
-    setIsWishlisted((current) => !current)
+    toggleWishlist(apartment.id)
   }
 
   const handleMapClick = (event) => {

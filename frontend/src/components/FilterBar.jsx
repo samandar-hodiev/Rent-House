@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
-import { useSearch } from '../context/SearchContext'
 import { useLocale } from '../context/LocaleContext'
 import { useDismiss } from '../hooks/useDismiss'
+import { getDistrictById } from '../data/districts'
 import { formatUzsAmount } from '../utils/formatPrice'
 import FilterPanel from './FilterPanel'
 
@@ -41,9 +41,15 @@ function Chip({ label, onRemove }) {
   )
 }
 
-function FilterBar() {
+function FilterBar({
+  filters,
+  setFilters,
+  clearFilters,
+  activeFilterCount,
+  showDistrict = false,
+  showFloor = true,
+}) {
   const { t } = useLocale()
-  const { filters, setFilters, clearFilters, activeFilterCount } = useSearch()
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef(null)
 
@@ -51,6 +57,15 @@ function FilterBar() {
   useDismiss(containerRef, isOpen, close)
 
   const chips = []
+
+  if (showDistrict && filters.districtId) {
+    const district = getDistrictById(filters.districtId)
+    chips.push({
+      key: 'district',
+      label: `${t('filters.district')}: ${district ? district.name : ''}`,
+      onRemove: () => setFilters({ districtId: null }),
+    })
+  }
 
   if (filters.minPrice !== null || filters.maxPrice !== null) {
     let value
@@ -99,7 +114,7 @@ function FilterBar() {
     })
   }
 
-  if (filters.floorRange !== null) {
+  if (showFloor && filters.floorRange !== null) {
     const labelKey =
       filters.floorRange === 'low'
         ? 'filters.floorLow'
@@ -149,6 +164,8 @@ function FilterBar() {
               onChange={setFilters}
               onReset={clearFilters}
               onApply={close}
+              showDistrict={showDistrict}
+              showFloor={showFloor}
             />
           </div>
         ) : null}

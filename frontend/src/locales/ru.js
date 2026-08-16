@@ -35,8 +35,11 @@ export default {
   'sort.expensive': 'Сначала дороже',
   'sort.areaLarge': 'Площадь: больше',
   'sort.areaSmall': 'Площадь: меньше',
+  'sort.savedNewest': 'Дата сохранения: сначала новые',
+  'sort.savedOldest': 'Дата сохранения: сначала старые',
 
   'filters.button': 'Фильтры',
+  'filters.district': 'Район',
   'filters.clearAll': 'Сбросить все',
   'filters.price': 'Цена',
   'filters.priceMin': 'От',
@@ -98,4 +101,10 @@ export default {
   'emptyState.description':
     'Попробуйте изменить фильтры или выбрать другой район.',
   'emptyState.action': 'Сбросить фильтры',
+
+  'wishlist.resultCount': 'Сохранено {count} квартир',
+  'wishlist.emptyTitle': 'Сохранённых квартир нет',
+  'wishlist.emptyDescription':
+    'Сохраняйте понравившиеся квартиры с помощью значка сердечка.',
+  'wishlist.emptyAction': 'Искать квартиры',
 }

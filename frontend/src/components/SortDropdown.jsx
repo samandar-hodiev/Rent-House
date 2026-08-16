@@ -1,9 +1,8 @@
 import { useRef, useState } from 'react'
-import { useSearch } from '../context/SearchContext'
 import { useLocale } from '../context/LocaleContext'
 import { useDismiss } from '../hooks/useDismiss'
 
-const SORT_OPTIONS = [
+export const DEFAULT_SORT_OPTIONS = [
   { value: 'newest', labelKey: 'sort.newest' },
   { value: 'cheapest', labelKey: 'sort.cheapest' },
   { value: 'expensive', labelKey: 'sort.expensive' },
@@ -23,19 +22,18 @@ function ChevronIcon() {
   )
 }
 
-function SortDropdown() {
+function SortDropdown({ sort, onChange, options = DEFAULT_SORT_OPTIONS }) {
   const { t } = useLocale()
-  const { sort, setSort } = useSearch()
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef(null)
 
   const close = () => setIsOpen(false)
   useDismiss(containerRef, isOpen, close)
 
-  const current = SORT_OPTIONS.find((option) => option.value === sort) ?? SORT_OPTIONS[0]
+  const current = options.find((option) => option.value === sort) ?? options[0]
 
   const handleSelect = (value) => {
-    setSort(value)
+    onChange(value)
     close()
   }
 
@@ -57,9 +55,9 @@ function SortDropdown() {
         <ul
           role="menu"
           aria-label={t('sort.ariaLabel')}
-          className="absolute right-0 top-full z-40 mt-2 w-48 rounded-md border border-border bg-surface p-1 shadow-md"
+          className="absolute right-0 top-full z-40 mt-2 w-52 rounded-md border border-border bg-surface p-1 shadow-md"
         >
-          {SORT_OPTIONS.map((option) => (
+          {options.map((option) => (
             <li key={option.value} role="none">
               <button
                 type="button"

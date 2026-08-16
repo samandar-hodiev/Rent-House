@@ -1,4 +1,5 @@
 import { useLocale } from '../context/LocaleContext'
+import { DISTRICTS } from '../data/districts'
 
 const ROOM_OPTIONS = [1, 2, 3, 4]
 const FLOOR_OPTIONS = [
@@ -15,7 +16,7 @@ function optionButtonClass(isActive) {
   }`
 }
 
-function FilterPanel({ filters, onChange, onReset, onApply }) {
+function FilterPanel({ filters, onChange, onReset, onApply, showDistrict = false, showFloor = true }) {
   const { t } = useLocale()
 
   const numberInputClass =
@@ -25,6 +26,29 @@ function FilterPanel({ filters, onChange, onReset, onApply }) {
 
   return (
     <div className="w-80 rounded-md border border-border bg-surface p-4 shadow-md">
+      {showDistrict ? (
+        <fieldset className="mb-4">
+          <legend className="mb-2 text-sm font-medium text-text-primary">
+            {t('filters.district')}
+          </legend>
+          <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">
+            {DISTRICTS.map((district) => (
+              <button
+                key={district.id}
+                type="button"
+                onClick={() =>
+                  onChange({ districtId: filters.districtId === district.id ? null : district.id })
+                }
+                aria-pressed={filters.districtId === district.id}
+                className={optionButtonClass(filters.districtId === district.id)}
+              >
+                {district.name}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+
       <fieldset className="mb-4">
         <legend className="mb-2 text-sm font-medium text-text-primary">
           {t('filters.price')}
@@ -114,26 +138,30 @@ function FilterPanel({ filters, onChange, onReset, onApply }) {
         </div>
       </fieldset>
 
-      <fieldset className="mb-4">
-        <legend className="mb-2 text-sm font-medium text-text-primary">
-          {t('filters.floor')}
-        </legend>
-        <div className="flex flex-wrap gap-2">
-          {FLOOR_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() =>
-                onChange({ floorRange: filters.floorRange === option.value ? null : option.value })
-              }
-              aria-pressed={filters.floorRange === option.value}
-              className={optionButtonClass(filters.floorRange === option.value)}
-            >
-              {t(option.labelKey)}
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      {showFloor ? (
+        <fieldset className="mb-4">
+          <legend className="mb-2 text-sm font-medium text-text-primary">
+            {t('filters.floor')}
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {FLOOR_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() =>
+                  onChange({
+                    floorRange: filters.floorRange === option.value ? null : option.value,
+                  })
+                }
+                aria-pressed={filters.floorRange === option.value}
+                className={optionButtonClass(filters.floorRange === option.value)}
+              >
+                {t(option.labelKey)}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
 
       <fieldset className="mb-5">
         <legend className="mb-2 text-sm font-medium text-text-primary">

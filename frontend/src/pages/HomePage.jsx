@@ -11,7 +11,17 @@ import { sortApartments } from '../utils/sortApartments'
 
 function HomePage() {
   const { t } = useLocale()
-  const { districtId, keyword, filters, activeFilterCount, sort, resetSearch } = useSearch()
+  const {
+    districtId,
+    keyword,
+    filters,
+    setFilters,
+    clearFilters,
+    activeFilterCount,
+    sort,
+    setSort,
+    resetSearch,
+  } = useSearch()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -47,11 +57,16 @@ function HomePage() {
           <p className="text-sm text-text-muted">{countText}</p>
         </div>
 
-        <SortDropdown />
+        <SortDropdown sort={sort} onChange={setSort} />
       </div>
 
       <div className="mb-6">
-        <FilterBar />
+        <FilterBar
+          filters={filters}
+          setFilters={setFilters}
+          clearFilters={clearFilters}
+          activeFilterCount={activeFilterCount}
+        />
       </div>
 
       <ApartmentGrid apartments={apartments} loading={loading} onClearFilters={resetSearch} />

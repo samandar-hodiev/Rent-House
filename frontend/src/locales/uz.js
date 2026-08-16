@@ -35,8 +35,11 @@ export default {
   'sort.expensive': 'Eng qimmat',
   'sort.areaLarge': 'Maydoni katta',
   'sort.areaSmall': 'Maydoni kichik',
+  'sort.savedNewest': 'Saqlangan vaqti: eng yangi',
+  'sort.savedOldest': 'Saqlangan vaqti: eng eski',
 
   'filters.button': 'Filtrlar',
+  'filters.district': 'Tuman',
   'filters.clearAll': 'Barchasini tozalash',
   'filters.price': 'Narx',
   'filters.priceMin': 'Minimal',
@@ -98,4 +101,10 @@ export default {
   'emptyState.description':
     "Filtrlarni o'zgartirib ko'ring yoki boshqa tuman tanlang.",
   'emptyState.action': 'Filtrlarni tozalash',
+
+  'wishlist.resultCount': '{count} ta uy saqlangan',
+  'wishlist.emptyTitle': "Saqlangan uylar yo'q",
+  'wishlist.emptyDescription':
+    "Sizga yoqqan uylarni yurak tugmasi orqali saqlab qo'ying.",
+  'wishlist.emptyAction': 'Uylarni qidirish',
 }

@@ -10,6 +10,10 @@ export function sortApartments(apartments, sort) {
       return sorted.sort((a, b) => b.area - a.area)
     case 'areaSmall':
       return sorted.sort((a, b) => a.area - b.area)
+    case 'savedNewest':
+      return sorted.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt))
+    case 'savedOldest':
+      return sorted.sort((a, b) => new Date(a.savedAt) - new Date(b.savedAt))
     case 'newest':
     default:
       return sorted.sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt))
