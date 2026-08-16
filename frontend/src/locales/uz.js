@@ -1,7 +1,7 @@
 export default {
   'brand.name': 'RentHouse',
 
-  'header.mapNav': 'Xarita',
+  'header.mapNav': 'Xaritada qidirish',
   'header.wishlistNav': 'Saqlangan uylar',
   'header.login': 'Kirish',
   'header.register': "Ro'yxatdan o'tish",

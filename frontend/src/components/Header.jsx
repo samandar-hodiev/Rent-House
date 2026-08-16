@@ -29,12 +29,13 @@ function Header() {
           aria-label="Asosiy navigatsiya"
           className="flex shrink-0 items-center gap-5 lg:gap-7"
         >
-          <NavLink to={ROUTES.map} className={navLinkClass}>
-            {t('header.mapNav')}
-          </NavLink>
           <NavLink to={ROUTES.wishlist} className={navLinkClass}>
             {t('header.wishlistNav')}
           </NavLink>
+          <NavLink to={ROUTES.map} className={navLinkClass}>
+            {t('header.mapNav')}
+          </NavLink>
+          <LanguageSelector />
           <NavLink to={ROUTES.login} className={navLinkClass}>
             {t('header.login')}
           </NavLink>
@@ -44,7 +45,6 @@ function Header() {
           >
             {t('header.register')}
           </Link>
-          <LanguageSelector />
         </nav>
       </Container>
     </header>

@@ -1,7 +1,7 @@
 export default {
   'brand.name': 'RentHouse',
 
-  'header.mapNav': 'Карта',
+  'header.mapNav': 'Поиск на карте',
   'header.wishlistNav': 'Избранное',
   'header.login': 'Войти',
   'header.register': 'Регистрация',

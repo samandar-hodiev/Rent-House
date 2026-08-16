@@ -1,7 +1,7 @@
 export default {
   'brand.name': 'RentHouse',
 
-  'header.mapNav': 'Map',
+  'header.mapNav': 'Search on map',
   'header.wishlistNav': 'Wishlist',
   'header.login': 'Log in',
   'header.register': 'Sign up',
