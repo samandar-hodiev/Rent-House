@@ -1,0 +1,27 @@
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Go / backend
+backend/bin/
+backend/tmp/
+*.exe
+*.test
+*.out
+
+# Env
+.env
+.env.local
+*.env
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
