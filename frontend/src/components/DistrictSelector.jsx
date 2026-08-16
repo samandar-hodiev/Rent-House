@@ -57,16 +57,16 @@ function DistrictSelector({ districtId, onChange }) {
   return (
     <div
       ref={containerRef}
-      className="relative flex h-full shrink-0 items-center border-r border-border"
+      className="relative flex h-full min-w-0 items-center border-r border-border"
     >
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
         aria-haspopup="true"
         aria-expanded={isOpen}
-        className="flex h-full items-center gap-1.5 rounded-l-md px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:px-4 lg:py-2.5"
+        className="flex h-full min-w-0 items-center gap-1.5 rounded-l-md px-3 py-2 text-sm text-text-secondary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:px-4 lg:py-2.5"
       >
-        <span className="max-w-[9rem] truncate">
+        <span className="max-w-[4.5rem] truncate min-[412px]:max-w-[7rem] sm:max-w-[9rem]">
           {selectedDistrict ? selectedDistrict.name : t('search.districtAll')}
         </span>
         {!selectedDistrict ? <ChevronIcon /> : null}
