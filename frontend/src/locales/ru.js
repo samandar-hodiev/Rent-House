@@ -109,4 +109,59 @@ export default {
   'wishlist.filteredEmptyTitle': 'Подходящие квартиры не найдены',
   'wishlist.filteredEmptyDescription':
     'Среди сохранённых квартир нет подходящих по выбранным фильтрам.',
+
+  'breadcrumb.home': 'Главная',
+
+  'apartmentDetails.notFoundTitle': 'Объявление не найдено',
+  'apartmentDetails.notFoundDescription':
+    'Возможно, объявление удалено или не существует.',
+  'apartmentDetails.notFoundAction': 'Вернуться на главную',
+  'apartmentDetails.gallery.prev': 'Предыдущее фото',
+  'apartmentDetails.gallery.next': 'Следующее фото',
+  'apartmentDetails.gallery.thumbnailLabel': '{title}, фото {index}',
+  'apartmentDetails.share': 'Поделиться',
+  'apartmentDetails.shareCopied': 'Ссылка скопирована',
+  'apartmentDetails.totalFloors': 'Этажность',
+  'apartmentDetails.description': 'Описание',
+  'apartmentDetails.amenities': 'Удобства',
+  'apartmentDetails.owner': 'Владелец',
+  'apartmentDetails.call': 'Позвонить',
+  'apartmentDetails.message': 'Написать сообщение',
+
+  'chat.headerWithName': 'Сообщение для {name}',
+  'chat.placeholder': 'Напишите сообщение...',
+  'chat.send': 'Отправить',
+  'chat.empty': 'Пока сообщений нет. Напишите первыми!',
+  'chat.close': 'Закрыть',
+
+  'amenity.wifi': 'Wi-Fi',
+  'amenity.parking': 'Парковка',
+  'amenity.elevator': 'Лифт',
+  'amenity.balcony': 'Балкон',
+  'amenity.ac': 'Кондиционер',
+  'amenity.furnished': 'С мебелью',
+  'amenity.kitchen': 'Кухонная техника',
+  'amenity.heating': 'Отопление',
+  'amenity.security': 'Охрана',
+
+  'apartmentDescription.1':
+    'Светлая и уютная квартира со всей необходимой мебелью и техникой. Рядом метро и магазины, удобно для семей.',
+  'apartmentDescription.2':
+    'Просторная семейная квартира в центре Чиланзара. Рядом станция метро, детские сады и школы.',
+  'apartmentDescription.3':
+    'Недавно отремонтированная квартира с новой сантехникой и техникой. Идеально для одного человека или пары.',
+  'apartmentDescription.4':
+    'Современная квартира в пешей доступности от Magic City. Панорамные окна и качественный ремонт.',
+  'apartmentDescription.5':
+    'Отдельный дом с двориком в тихом зелёном районе. Без шума, подходит для семейного отдыха.',
+  'apartmentDescription.6':
+    'Удобная квартира рядом с центром города, в пешей доступности от метро. Рядом офисы и университеты.',
+  'apartmentDescription.7':
+    'Большая 4-комнатная квартира с широким балконом. Подходит для больших семей, все комнаты светлые и раздельные.',
+  'apartmentDescription.8':
+    'Компактная и экономичная студия для одного человека. Есть вся необходимая мебель.',
+  'apartmentDescription.9':
+    'Просторная светлая квартира в новом жилом комплексе. Рядом станция метро Юнусабад.',
+  'apartmentDescription.10':
+    'Чистая квартира в новостройке, сдаётся впервые. Новая инфраструктура и просторная территория.',
 }

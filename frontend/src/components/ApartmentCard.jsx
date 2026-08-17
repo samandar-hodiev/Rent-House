@@ -37,34 +37,23 @@ function ApartmentCard({ apartment }) {
   const district = getDistrictById(apartment.districtId)
   const title = t(`apartmentTitle.${apartment.id}`)
 
-  const handleCardClick = () => {
-    navigate(apartmentDetailsPath(apartment.id))
-  }
-
-  const handleKeyDown = (event) => {
-    if (event.target !== event.currentTarget) return
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      handleCardClick()
-    }
-  }
-
   const handleWishlistClick = (event) => {
     event.stopPropagation()
+    event.preventDefault()
     toggleWishlist(apartment.id)
   }
 
   const handleMapClick = (event) => {
     event.stopPropagation()
+    event.preventDefault()
     navigate(`/map?apartment=${apartment.id}`)
   }
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={handleCardClick}
-      onKeyDown={handleKeyDown}
+    <a
+      href={apartmentDetailsPath(apartment.id)}
+      target="_blank"
+      rel="noopener noreferrer"
       aria-label={t('apartmentCard.detailsAriaLabel', { title })}
       className="group flex cursor-pointer flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
@@ -120,7 +109,7 @@ function ApartmentCard({ apartment }) {
           </button>
         </div>
       </div>
-    </div>
+    </a>
   )
 }
 

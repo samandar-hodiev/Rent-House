@@ -108,4 +108,59 @@ export default {
   'wishlist.filteredEmptyTitle': 'No matching apartments',
   'wishlist.filteredEmptyDescription':
     'None of your saved apartments match the selected filters.',
+
+  'breadcrumb.home': 'Home',
+
+  'apartmentDetails.notFoundTitle': 'Listing not found',
+  'apartmentDetails.notFoundDescription':
+    'This listing may have been removed or does not exist.',
+  'apartmentDetails.notFoundAction': 'Back to home',
+  'apartmentDetails.gallery.prev': 'Previous image',
+  'apartmentDetails.gallery.next': 'Next image',
+  'apartmentDetails.gallery.thumbnailLabel': '{title}, photo {index}',
+  'apartmentDetails.share': 'Share',
+  'apartmentDetails.shareCopied': 'Link copied',
+  'apartmentDetails.totalFloors': 'Total floors',
+  'apartmentDetails.description': 'Description',
+  'apartmentDetails.amenities': 'Amenities',
+  'apartmentDetails.owner': 'Owner',
+  'apartmentDetails.call': 'Call',
+  'apartmentDetails.message': 'Message',
+
+  'chat.headerWithName': 'Message to {name}',
+  'chat.placeholder': 'Type a message...',
+  'chat.send': 'Send',
+  'chat.empty': 'No messages yet. Say hello!',
+  'chat.close': 'Close',
+
+  'amenity.wifi': 'Wi-Fi',
+  'amenity.parking': 'Parking',
+  'amenity.elevator': 'Elevator',
+  'amenity.balcony': 'Balcony',
+  'amenity.ac': 'Air conditioning',
+  'amenity.furnished': 'Furnished',
+  'amenity.kitchen': 'Kitchen appliances',
+  'amenity.heating': 'Heating',
+  'amenity.security': 'Security',
+
+  'apartmentDescription.1':
+    'Bright and cozy apartment fully equipped with furniture and appliances. Close to the metro and shops, convenient for families.',
+  'apartmentDescription.2':
+    'Spacious family apartment in the center of Chilonzor. Near the metro station, kindergartens and schools.',
+  'apartmentDescription.3':
+    'Recently renovated apartment with new plumbing and appliances. Ideal for a single person or a couple.',
+  'apartmentDescription.4':
+    'Modern apartment within walking distance of Magic City. Panoramic windows and quality renovation.',
+  'apartmentDescription.5':
+    'Detached house with a yard in a quiet, green area. No noise, great for family relaxation.',
+  'apartmentDescription.6':
+    'Convenient apartment near the city center, within walking distance of the metro. Close to offices and universities.',
+  'apartmentDescription.7':
+    'Large 4-room apartment with a wide balcony. Suitable for big families, all rooms are bright and separate.',
+  'apartmentDescription.8':
+    'Compact and budget-friendly studio-style room for one person. All essential furniture included.',
+  'apartmentDescription.9':
+    'Spacious, bright apartment in a new residential complex. Near Yunusobod metro station.',
+  'apartmentDescription.10':
+    'Clean apartment in a newly built house, rented out for the first time. New infrastructure and spacious grounds.',
 }

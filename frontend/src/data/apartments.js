@@ -5,7 +5,25 @@ const hoursAgo = (n) => new Date(Date.now() - n * HOUR_MS).toISOString()
 const daysAgo = (n) => new Date(Date.now() - n * DAY_MS).toISOString()
 
 const IMAGE = (id) =>
-  `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=800&q=60`
+  `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=1200&q=60`
+
+const GALLERY_PHOTOS = [
+  '1560448204-e02f11c3d0e2',
+  '1522708323590-d24dbb6b0267',
+  '1502672260266-1c1ef2d93688',
+  '1484154218962-a197022b5858',
+  '1493809842364-78817add7ffb',
+  '1502005229762-cf1b2da7c5d6',
+  '1512918728675-ed5a9ecdebfd',
+  '1560185127-6ed189bf02f4',
+  '1494203484021-3c454daf695d',
+  '1484101403633-562f891dc89a',
+  '1560449752-2ee611e0a3fc',
+  '1571508601891-ca5e7a713859',
+]
+
+const gallery = (startIndex) =>
+  Array.from({ length: 5 }, (_, i) => IMAGE(GALLERY_PHOTOS[(startIndex + i) % GALLERY_PHOTOS.length]))
 
 export const APARTMENTS = [
   {
@@ -20,6 +38,9 @@ export const APARTMENTS = [
     totalFloors: 9,
     furnished: true,
     image: IMAGE('1560448204-e02f11c3d0e2'),
+    images: gallery(0),
+    amenities: ['wifi', 'furnished', 'balcony', 'kitchen', 'heating'],
+    owner: { name: 'Aziz Karimov', phone: '+998901234567' },
     postedAt: hoursAgo(2),
     latitude: 41.2131,
     longitude: 69.2401,
@@ -37,6 +58,9 @@ export const APARTMENTS = [
     totalFloors: 12,
     furnished: false,
     image: IMAGE('1522708323590-d24dbb6b0267'),
+    images: gallery(1),
+    amenities: ['wifi', 'parking', 'elevator', 'security'],
+    owner: { name: 'Dilnoza Yusupova', phone: '+998901112233' },
     postedAt: hoursAgo(8),
     latitude: 41.2789,
     longitude: 69.2043,
@@ -55,6 +79,9 @@ export const APARTMENTS = [
     totalFloors: 5,
     furnished: true,
     image: IMAGE('1502672260266-1c1ef2d93688'),
+    images: gallery(2),
+    amenities: ['wifi', 'furnished', 'ac', 'kitchen'],
+    owner: { name: 'Jasur Toshmatov', phone: '+998933334455' },
     postedAt: daysAgo(1),
     latitude: 41.3599,
     longitude: 69.2887,
@@ -73,6 +100,9 @@ export const APARTMENTS = [
     totalFloors: 16,
     furnished: true,
     image: IMAGE('1484154218962-a197022b5858'),
+    images: gallery(3),
+    amenities: ['wifi', 'parking', 'elevator', 'ac', 'security', 'furnished'],
+    owner: { name: 'Madina Alieva', phone: '+998971234567' },
     postedAt: daysAgo(5),
     latitude: 41.3007,
     longitude: 69.2899,
@@ -91,6 +121,9 @@ export const APARTMENTS = [
     totalFloors: 2,
     furnished: false,
     image: IMAGE('1493809842364-78817add7ffb'),
+    images: gallery(4),
+    amenities: ['parking', 'balcony', 'heating'],
+    owner: { name: 'Otabek Rashidov', phone: '+998909876543' },
     postedAt: hoursAgo(3),
     latitude: 41.2925,
     longitude: 69.2607,
@@ -108,6 +141,9 @@ export const APARTMENTS = [
     totalFloors: 9,
     furnished: true,
     image: IMAGE('1502005229762-cf1b2da7c5d6'),
+    images: gallery(5),
+    amenities: ['wifi', 'furnished', 'elevator', 'kitchen'],
+    owner: { name: 'Kamola Nazarova', phone: '+998915554433' },
     postedAt: hoursAgo(9),
     latitude: 41.3287,
     longitude: 69.2401,
@@ -126,6 +162,9 @@ export const APARTMENTS = [
     totalFloors: 9,
     furnished: true,
     image: IMAGE('1512918728675-ed5a9ecdebfd'),
+    images: gallery(6),
+    amenities: ['wifi', 'parking', 'balcony', 'ac', 'furnished', 'security'],
+    owner: { name: 'Sardor Ergashev', phone: '+998931239876' },
     postedAt: daysAgo(2),
     latitude: 41.2803,
     longitude: 69.2077,
@@ -143,6 +182,9 @@ export const APARTMENTS = [
     totalFloors: 5,
     furnished: true,
     image: IMAGE('1560185127-6ed189bf02f4'),
+    images: gallery(7),
+    amenities: ['wifi', 'furnished', 'kitchen'],
+    owner: { name: 'Nodira Xolova', phone: '+998977778899' },
     postedAt: hoursAgo(1),
     latitude: 41.361,
     longitude: 69.228,
@@ -161,6 +203,9 @@ export const APARTMENTS = [
     totalFloors: 14,
     furnished: false,
     image: IMAGE('1494203484021-3c454daf695d'),
+    images: gallery(8),
+    amenities: ['parking', 'elevator', 'security', 'heating'],
+    owner: { name: 'Bekzod Yoldoshev', phone: '+998944445566' },
     postedAt: hoursAgo(12),
     latitude: 41.3621,
     longitude: 69.2905,
@@ -179,6 +224,9 @@ export const APARTMENTS = [
     totalFloors: 9,
     furnished: false,
     image: IMAGE('1484101403633-562f891dc89a'),
+    images: gallery(9),
+    amenities: ['parking', 'balcony', 'heating', 'security'],
+    owner: { name: 'Shahnoza Ibragimova', phone: '+998998887766' },
     postedAt: daysAgo(6),
     latitude: 41.2098,
     longitude: 69.2355,

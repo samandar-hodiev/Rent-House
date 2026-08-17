@@ -109,4 +109,59 @@ export default {
   'wishlist.filteredEmptyTitle': 'Mos uylar topilmadi',
   'wishlist.filteredEmptyDescription':
     'Tanlangan filterlarga mos saqlangan uylar mavjud emas.',
+
+  'breadcrumb.home': 'Bosh sahifa',
+
+  'apartmentDetails.notFoundTitle': "E'lon topilmadi",
+  'apartmentDetails.notFoundDescription':
+    "Siz qidirayotgan e'lon mavjud emas yoki o'chirilgan.",
+  'apartmentDetails.notFoundAction': 'Bosh sahifaga qaytish',
+  'apartmentDetails.gallery.prev': 'Oldingi rasm',
+  'apartmentDetails.gallery.next': 'Keyingi rasm',
+  'apartmentDetails.gallery.thumbnailLabel': '{title}, {index}-rasm',
+  'apartmentDetails.share': 'Ulashish',
+  'apartmentDetails.shareCopied': 'Havola nusxalandi',
+  'apartmentDetails.totalFloors': 'Qavatlar soni',
+  'apartmentDetails.description': 'Tavsif',
+  'apartmentDetails.amenities': 'Qulayliklar',
+  'apartmentDetails.owner': 'Uy egasi',
+  'apartmentDetails.call': "Qo'ng'iroq qilish",
+  'apartmentDetails.message': 'Xabar yozish',
+
+  'chat.headerWithName': '{name}ga xabar',
+  'chat.placeholder': 'Xabar yozing...',
+  'chat.send': 'Yuborish',
+  'chat.empty': "Hozircha xabar yo'q. Birinchi bo'lib yozing!",
+  'chat.close': 'Yopish',
+
+  'amenity.wifi': 'Wi-Fi',
+  'amenity.parking': "Avtoturargoh",
+  'amenity.elevator': 'Lift',
+  'amenity.balcony': 'Balkon',
+  'amenity.ac': 'Konditsioner',
+  'amenity.furnished': 'Mebel bilan',
+  'amenity.kitchen': "Oshxona jihozlari",
+  'amenity.heating': 'Isitish tizimi',
+  'amenity.security': "Qo'riqlash",
+
+  'apartmentDescription.1':
+    "Yorug' va shinam kvartira, barcha kerakli mebel va texnika bilan jihozlangan. Metro va do'konlarga yaqin, oilalar uchun qulay.",
+  'apartmentDescription.2':
+    "Chilonzor markazida joylashgan keng oilaviy kvartira. Metro bekatiga yaqin, bolalar bog'chasi va maktablar atrofida.",
+  'apartmentDescription.3':
+    "Yaqinda ta'mirlangan, yangi santexnika va elektr jihozlari o'rnatilgan shinam kvartira. Yolg'iz yoki juftliklar uchun ideal.",
+  'apartmentDescription.4':
+    "Magic City savdo-ko'ngilochar majmuasiga piyoda masofada joylashgan zamonaviy kvartira. Panoramali derazalar va sifatli ta'mir.",
+  'apartmentDescription.5':
+    'Tinch va yashil hududda joylashgan, hovlisi bor mustaqil uy. Shovqin-suronsiz, oilaviy dam olish uchun qulay.',
+  'apartmentDescription.6':
+    'Shahar markaziga yaqin, metro bekatidan piyoda erishish mumkin bo‘lgan qulay kvartira. Ofis va universitetlarga yaqin.',
+  'apartmentDescription.7':
+    'Keng balkonli, 4 xonali katta kvartira. Katta oilalar uchun mos, barcha xonalar alohida va yorug‘.',
+  'apartmentDescription.8':
+    "Kichik va tejamkor, yolg'iz yashovchilar uchun mos studiya turidagi xona. Barcha zarur mebel mavjud.",
+  'apartmentDescription.9':
+    'Yangi qurilgan turar-joy majmuasida joylashgan keng va yorug‘ kvartira. Metro Yunusobod bekatiga yaqin.',
+  'apartmentDescription.10':
+    "Yangi qurilgan uyda joylashgan, birinchi marta ijaraga beriladigan toza kvartira. Yangi infratuzilma va keng hudud.",
 }
