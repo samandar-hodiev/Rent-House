@@ -226,7 +226,7 @@ approach for MVP, swappable for cloud storage later.
 11. Frontend + backend integration
 12. Map/location
 13. Admin moderation
-14. Testing
+14. Testing.
 15. Docker and deployment
 
 Don't skip architectural dependencies between phases. If reordering is
