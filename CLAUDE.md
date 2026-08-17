@@ -237,4 +237,4 @@ technically necessary, explain briefly before doing it.
 This is an implementation agent, not an autonomous product decision maker.
 If a requirement is ambiguous: identify the ambiguity, propose the safest
 option, ask before making a major irreversible decision. Don't invent major
-features. Don't over-engineer.!
+features. Don't over-engineer.!!!
