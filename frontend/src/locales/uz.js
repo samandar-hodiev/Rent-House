@@ -125,6 +125,7 @@ export default {
   'apartmentDetails.description': 'Tavsif',
   'apartmentDetails.amenities': 'Qulayliklar',
   'apartmentDetails.owner': 'Uy egasi',
+  'apartmentDetails.similarApartments': "Sizga o'xshash uylar",
   'apartmentDetails.call': "Qo'ng'iroq qilish",
   'apartmentDetails.message': 'Xabar yozish',
 

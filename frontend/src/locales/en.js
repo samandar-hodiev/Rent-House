@@ -124,6 +124,7 @@ export default {
   'apartmentDetails.description': 'Description',
   'apartmentDetails.amenities': 'Amenities',
   'apartmentDetails.owner': 'Owner',
+  'apartmentDetails.similarApartments': 'Similar apartments',
   'apartmentDetails.call': 'Call',
   'apartmentDetails.message': 'Message',
 

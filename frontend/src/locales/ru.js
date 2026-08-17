@@ -125,6 +125,7 @@ export default {
   'apartmentDetails.description': 'Описание',
   'apartmentDetails.amenities': 'Удобства',
   'apartmentDetails.owner': 'Владелец',
+  'apartmentDetails.similarApartments': 'Похожие квартиры',
   'apartmentDetails.call': 'Позвонить',
   'apartmentDetails.message': 'Написать сообщение',
 

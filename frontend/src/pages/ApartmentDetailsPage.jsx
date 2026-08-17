@@ -26,6 +26,7 @@ import EmptyState from '../components/EmptyState'
 import ImageGallery from '../components/ImageGallery'
 import ApartmentDetailsSkeleton from '../components/ApartmentDetailsSkeleton'
 import ContactChatModal from '../components/ContactChatModal'
+import ApartmentCard from '../components/ApartmentCard'
 import { useLocale } from '../context/LocaleContext'
 import { useWishlist } from '../context/WishlistContext'
 import { APARTMENTS } from '../data/apartments'
@@ -33,6 +34,7 @@ import { getDistrictById } from '../data/districts'
 import { ROUTES } from '../routes/paths'
 import { formatUzsAmount } from '../utils/formatPrice'
 import { formatPostedAt } from '../utils/formatRelativeTime'
+import { getSimilarApartments } from '../utils/getSimilarApartments'
 
 const AMENITY_ICONS = {
   wifi: Wifi,
@@ -81,6 +83,11 @@ function ApartmentDetailsPage() {
   }, [])
 
   const apartment = useMemo(() => APARTMENTS.find((item) => String(item.id) === id), [id])
+
+  const similarApartments = useMemo(
+    () => (apartment ? getSimilarApartments(apartment, APARTMENTS, 4) : []),
+    [apartment],
+  )
 
   if (loading) {
     return (
@@ -278,6 +285,19 @@ function ApartmentDetailsPage() {
           </button>
         </div>
       </div>
+
+      {similarApartments.length > 0 ? (
+        <div className="mt-10 border-t border-border pt-8">
+          <h2 className="mb-5 text-xl font-semibold text-text-primary">
+            {t('apartmentDetails.similarApartments')}
+          </h2>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {similarApartments.map((similarApartment) => (
+              <ApartmentCard key={similarApartment.id} apartment={similarApartment} />
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="fixed inset-x-0 bottom-0 z-30 flex gap-3 border-t border-border bg-surface p-3 lg:hidden">
         <a
