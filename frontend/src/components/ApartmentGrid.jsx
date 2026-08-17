@@ -5,7 +5,15 @@ import EmptyState from './EmptyState'
 
 const SKELETON_COUNT = 8
 
-function ApartmentGrid({ apartments, loading, onClearFilters }) {
+function ApartmentGrid({
+  apartments,
+  loading,
+  onClearFilters,
+  emptyIcon,
+  emptyTitle,
+  emptyDescription,
+  emptyActionLabel,
+}) {
   const { t } = useLocale()
 
   if (loading) {
@@ -22,9 +30,10 @@ function ApartmentGrid({ apartments, loading, onClearFilters }) {
   if (apartments.length === 0) {
     return (
       <EmptyState
-        title={t('emptyState.title')}
-        description={t('emptyState.description')}
-        actionLabel={t('emptyState.action')}
+        icon={emptyIcon}
+        title={emptyTitle ?? t('emptyState.title')}
+        description={emptyDescription ?? t('emptyState.description')}
+        actionLabel={emptyActionLabel ?? t('emptyState.action')}
         onAction={onClearFilters}
       />
     )

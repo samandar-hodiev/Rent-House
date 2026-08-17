@@ -103,8 +103,10 @@ export default {
   'emptyState.action': 'Filtrlarni tozalash',
 
   'wishlist.resultCount': '{count} ta uy saqlangan',
-  'wishlist.emptyTitle': "Saqlangan uylar yo'q",
-  'wishlist.emptyDescription':
-    "Sizga yoqqan uylarni yurak tugmasi orqali saqlab qo'ying.",
+  'wishlist.emptyTitle': "Hali saqlangan uylar yo'q",
+  'wishlist.emptyDescription': "Saqlangan uylar shu yerda ko'rinadi.",
   'wishlist.emptyAction': 'Uylarni qidirish',
+  'wishlist.filteredEmptyTitle': 'Mos uylar topilmadi',
+  'wishlist.filteredEmptyDescription':
+    'Tanlangan filterlarga mos saqlangan uylar mavjud emas.',
 }

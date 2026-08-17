@@ -102,7 +102,10 @@ export default {
   'emptyState.action': 'Clear filters',
 
   'wishlist.resultCount': '{count} saved homes',
-  'wishlist.emptyTitle': 'No saved apartments',
-  'wishlist.emptyDescription': 'Save the apartments you like using the heart button.',
+  'wishlist.emptyTitle': 'No saved apartments yet',
+  'wishlist.emptyDescription': 'Your saved apartments will appear here.',
   'wishlist.emptyAction': 'Search apartments',
+  'wishlist.filteredEmptyTitle': 'No matching apartments',
+  'wishlist.filteredEmptyDescription':
+    'None of your saved apartments match the selected filters.',
 }

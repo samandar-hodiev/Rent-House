@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Heart } from 'lucide-react'
+import { Heart, Home, SearchX } from 'lucide-react'
 import Container from '../components/Container'
 import FilterBar from '../components/FilterBar'
 import SortDropdown, { DEFAULT_SORT_OPTIONS } from '../components/SortDropdown'
 import ApartmentGrid from '../components/ApartmentGrid'
-import EmptyState from '../components/EmptyState'
 import { useWishlist } from '../context/WishlistContext'
 import { useLocale } from '../context/LocaleContext'
 import { APARTMENTS } from '../data/apartments'
@@ -79,13 +78,29 @@ function WishlistPage() {
         <h1 className="mb-6 text-2xl font-semibold text-text-primary">
           {t('header.wishlistNav')}
         </h1>
-        <EmptyState
-          icon={<Heart size={40} aria-hidden="true" />}
-          title={t('wishlist.emptyTitle')}
-          description={t('wishlist.emptyDescription')}
-          actionLabel={t('wishlist.emptyAction')}
-          onAction={() => navigate(ROUTES.home)}
-        />
+        <div className="flex flex-col items-center gap-4 px-4 py-10 text-center">
+          <div className="relative flex size-16 items-center justify-center rounded-full bg-primary-light">
+            <Home aria-hidden="true" size={30} strokeWidth={1.75} className="text-primary" />
+            <span className="absolute -bottom-1 -right-1 flex size-6 items-center justify-center rounded-full bg-surface ring-2 ring-surface">
+              <Heart aria-hidden="true" size={13} className="fill-primary text-primary" />
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <h2 className="text-lg font-semibold text-text-primary">
+              {t('wishlist.emptyTitle')}
+            </h2>
+            <p className="text-sm text-text-secondary">{t('wishlist.emptyDescription')}</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate(ROUTES.home)}
+            className="mt-1 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {t('wishlist.emptyAction')}
+          </button>
+        </div>
       </Container>
     )
   }
@@ -116,7 +131,15 @@ function WishlistPage() {
         />
       </div>
 
-      <ApartmentGrid apartments={apartments} loading={loading} onClearFilters={clearFilters} />
+      <ApartmentGrid
+        apartments={apartments}
+        loading={loading}
+        onClearFilters={clearFilters}
+        emptyIcon={<SearchX aria-hidden="true" size={32} className="text-text-muted" />}
+        emptyTitle={t('wishlist.filteredEmptyTitle')}
+        emptyDescription={t('wishlist.filteredEmptyDescription')}
+        emptyActionLabel={t('emptyState.action')}
+      />
     </Container>
   )
 }

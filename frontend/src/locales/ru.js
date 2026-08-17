@@ -103,8 +103,10 @@ export default {
   'emptyState.action': 'Сбросить фильтры',
 
   'wishlist.resultCount': 'Сохранено {count} квартир',
-  'wishlist.emptyTitle': 'Сохранённых квартир нет',
-  'wishlist.emptyDescription':
-    'Сохраняйте понравившиеся квартиры с помощью значка сердечка.',
+  'wishlist.emptyTitle': 'Пока нет сохранённых квартир',
+  'wishlist.emptyDescription': 'Сохранённые квартиры появятся здесь.',
   'wishlist.emptyAction': 'Искать квартиры',
+  'wishlist.filteredEmptyTitle': 'Подходящие квартиры не найдены',
+  'wishlist.filteredEmptyDescription':
+    'Среди сохранённых квартир нет подходящих по выбранным фильтрам.',
 }
