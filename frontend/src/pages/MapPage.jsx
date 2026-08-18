@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { LocateFixed, Minus, Plus } from 'lucide-react'
+import { Check, Layers, LocateFixed, Minus, Plus } from 'lucide-react'
 import ApartmentMap from '../components/ApartmentMap'
 import MapApartmentPreview from '../components/MapApartmentPreview'
 import FilterBar from '../components/FilterBar'
 import { useSearch } from '../context/SearchContext'
 import { useLocale } from '../context/LocaleContext'
+import { useDismiss } from '../hooks/useDismiss'
 import { APARTMENTS } from '../data/apartments'
+import { DEFAULT_MAP_LAYER_ID, MAP_LAYERS } from '../data/mapLayers'
 import { filterApartments } from '../utils/filterApartments'
 import { getNearbyApartments } from '../utils/geo'
 import { applyMapFiltersToParams, parseMapFiltersFromParams } from '../utils/mapFilterParams'
@@ -28,9 +30,15 @@ function MapPage() {
   const [userLocation, setUserLocation] = useState(null)
   const [locationStatus, setLocationStatus] = useState('idle') // idle | locating | granted | error
   const [locationErrorKey, setLocationErrorKey] = useState(null)
+  const [layerId, setLayerId] = useState(DEFAULT_MAP_LAYER_ID)
+  const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false)
   const isLocatingRef = useRef(false)
   const leafletMapRef = useRef(null)
   const skipNextUrlSync = useRef(false)
+  const layerMenuRef = useRef(null)
+
+  const closeLayerMenu = useCallback(() => setIsLayerMenuOpen(false), [])
+  useDismiss(layerMenuRef, isLayerMenuOpen, closeLayerMenu)
 
   const focusApartmentId = useMemo(() => {
     const raw = searchParams.get('apartment')
@@ -139,6 +147,7 @@ function MapPage() {
         onMarkerClick={handleMarkerClick}
         userLocation={locationStatus === 'granted' ? userLocation : null}
         nearbyApartmentIds={nearbyApartmentIds}
+        layerId={layerId}
         mapRef={leafletMapRef}
       />
 
@@ -158,6 +167,51 @@ function MapPage() {
           </div>
 
           <div className="flex items-center justify-end gap-1">
+            <div ref={layerMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setIsLayerMenuOpen((open) => !open)}
+                aria-haspopup="true"
+                aria-expanded={isLayerMenuOpen}
+                aria-label={t('map.layers')}
+                title={t('map.layers')}
+                className={`flex size-8 shrink-0 items-center justify-center rounded-full hover:bg-white/70 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  isLayerMenuOpen ? 'bg-white/70 text-primary' : 'text-text-secondary'
+                }`}
+              >
+                <Layers aria-hidden="true" size={16} />
+              </button>
+
+              {isLayerMenuOpen ? (
+                <div
+                  role="dialog"
+                  aria-label={t('map.layers')}
+                  className="absolute right-0 top-full z-40 mt-2 w-44 rounded-md border border-border bg-surface p-1.5 shadow-md"
+                >
+                  {MAP_LAYERS.map((layer) => {
+                    const isActive = layer.id === layerId
+                    return (
+                      <button
+                        key={layer.id}
+                        type="button"
+                        onClick={() => {
+                          setLayerId(layer.id)
+                          closeLayerMenu()
+                        }}
+                        aria-pressed={isActive}
+                        className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                          isActive ? 'font-medium text-primary' : 'text-text-primary'
+                        }`}
+                      >
+                        {t(layer.labelKey)}
+                        {isActive ? <Check aria-hidden="true" size={14} /> : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
+            </div>
+
             <button
               type="button"
               onClick={handleLocateRequest}

@@ -3,14 +3,13 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { TASHKENT_CENTER } from '../data/districts'
 import { getDistrictFeature } from '../data/districtBoundaries'
+import { DEFAULT_MAP_LAYER_ID, getMapLayerById } from '../data/mapLayers'
 import { formatUzsShort } from '../utils/formatPrice'
 
 const DEFAULT_ZOOM = 12
 const DISTRICT_ZOOM = 14
 const LOCATION_ZOOM = 15
-const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-const TILE_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+const TILE_SWAP_FALLBACK_MS = 3000
 
 const DISTRICT_BORDER_COLOR = '#059669'
 const DIM_MASK_COLOR = '#0f172a'
@@ -86,10 +85,12 @@ function ApartmentMap({
   onMarkerClick,
   userLocation,
   nearbyApartmentIds,
+  layerId = DEFAULT_MAP_LAYER_ID,
   mapRef: externalMapRef,
 }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
+  const tileLayerRef = useRef(null)
   const markersLayerRef = useRef(null)
   const districtLayerRef = useRef(null)
   const locationLayerRef = useRef(null)
@@ -104,7 +105,6 @@ function ApartmentMap({
       // Leaflet's own top-right control — see MapPage's mapRef usage.
       zoomControl: false,
     })
-    L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION, maxZoom: 19 }).addTo(map)
     markersLayerRef.current = L.layerGroup().addTo(map)
     mapRef.current = map
     if (externalMapRef) externalMapRef.current = map
@@ -112,12 +112,48 @@ function ApartmentMap({
       map.remove()
       mapRef.current = null
       if (externalMapRef) externalMapRef.current = null
+      tileLayerRef.current = null
       markersLayerRef.current = null
       districtLayerRef.current = null
       locationLayerRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Base tile layer, swapped in place when the user picks another map
+  // style. Tiles live in Leaflet's `tilePane`, which sits below the
+  // overlay/marker panes, so markers and the district boundary are
+  // unaffected by a layer change.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const layer = getMapLayerById(layerId)
+    const nextTileLayer = L.tileLayer(layer.url, {
+      attribution: layer.attribution,
+      maxZoom: layer.maxZoom,
+    }).addTo(map)
+    const previousTileLayer = tileLayerRef.current
+    tileLayerRef.current = nextTileLayer
+    if (!previousTileLayer) return undefined
+
+    // Keep the old tiles underneath until the new ones are ready, so the
+    // map never flashes an empty background mid-switch. The timeout is a
+    // fallback: `load` never fires if any tile in the viewport fails, and
+    // leaving both layers stacked would show the wrong style.
+    let done = false
+    const removePrevious = () => {
+      if (done) return
+      done = true
+      previousTileLayer.remove()
+    }
+    nextTileLayer.once('load', removePrevious)
+    const fallbackTimer = setTimeout(removePrevious, TILE_SWAP_FALLBACK_MS)
+
+    return () => {
+      clearTimeout(fallbackTimer)
+      removePrevious()
+    }
+  }, [layerId])
 
   useEffect(() => {
     const map = mapRef.current

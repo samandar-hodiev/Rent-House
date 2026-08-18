@@ -34,9 +34,9 @@ All Map-page state lives in `MapPage`, not in `ApartmentMap` or Context:
 One shared bar directly under the Header (`absolute inset-x-0 top-0 z-10` inside the map's `relative` container):
 
 - **Left:** `FilterBar` (with `glass` prop) + a result-count pill.
-- **Right:** My Location, Zoom In, Zoom Out — plain React buttons, not Leaflet controls, so they can live in the same bar as the filters. They call `leafletMapRef.current.zoomIn()/.zoomOut()` and the existing `handleLocateRequest`.
-- **Desktop/tablet (`sm:` and up):** one row, `flex-row justify-between` — filters on the left, location/zoom on the right.
-- **Mobile:** the *same* bar switches to `flex-col` — filter button/chips on the first row, the location/zoom cluster on a second row inside the same container, right-aligned (`justify-end`). There is no second floating control container on mobile; it's the same glass `<div>`, just stacked.
+- **Right:** Layers, My Location, Zoom In, Zoom Out — plain React buttons, not Leaflet controls, so they can live in the same bar as the filters. They call `leafletMapRef.current.zoomIn()/.zoomOut()` and the existing `handleLocateRequest`.
+- **Desktop/tablet (`sm:` and up):** one row, `flex-row justify-between` — filters on the left, layers/location/zoom on the right.
+- **Mobile:** the *same* bar switches to `flex-col` — filter button/chips on the first row, the layers/location/zoom cluster on a second row inside the same container, right-aligned (`justify-end`). There is no second floating control container on mobile; it's the same glass `<div>`, just stacked.
 
 Style: `bg-white/12` + `backdrop-blur-lg` (16px) + `border-white/25` + a soft shadow — deliberately very translucent ("liquid glass floating over the map", not a white toolbar); the map stays clearly visible through it. `FilterBar`'s `glass` variant intentionally has **no border/blur/shadow of its own** (`border-transparent bg-white/55`) since it's nested inside the bar's own glass surface — giving it a second full glass treatment would double up the effect, and its higher, fixed opacity is what keeps filter text/chips/count readable even though the bar itself is only ~12% white. A secondary small pill (locating/nearby-count/error status) renders in its own row below the bar only when there's something to show, so the primary bar's height stays fixed regardless of geolocation state.
 
@@ -148,6 +148,29 @@ back/forward, and copy/paste of the URL:
 centers the map on that apartment, and calls the same `onMarkerClick` a
 real marker click would — so it opens the same preview component, not a
 separate code path.
+
+## Map layer (base tile) switching
+
+`data/mapLayers.js` declares the available base layers (`street` — OSM;
+`satellite` — Esri World Imagery). Both are free and key-less, so no env
+config or secret is involved. Adding another style is one more entry there
+plus its `map.layer*` locale key; nothing else changes.
+
+`MapPage` owns the selected `layerId` (plain `useState`, defaulting to
+`street`) and renders the Layers button + panel in the shared glass control
+bar, dismissed via the same `useDismiss` hook every other popover uses.
+`ApartmentMap` takes `layerId` as a prop and swaps the tile layer in place:
+
+- The new `L.tileLayer` is added first, and the previous one is removed on
+  the new layer's `load` event, so the map never flashes an empty
+  background mid-switch. A `TILE_SWAP_FALLBACK_MS` timer guarantees the old
+  layer is dropped even if `load` never fires (Leaflet won't fire it if any
+  tile in the viewport fails), which would otherwise leave both styles
+  stacked.
+- Tiles live in Leaflet's `tilePane`, which sits *below* the overlay and
+  marker panes — so markers, the district boundary/dim mask, and the user
+  location dot are all unaffected by a layer change. Switching is purely a
+  base-layer swap with no page reload and no effect on filtering state.
 
 ## My Location / geolocation flow
 
