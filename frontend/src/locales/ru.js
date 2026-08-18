@@ -169,4 +169,11 @@ export default {
 
   'map.pageTitle': 'Карта',
   'map.viewDetails': 'Подробнее',
+  'map.locateMe': 'Показать моё местоположение',
+  'map.locating': 'Определение местоположения…',
+  'map.nearbyCount': '{count} квартир в радиусе 3 км',
+  'map.locationDenied': 'Доступ к геолокации запрещён',
+  'map.locationUnavailable': 'Не удалось определить местоположение',
+  'map.locationTimeout': 'Истекло время ожидания геолокации',
+  'map.locationUnsupported': 'Браузер не поддерживает геолокацию',
 }

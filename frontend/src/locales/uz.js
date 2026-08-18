@@ -169,4 +169,11 @@ export default {
 
   'map.pageTitle': 'Xarita',
   'map.viewDetails': "Batafsil ko'rish",
+  'map.locateMe': "Joylashuvimni ko'rsatish",
+  'map.locating': 'Joylashuv aniqlanmoqda…',
+  'map.nearbyCount': '3 km atrofida {count} ta kvartira',
+  'map.locationDenied': 'Joylashuvga ruxsat berilmadi',
+  'map.locationUnavailable': "Joylashuvni aniqlab bo'lmadi",
+  'map.locationTimeout': "Joylashuvni aniqlash vaqti tugadi",
+  'map.locationUnsupported': "Brauzeringiz joylashuvni aniqlashni qo'llab-quvvatlamaydi",
 }

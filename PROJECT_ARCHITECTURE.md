@@ -25,9 +25,9 @@ persisted, and it's persisted to the browser's `localStorage`, not a server.
 
 Implemented so far: Home page (search, filters, sort, listings), Wishlist
 page, Apartment Details page (gallery, amenities, owner, similar listings),
+the Map page (Leaflet, district boundaries, geolocation/nearby apartments),
 a responsive header/footer, and full uz/ru/en localization. Not yet
-implemented: the Map page's actual map, authentication, the Go backend, and
-the database.
+implemented: authentication, the Go backend, and the database.
 
 ---
 
@@ -63,7 +63,7 @@ Rent-House/
         │   └── paths.js           Single source of truth for route path strings
         ├── hooks/
         │   └── useDismiss.js      Shared outside-click/Escape-to-close hook
-        └── utils/                 Pure helper functions (formatting, filtering, sorting)
+        └── utils/                 Pure helper functions (formatting, filtering, sorting, geo)
 ```
 
 There is **no `services/` folder yet** (listed as a suggested future folder
@@ -134,6 +134,88 @@ Reusable, mostly presentational pieces. Notable ones:
 - `ImageGallery.jsx` — main image + prev/next + 5-thumbnail strip, local
   `activeIndex` state.
 - `ContactChatModal.jsx` — **UI-only mock chat**, see Section 13.
+- `ApartmentMap.jsx` — vanilla Leaflet map (imperative `useRef`/`useEffect`
+  integration, **not** `react-leaflet` — chosen to avoid a React 19 peer-dep
+  conflict, since plain `leaflet` has zero peer deps). Renders price-pill
+  markers, the selected district's boundary + dim mask, the current-location
+  control/marker, and exposes `onMarkerClick`. See "Map page architecture"
+  below.
+- `MapApartmentPreview.jsx` — the small card shown over the map when a
+  marker (or a `?apartment=` deep link) is selected; reuses
+  `apartmentDetailsPath()` for its "Batafsil ko'rish" button so it navigates
+  to the same `ApartmentDetailsPage` as everywhere else, not a duplicate view.
+
+### Map page architecture (`/map`)
+
+`MapPage.jsx` composes the existing search/filter architecture with
+`ApartmentMap.jsx` — there is **one** filtering pipeline, not a
+map-specific duplicate:
+
+- **Filtering:** `MapPage` reads `districtId`/`filters` from the same
+  `SearchContext` used by Home, and calls the same
+  `filterApartments(APARTMENTS, { districtId, keyword: '', filters })`
+  util (keyword search is disabled on this route — see `SearchBar.jsx`'s
+  `isKeywordSearchDisabled`). The resulting `visibleApartments` array is
+  the single source both the marker list and the results-count pill read
+  from — selecting a district or opening `FilterBar` narrows both
+  identically, with no separate map query.
+- **District boundaries:** `data/districts.js` exports `DISTRICTS` as
+  `{ id, name, latitude, longitude, boundary }`, where `boundary` is a
+  simplified `[lat, lng][]` polygon ring (derived from OpenStreetMap
+  administrative-boundary relations via Nominatim/Overpass, stride-sampled
+  down to ≤40 points per district for bundle size — not survey-grade). This
+  replaced an earlier `radiusMeters` circle-based placeholder; every mock
+  apartment's `latitude`/`longitude` was re-validated (point-in-polygon) to
+  actually fall inside its `districtId`'s real boundary.
+- **District selection visuals:** when `selectedDistrict` is set,
+  `ApartmentMap` draws two `L.polygon` layers in a `layerGroup`: (1) a
+  world-covering rectangle with the district boundary as a hole (SVG
+  even-odd fill), semi-transparent dark fill, to dim everything outside the
+  district without hiding geographic context; (2) the district boundary
+  itself with a clear `--color-primary` (green) outline and no fill. Markers
+  live in Leaflet's `markerPane` (z-index above the vector `overlayPane`),
+  so they're never visually obscured by the mask. Apartments outside the
+  district are simply absent from `visibleApartments` (filtered upstream),
+  not hidden via CSS/opacity.
+- **Stacking/z-index:** `ApartmentMap`'s root div is `absolute inset-0 z-0`
+  — an explicit `z-0` is required (not just `position`) so it establishes
+  its **own stacking context**, which contains Leaflet's internal
+  `.leaflet-top`/`.leaflet-bottom` control panes (`z-index: 1000` in
+  Leaflet's bundled CSS). Without that, those panes have no bounding
+  stacking context and compete directly against `Header`'s `sticky z-30`
+  context in the document root, winning and rendering over the district
+  dropdown. `MapPage`'s own floating overlay (`FilterBar`, result pill,
+  preview card) is `absolute inset-0 z-10` for the same reason — enough to
+  sit above the map, but still below Header.
+- **Layout height:** `MapPage`'s root is `flex-1` (not `h-full`/`h-[80vh]`).
+  Percentage heights (`h-full`) don't resolve against an ancestor whose own
+  height comes from `flex-grow` rather than an explicit `height` — per the
+  CSS spec, that's treated as an "indefinite" containing block, so the
+  percentage silently falls back to auto. `RootLayout`'s `<main>` was
+  changed to `flex flex-1 flex-col` specifically so `flex-1` can propagate
+  down through `MapPage` to the map without that percentage-height trap
+  (this is what previously left a visible gap above `Footer`).
+- **Geolocation & nearby apartments:** a Leaflet custom control
+  (`LocateControl`, stacked in the same `topright` corner as the zoom
+  control) calls `onLocateRequest`, owned by `MapPage`. It calls
+  `navigator.geolocation.getCurrentPosition()` directly — no custom
+  permission UI — only on click, and only handles success/error there
+  (denied/unavailable/timeout/unsupported all map to a small status pill
+  via `map.location*` locale keys instead of a raw browser error or a
+  crash). On success, `userLocation` is passed to `ApartmentMap`, which
+  renders a small pulsing blue dot (+ accuracy circle) and flies to it.
+  `utils/geo.js` exports `getDistanceKm` (haversine) and
+  `getNearbyApartments(apartments, userLocation, radiusKm = 3)`, kept
+  framework-agnostic and isolated specifically so the same client-side MVP
+  logic can move to a backend query later without touching `MapPage` or
+  `ApartmentMap`. Nearby apartments aren't a second filter — they're a
+  presentation layer on top of the already-filtered `visibleApartments`
+  (a status pill + a subtle ring style on their markers).
+- **Deep links:** `/map?apartment=:id` is read once via a
+  `hasFocusedInitialApartment` ref inside `ApartmentMap`, which centers the
+  map on that apartment and calls the same `onMarkerClick` a real marker
+  click would — so it opens `MapApartmentPreview`, not a separate code
+  path, and "Batafsil ko'rish" still routes to `ApartmentDetailsPage`.
 
 ### Hooks (`src/hooks/`)
 
@@ -167,7 +249,11 @@ Pure functions, no side effects, no React imports:
   apartment (district match, price/area/room closeness) and returns the top
   N; written as a pure, swappable function specifically so it can later be
   replaced by a call to a recommendations API without changing call sites.
-- `formatUzsAmount`, `formatPostedAt` — display formatting.
+- `formatUzsAmount`, `formatPostedAt`, `formatUzsShort` — display formatting.
+- `getDistanceKm(lat1, lng1, lat2, lng2)`, `getNearbyApartments(apartments,
+  userLocation, radiusKm)` — haversine distance + client-side "nearby"
+  matching for the Map page's geolocation feature; safely skips apartments
+  without valid coordinates.
 
 ### How the pieces communicate
 
@@ -234,7 +320,7 @@ All routes render inside `RootLayout` (Header + `<Outlet/>` + Footer).
 | `/` | `HomePage` | Search, filters, sort, apartment grid | Implemented |
 | `/search` | `SearchPage` | Placeholder | Not implemented (`PagePlaceholder`) |
 | `/apartment/:id` | `ApartmentDetailsPage` | Full listing detail: gallery, facts, description, amenities, owner, similar listings | Implemented |
-| `/map` | `MapPage` | Placeholder; reads `?apartment=` query param | Not implemented (this task) |
+| `/map` | `MapPage` | Leaflet map: district boundaries, filters, geolocation/nearby apartments, `?apartment=` deep link | Implemented (frontend-only, mock data) |
 | `/wishlist` | `WishlistPage` | Saved apartments, own filter/sort, empty states | Implemented |
 | `/login` | `LoginPage` | Placeholder | Not implemented |
 | `/register` | `RegisterPage` | Placeholder | Not implemented |
@@ -275,7 +361,7 @@ Source of truth: `frontend/src/data/apartments.js`, exporting a plain array
 | `amenities` | string[] | Keys like `'wifi'`, `'parking'` — looked up against an icon map and `amenity.<key>` translation strings, not raw text |
 | `owner` | `{ name, phone }` | Mock owner contact info; `phone` feeds the `tel:` call link |
 | `postedAt` | ISO date string | Generated relative to "now" at module load (`hoursAgo(n)` / `daysAgo(n)` helpers) so relative-time display stays realistic |
-| `latitude`, `longitude` | number | **Already present** on every apartment — added specifically to prepare for the Map feature |
+| `latitude`, `longitude` | number | Used by the Map page for marker placement, district point-in-polygon consistency, and the geolocation "nearby apartments" distance calculation |
 | `searchText` | string | Pre-lowercased blob of title/address/landmark keywords for keyword search matching — independent of the `title` field |
 
 **Missing / not yet on the model** (relevant to near-term features):
@@ -287,9 +373,6 @@ Source of truth: `frontend/src/data/apartments.js`, exporting a plain array
 - No `ownerId` linking to a `User` — owners are just an inline
   `{name, phone}` blob, not a real entity, because there's no auth/user
   system yet.
-- No district-level geo data (center point, zoom level, or boundary
-  polygon) — `data/districts.js` only has `{ id, name }`. This is the gap
-  the Map feature needs to fill (see Part 2 of this task).
 - `title`/`address` aren't localized at the data level (RU/EN titles live
   in the locale files under a separate `apartmentTitle.<id>` key instead —
   a bit of an inconsistency worth resolving once this becomes real backend
@@ -407,13 +490,14 @@ From `frontend/package.json`:
 | `react-router-dom` (^7) | Client-side routing |
 | `tailwindcss` + `@tailwindcss/vite` (v4) | Styling, compiled via the Vite plugin (no separate PostCSS config) |
 | `lucide-react` | Tree-shakeable icon set (map/pin/gallery/amenity/chat icons); added specifically when icon needs grew past the project's hand-rolled inline SVGs |
+| `leaflet` | Map rendering on `/map` (tiles, markers, polygons, controls) — used directly via `useRef`/`useEffect`, deliberately **not** `react-leaflet`, to avoid a React 19 peer-dependency conflict (`leaflet` itself has zero peer deps) |
 | `vite` (dev) | Dev server + build |
 | `@vitejs/plugin-react` (dev) | React Fast Refresh / JSX transform for Vite |
 | `oxlint` (dev) | Linter (`npm run lint`) — fast Rust-based ESLint alternative, config in `.oxlintrc.json` |
 
 No state management library, no HTTP client, no CSS-in-JS, no UI component
-library, no map library yet, no testing framework installed. This is
-deliberate per CLAUDE.md ("do not add unnecessary dependencies").
+library, no testing framework installed. This is deliberate per CLAUDE.md
+("do not add unnecessary dependencies").
 
 ---
 
@@ -447,9 +531,13 @@ backend database URL) — no secrets exist in the repository today.
 - [x] Responsive header/footer/grid/details across desktop/tablet/mobile
 - [x] uz/ru/en localization (default uz), persisted language choice
 - [x] Loading skeletons and empty/not-found states throughout
-- [ ] Map (page exists as a placeholder only — this task)
+- [x] Map (`/map`): Leaflet tiles/markers, district boundary highlight +
+      dimmed surroundings, existing filters reused (no second filtering
+      system), current-location geolocation button with client-side
+      "nearby apartments" (~3 km, haversine), `?apartment=:id` deep link
+      into the shared apartment preview
 - [ ] Address/street/metro text search on the Map page (explicitly deferred
-      per this task's spec — district + filters only for the Map MVP)
+      — district + filters only for the Map MVP)
 - [ ] Authentication (login/register pages are placeholders; no session,
       no protected routes, no role checks)
 - [ ] Go backend / REST API (no backend code exists)
@@ -478,10 +566,16 @@ backend database URL) — no secrets exist in the repository today.
   aren't actually delivered anywhere. This is intentional/scoped, not a bug.
 - **"Qo'ng'iroq qilish" (Call) is a plain `tel:` link** — no call-tracking,
   no backend involvement.
-- **Districts have no geographic shape data.** `data/districts.js` is just
-  `{ id, name }` pairs — no center coordinates, boundary polygon, or zoom
-  level. Apartments do have `latitude`/`longitude`, but districts don't
-  have anything to draw or zoom to yet (addressed by this task).
+- **District boundaries are simplified, not survey-grade.** `data/districts.js`'s
+  `boundary` polygons are derived from OpenStreetMap administrative
+  relations but stride-sampled down to ≤40 points per district for bundle
+  size — fine for a visual highlight, not for precise cadastral use.
+- **"Nearby apartments" is a client-side MVP.** `utils/geo.js` computes
+  straight-line (haversine) distance against the full in-memory
+  `APARTMENTS` array on every geolocation success — fine at 10 mock
+  listings, would need to move to a backend geo-query (e.g. PostGIS) at
+  real scale. The util is intentionally isolated so that move doesn't
+  touch `MapPage`/`ApartmentMap`.
 - **Search is substring matching against a precomputed `searchText`
   field**, not a real search index — fine for 10 mock listings, would not
   scale to a real catalog without a backend search implementation.
@@ -509,12 +603,6 @@ built, so implementation choices made now (e.g. `latitude`/`longitude`
 already on apartments, `filterApartments`/`sortApartments` being pure
 functions, `FilterBar`/`SortDropdown` being props-controlled) don't have to
 be reworked later.
-
-### Map (this task)
-Frontend-only for now: a Leaflet/OpenStreetMap (or similar) map on the
-`/map` route, using the `latitude`/`longitude` already present on each
-apartment. District highlighting will need boundary/center data added to
-`data/districts.js` — the minimum viable addition, not a real GIS dataset.
 
 ### Go API
 `Router → Handler → Service → Repository → PostgreSQL`, REST under

@@ -168,4 +168,11 @@ export default {
 
   'map.pageTitle': 'Map',
   'map.viewDetails': 'View details',
+  'map.locateMe': 'Show my location',
+  'map.locating': 'Locating…',
+  'map.nearbyCount': '{count} apartments within 3 km',
+  'map.locationDenied': 'Location access denied',
+  'map.locationUnavailable': 'Location unavailable',
+  'map.locationTimeout': 'Location request timed out',
+  'map.locationUnsupported': 'Geolocation is not supported by this browser',
 }

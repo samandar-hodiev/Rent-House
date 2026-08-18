@@ -42,8 +42,8 @@ export const APARTMENTS = [
     amenities: ['wifi', 'furnished', 'balcony', 'kitchen', 'heating'],
     owner: { name: 'Aziz Karimov', phone: '+998901234567' },
     postedAt: hoursAgo(2),
-    latitude: 41.2131,
-    longitude: 69.2401,
+    latitude: 41.247,
+    longitude: 69.2807,
     searchText: "2 xonali shinam kvartira sergeli chimboy ko'chasi",
   },
   {
@@ -145,8 +145,8 @@ export const APARTMENTS = [
     amenities: ['wifi', 'furnished', 'elevator', 'kitchen'],
     owner: { name: 'Kamola Nazarova', phone: '+998915554433' },
     postedAt: hoursAgo(9),
-    latitude: 41.3287,
-    longitude: 69.2401,
+    latitude: 41.3286,
+    longitude: 69.2106,
     searchText:
       "markazga yaqin 2 xonali shayxontohur navoi metro ko'chasi",
   },
@@ -228,8 +228,8 @@ export const APARTMENTS = [
     amenities: ['parking', 'balcony', 'heating', 'security'],
     owner: { name: 'Shahnoza Ibragimova', phone: '+998998887766' },
     postedAt: daysAgo(6),
-    latitude: 41.2098,
-    longitude: 69.2355,
+    latitude: 41.227,
+    longitude: 69.2607,
     searchText: 'sergeli yangi qurilgan turar-joy massiv',
   },
 ]
