@@ -115,7 +115,7 @@ function MapPage() {
       />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-start gap-2 p-3 sm:p-4">
-        <div className="pointer-events-auto flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-white/30 bg-white/60 px-2.5 py-2 shadow-[0_2px_8px_rgba(15,23,42,0.08)] backdrop-blur-md">
+        <div className="pointer-events-auto flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-white/25 bg-white/20 px-2.5 py-2 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg">
           <div className="flex flex-wrap items-center gap-2">
             <FilterBar
               filters={filters}
