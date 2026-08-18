@@ -113,7 +113,7 @@ function MapPage() {
         locateLabel={t('map.locateMe')}
       />
 
-      <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-start justify-between p-4">
+      <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-start p-4">
         <div className="flex w-full flex-col items-start gap-2">
           <div className="pointer-events-auto flex flex-col items-start gap-2 sm:flex-row sm:items-center">
             <FilterBar
@@ -121,8 +121,9 @@ function MapPage() {
               setFilters={setFilters}
               clearFilters={clearFilters}
               activeFilterCount={activeFilterCount}
+              glass
             />
-            <span className="rounded-full bg-surface px-3 py-1.5 text-xs font-medium text-text-secondary shadow-sm">
+            <span className="rounded-full border border-white/50 bg-white/80 px-3 py-1.5 text-xs font-medium text-text-secondary shadow-[0_2px_10px_rgba(15,23,42,0.10)] backdrop-blur-md">
               {countText}
             </span>
           </div>
@@ -130,22 +131,39 @@ function MapPage() {
           {locationStatusText ? (
             <span
               role="status"
-              className="pointer-events-auto rounded-full bg-surface px-3 py-1.5 text-xs font-medium text-text-secondary shadow-sm"
+              className="pointer-events-auto rounded-full border border-white/50 bg-white/80 px-3 py-1.5 text-xs font-medium text-text-secondary shadow-[0_2px_10px_rgba(15,23,42,0.10)] backdrop-blur-md"
             >
               {locationStatusText}
             </span>
           ) : null}
         </div>
-
-        {selectedApartment ? (
-          <div className="pointer-events-auto mx-auto w-full sm:mx-0 sm:w-80">
-            <MapApartmentPreview
-              apartment={selectedApartment}
-              onClose={() => setSelectedApartment(null)}
-            />
-          </div>
-        ) : null}
       </div>
+
+      {selectedApartment ? (
+        <>
+          {/* Desktop/tablet: floating card near the viewport center. */}
+          <div className="pointer-events-none absolute inset-0 z-20 hidden items-center justify-center p-4 sm:flex">
+            <div className="pointer-events-auto w-full max-w-[400px]">
+              <MapApartmentPreview
+                apartment={selectedApartment}
+                onClose={() => setSelectedApartment(null)}
+                variant="floating"
+              />
+            </div>
+          </div>
+
+          {/* Mobile: bottom-sheet card, map stays interactive above it. */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center sm:hidden">
+            <div className="pointer-events-auto w-full">
+              <MapApartmentPreview
+                apartment={selectedApartment}
+                onClose={() => setSelectedApartment(null)}
+                variant="sheet"
+              />
+            </div>
+          </div>
+        </>
+      ) : null}
     </div>
   )
 }

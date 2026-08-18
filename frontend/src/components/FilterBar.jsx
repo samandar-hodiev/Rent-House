@@ -25,9 +25,16 @@ function ChipRemoveIcon() {
   )
 }
 
-function Chip({ label, onRemove }) {
+const GLASS_CLASS =
+  'border-white/50 bg-white/80 backdrop-blur-md shadow-[0_2px_10px_rgba(15,23,42,0.10)]'
+
+function Chip({ label, onRemove, glass }) {
   return (
-    <span className="flex items-center gap-1.5 rounded-full border border-border bg-surface-secondary py-1 pl-3 pr-1.5 text-sm text-text-secondary">
+    <span
+      className={`flex items-center gap-1.5 rounded-full border py-1 pl-3 pr-1.5 text-sm text-text-secondary ${
+        glass ? GLASS_CLASS : 'border-border bg-surface-secondary'
+      }`}
+    >
       {label}
       <button
         type="button"
@@ -48,6 +55,7 @@ function FilterBar({
   activeFilterCount,
   showDistrict = false,
   showFloor = true,
+  glass = false,
 }) {
   const { t } = useLocale()
   const [isOpen, setIsOpen] = useState(false)
@@ -146,7 +154,9 @@ function FilterBar({
           onClick={() => setIsOpen((open) => !open)}
           aria-haspopup="true"
           aria-expanded={isOpen}
-          className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+            glass ? `${GLASS_CLASS} hover:bg-white/90` : 'border-border bg-surface hover:bg-surface-secondary'
+          }`}
         >
           <FilterIcon />
           {t('filters.button')}
@@ -172,7 +182,7 @@ function FilterBar({
       </div>
 
       {chips.map((chip) => (
-        <Chip key={chip.key} label={chip.label} onRemove={chip.onRemove} />
+        <Chip key={chip.key} label={chip.label} onRemove={chip.onRemove} glass={glass} />
       ))}
 
       {activeFilterCount > 0 ? (
