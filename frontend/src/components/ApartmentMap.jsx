@@ -1,81 +1,85 @@
-import { useEffect, useRef } from 'react'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import { useEffect, useRef, useState } from 'react'
 import { TASHKENT_CENTER } from '../data/districts'
 import { getDistrictFeature } from '../data/districtBoundaries'
 import { DEFAULT_MAP_LAYER_ID, getMapLayerById } from '../data/mapLayers'
 import { formatUzsShort } from '../utils/formatPrice'
+import { loadYandexMaps } from '../utils/yandexMaps'
 
 const DEFAULT_ZOOM = 12
 const DISTRICT_ZOOM = 14
 const LOCATION_ZOOM = 15
-const TILE_SWAP_FALLBACK_MS = 3000
+const FLY_DURATION_MS = 600
+const LOCATION_FLY_DURATION_MS = 800
 
 const DISTRICT_BORDER_COLOR = '#059669'
 const DIM_MASK_COLOR = '#0f172a'
-// A rectangle far larger than the Tashkent viewport, used with the district
-// boundary as a hole so everything outside the district reads as dimmed.
-// GeoJSON coordinate order is [lng, lat].
-const WORLD_MASK_RING = [
-  [-180, -85],
-  [180, -85],
-  [180, 85],
-  [-180, 85],
-  [-180, -85],
+const USER_LOCATION_COLOR = '#3b82f6'
+
+// Outer ring of the "dim everything outside the district" mask, in Yandex's
+// [lat, lng] order (our GeoJSON boundaries are [lng, lat]). A full-globe
+// rectangle is not rendered reliably by the Yandex renderer, so this is a
+// generous box around the Tashkent region instead — far outside any view the
+// district-level zoom can reach.
+const MASK_OUTER_RING = [
+  [30, 50],
+  [30, 90],
+  [50, 90],
+  [50, 50],
+  [30, 50],
 ]
-
-// A district's real boundary (from districts.geo.json) is a Polygon or
-// MultiPolygon (e.g. a district with a disjoint exclave). Either way, we
-// only need its outer ring(s) — none of the source districts have holes.
-function outerRingsOf(geometry) {
-  if (geometry.type === 'Polygon') return [geometry.coordinates[0]]
-  if (geometry.type === 'MultiPolygon') return geometry.coordinates.map((polygon) => polygon[0])
-  return []
-}
-
-// A Polygon whose first ring is a world-covering rectangle and whose
-// remaining rings are the district's outer ring(s) as holes (Leaflet's SVG
-// renderer uses an even-odd fill rule, so ring winding direction doesn't
-// matter here) — dims everything outside the district in one layer.
-function buildMaskGeometry(feature) {
-  return {
-    type: 'Polygon',
-    coordinates: [WORLD_MASK_RING, ...outerRingsOf(feature.geometry)],
-  }
-}
 
 const MARKER_WIDTH = 64
 const MARKER_HEIGHT = 26
 
-function createPriceIcon(apartment, { isNearby = false } = {}) {
-  const nearbyClass = isNearby
-    ? 'ring-2 ring-blue-400 hover:ring-blue-500'
-    : 'hover:border-primary hover:text-primary'
-  const html = `
-    <div class="flex size-full cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-border bg-white text-xs font-semibold text-text-primary shadow-sm transition-all duration-200 hover:shadow-md ${nearbyClass}">
-      ${formatUzsShort(apartment.price)}
+// Keeps the same class names the Leaflet implementation used, so styling
+// and any marker lookups keep working unchanged.
+const MARKER_TEMPLATE = `
+  <div class="renthouse-map-marker" style="position:absolute;transform:translate(-50%,-50%);">
+    <div class="flex h-[26px] w-16 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-border bg-white text-xs font-semibold text-text-primary shadow-sm transition-all duration-200 hover:shadow-md $[properties.accentClass]">
+      $[properties.priceLabel]
     </div>
-  `
-  return L.divIcon({
-    html,
-    className: 'renthouse-map-marker',
-    iconSize: [MARKER_WIDTH, MARKER_HEIGHT],
-    iconAnchor: [MARKER_WIDTH / 2, MARKER_HEIGHT / 2],
-  })
+  </div>
+`
+
+const LOCATION_TEMPLATE = `
+  <div class="renthouse-location-marker" style="position:absolute;transform:translate(-50%,-50%);">
+    <span class="relative flex size-4 items-center justify-center">
+      <span class="absolute size-full animate-ping rounded-full bg-blue-400 opacity-60"></span>
+      <span class="relative size-3 rounded-full border-2 border-white bg-blue-500 shadow-md"></span>
+    </span>
+  </div>
+`
+
+// A district boundary is a Polygon or a MultiPolygon (a district with a
+// disjoint exclave). Either way we only need its outer ring(s) — none of the
+// source districts have holes — converted to Yandex's [lat, lng] order.
+function outerRingsOf(geometry) {
+  const rings =
+    geometry.type === 'Polygon'
+      ? [geometry.coordinates[0]]
+      : geometry.type === 'MultiPolygon'
+        ? geometry.coordinates.map((polygon) => polygon[0])
+        : []
+  return rings.map((ring) => ring.map(([lng, lat]) => [lat, lng]))
 }
 
-function createLocationDivIcon() {
-  return L.divIcon({
-    html: `
-      <span class="relative flex size-4 items-center justify-center">
-        <span class="absolute size-full animate-ping rounded-full bg-blue-400 opacity-60"></span>
-        <span class="relative size-3 rounded-full border-2 border-white bg-blue-500 shadow-md"></span>
-      </span>
-    `,
-    className: 'renthouse-location-marker',
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-  })
+function boundsOfRings(rings) {
+  let minLat = Infinity
+  let minLng = Infinity
+  let maxLat = -Infinity
+  let maxLng = -Infinity
+  rings.forEach((ring) =>
+    ring.forEach(([lat, lng]) => {
+      if (lat < minLat) minLat = lat
+      if (lat > maxLat) maxLat = lat
+      if (lng < minLng) minLng = lng
+      if (lng > maxLng) maxLng = lng
+    }),
+  )
+  return [
+    [minLat, minLng],
+    [maxLat, maxLng],
+  ]
 }
 
 function ApartmentMap({
@@ -89,170 +93,236 @@ function ApartmentMap({
   mapRef: externalMapRef,
 }) {
   const containerRef = useRef(null)
+  const ymapsRef = useRef(null)
   const mapRef = useRef(null)
-  const tileLayerRef = useRef(null)
-  const markersLayerRef = useRef(null)
-  const districtLayerRef = useRef(null)
-  const locationLayerRef = useRef(null)
+  const markersCollectionRef = useRef(null)
+  const districtCollectionRef = useRef(null)
+  const locationCollectionRef = useRef(null)
+  const markerLayoutRef = useRef(null)
   const hasFocusedInitialApartment = useRef(false)
+  // The Yandex API loads asynchronously, so the effects below have to wait
+  // for the map instance instead of assuming it exists on first render.
+  const [isMapReady, setIsMapReady] = useState(false)
 
   useEffect(() => {
-    const map = L.map(containerRef.current, {
-      center: [TASHKENT_CENTER.latitude, TASHKENT_CENTER.longitude],
-      zoom: DEFAULT_ZOOM,
-      scrollWheelZoom: true,
-      // Zoom controls live in the page's compact glass bar instead of
-      // Leaflet's own top-right control — see MapPage's mapRef usage.
-      zoomControl: false,
-    })
-    markersLayerRef.current = L.layerGroup().addTo(map)
-    mapRef.current = map
-    if (externalMapRef) externalMapRef.current = map
+    let cancelled = false
+
+    loadYandexMaps()
+      .then((ymaps) => {
+        if (cancelled || !containerRef.current) return
+
+        const map = new ymaps.Map(
+          containerRef.current,
+          {
+            center: [TASHKENT_CENTER.latitude, TASHKENT_CENTER.longitude],
+            zoom: DEFAULT_ZOOM,
+            // Zoom controls live in the page's compact glass bar — see
+            // MapPage's mapRef usage.
+            controls: [],
+            type: getMapLayerById(layerId).type,
+          },
+          { suppressMapOpenBlock: true },
+        )
+
+        ymapsRef.current = ymaps
+        mapRef.current = map
+        markerLayoutRef.current = ymaps.templateLayoutFactory.createClass(MARKER_TEMPLATE)
+
+        markersCollectionRef.current = new ymaps.GeoObjectCollection()
+        districtCollectionRef.current = new ymaps.GeoObjectCollection()
+        locationCollectionRef.current = new ymaps.GeoObjectCollection()
+        map.geoObjects.add(districtCollectionRef.current)
+        map.geoObjects.add(markersCollectionRef.current)
+        map.geoObjects.add(locationCollectionRef.current)
+
+        // MapPage drives zoom through this ref; expose the same small API
+        // the Leaflet map instance offered.
+        if (externalMapRef) {
+          externalMapRef.current = {
+            zoomIn: () => map.setZoom(map.getZoom() + 1, { duration: 200 }),
+            zoomOut: () => map.setZoom(map.getZoom() - 1, { duration: 200 }),
+          }
+        }
+
+        setIsMapReady(true)
+      })
+      .catch(() => {
+        // The map simply stays empty if the API cannot be reached; the rest
+        // of the page (filters, counts, preview) keeps working.
+      })
+
     return () => {
-      map.remove()
+      cancelled = true
+      mapRef.current?.destroy()
       mapRef.current = null
+      ymapsRef.current = null
       if (externalMapRef) externalMapRef.current = null
-      tileLayerRef.current = null
-      markersLayerRef.current = null
-      districtLayerRef.current = null
-      locationLayerRef.current = null
+      markersCollectionRef.current = null
+      districtCollectionRef.current = null
+      locationCollectionRef.current = null
+      markerLayoutRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Base tile layer, swapped in place when the user picks another map
-  // style. Tiles live in Leaflet's `tilePane`, which sits below the
-  // overlay/marker panes, so markers and the district boundary are
-  // unaffected by a layer change.
+  // Base map style, swapped in place. Yandex renders the base map below all
+  // geo objects, so markers and the district overlay are unaffected.
   useEffect(() => {
     const map = mapRef.current
-    if (!map) return
-    const layer = getMapLayerById(layerId)
-    const nextTileLayer = L.tileLayer(layer.url, {
-      attribution: layer.attribution,
-      maxZoom: layer.maxZoom,
-    }).addTo(map)
-    const previousTileLayer = tileLayerRef.current
-    tileLayerRef.current = nextTileLayer
-    if (!previousTileLayer) return undefined
-
-    // Keep the old tiles underneath until the new ones are ready, so the
-    // map never flashes an empty background mid-switch. The timeout is a
-    // fallback: `load` never fires if any tile in the viewport fails, and
-    // leaving both layers stacked would show the wrong style.
-    let done = false
-    const removePrevious = () => {
-      if (done) return
-      done = true
-      previousTileLayer.remove()
-    }
-    nextTileLayer.once('load', removePrevious)
-    const fallbackTimer = setTimeout(removePrevious, TILE_SWAP_FALLBACK_MS)
-
-    return () => {
-      clearTimeout(fallbackTimer)
-      removePrevious()
-    }
-  }, [layerId])
+    if (!map || !isMapReady) return
+    map.setType(getMapLayerById(layerId).type)
+  }, [layerId, isMapReady])
 
   useEffect(() => {
-    const map = mapRef.current
-    const layer = markersLayerRef.current
-    if (!map || !layer) return
-    layer.clearLayers()
+    const ymaps = ymapsRef.current
+    const collection = markersCollectionRef.current
+    if (!ymaps || !collection || !isMapReady) return
+    collection.removeAll()
     apartments.forEach((apartment) => {
       const isNearby = nearbyApartmentIds?.has(apartment.id) ?? false
-      const marker = L.marker([apartment.latitude, apartment.longitude], {
-        icon: createPriceIcon(apartment, { isNearby }),
-      })
-      marker.on('click', () => onMarkerClick(apartment))
-      marker.addTo(layer)
-    })
-  }, [apartments, nearbyApartmentIds, onMarkerClick])
-
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-    if (districtLayerRef.current) {
-      districtLayerRef.current.remove()
-      districtLayerRef.current = null
-    }
-    const feature = selectedDistrictId ? getDistrictFeature(selectedDistrictId) : null
-    if (feature) {
-      const group = L.layerGroup()
-      // Dim everything outside the district using its real boundary as a
-      // hole in a world-covering mask.
-      L.geoJSON(
-        { type: 'Feature', properties: {}, geometry: buildMaskGeometry(feature) },
-        { stroke: false, fillColor: DIM_MASK_COLOR, fillOpacity: 0.22, interactive: false },
-      ).addTo(group)
-      // Clear green outline for the district's actual boundary.
-      const boundaryLayer = L.geoJSON(feature, {
-        style: {
-          color: DISTRICT_BORDER_COLOR,
-          weight: 2.5,
-          opacity: 0.9,
-          fillOpacity: 0,
+      const placemark = new ymaps.Placemark(
+        [apartment.latitude, apartment.longitude],
+        {
+          priceLabel: formatUzsShort(apartment.price),
+          accentClass: isNearby
+            ? 'ring-2 ring-blue-400 hover:ring-blue-500'
+            : 'hover:border-primary hover:text-primary',
         },
-        interactive: false,
-      }).addTo(group)
-      group.addTo(map)
-      districtLayerRef.current = group
+        {
+          iconLayout: markerLayoutRef.current,
+          iconShape: {
+            type: 'Rectangle',
+            coordinates: [
+              [-MARKER_WIDTH / 2, -MARKER_HEIGHT / 2],
+              [MARKER_WIDTH / 2, MARKER_HEIGHT / 2],
+            ],
+          },
+        },
+      )
+      placemark.events.add('click', () => onMarkerClick(apartment))
+      collection.add(placemark)
+    })
+  }, [apartments, nearbyApartmentIds, onMarkerClick, isMapReady])
 
-      map.flyToBounds(boundaryLayer.getBounds(), {
-        paddingTopLeft: [40, 40],
-        paddingBottomRight: [40, 40],
-        maxZoom: DISTRICT_ZOOM,
-        duration: 0.6,
+  useEffect(() => {
+    const ymaps = ymapsRef.current
+    const map = mapRef.current
+    const collection = districtCollectionRef.current
+    if (!ymaps || !map || !collection || !isMapReady) return
+
+    collection.removeAll()
+
+    const feature = selectedDistrictId ? getDistrictFeature(selectedDistrictId) : null
+    if (!feature) {
+      map.setCenter([TASHKENT_CENTER.latitude, TASHKENT_CENTER.longitude], DEFAULT_ZOOM, {
+        duration: FLY_DURATION_MS,
       })
-    } else {
-      map.flyTo([TASHKENT_CENTER.latitude, TASHKENT_CENTER.longitude], DEFAULT_ZOOM, {
-        duration: 0.6,
-      })
+      return
     }
-  }, [selectedDistrictId])
+
+    const rings = outerRingsOf(feature.geometry)
+
+    // Dim everything outside the district: one polygon covering the world
+    // with the district's ring(s) punched out via the even-odd fill rule.
+    collection.add(
+      new ymaps.Polygon(
+        [MASK_OUTER_RING, ...rings],
+        {},
+        {
+          fillColor: DIM_MASK_COLOR,
+          fillOpacity: 0.22,
+          fillRule: 'evenOdd',
+          stroke: false,
+          interactivityModel: 'default#transparent',
+        },
+      ),
+    )
+
+    // Clear green outline for the district's actual boundary.
+    rings.forEach((ring) => {
+      collection.add(
+        new ymaps.Polygon(
+          [ring],
+          {},
+          {
+            fill: false,
+            strokeColor: DISTRICT_BORDER_COLOR,
+            strokeWidth: 2.5,
+            strokeOpacity: 0.9,
+            interactivityModel: 'default#transparent',
+          },
+        ),
+      )
+    })
+
+    // setBounds is asynchronous — clamp the zoom only after it settles, or
+    // the clamp would interrupt the animation instead of following it.
+    Promise.resolve(
+      map.setBounds(boundsOfRings(rings), {
+        checkZoomRange: true,
+        zoomMargin: 40,
+        duration: FLY_DURATION_MS,
+      }),
+    )
+      .then(() => {
+        if (mapRef.current && map.getZoom() > DISTRICT_ZOOM) {
+          map.setZoom(DISTRICT_ZOOM, { duration: 0 })
+        }
+      })
+      .catch(() => {})
+  }, [selectedDistrictId, isMapReady])
 
   useEffect(() => {
     const map = mapRef.current
-    if (!map || hasFocusedInitialApartment.current || !focusApartmentId) return
+    if (!map || !isMapReady || hasFocusedInitialApartment.current || !focusApartmentId) return
     const apartment = apartments.find((item) => item.id === focusApartmentId)
     if (!apartment) return
     hasFocusedInitialApartment.current = true
-    map.setView([apartment.latitude, apartment.longitude], DISTRICT_ZOOM)
+    map.setCenter([apartment.latitude, apartment.longitude], DISTRICT_ZOOM)
     onMarkerClick(apartment)
-  }, [apartments, focusApartmentId, onMarkerClick])
+  }, [apartments, focusApartmentId, onMarkerClick, isMapReady])
 
   useEffect(() => {
+    const ymaps = ymapsRef.current
     const map = mapRef.current
-    if (!map) return
-    if (locationLayerRef.current) {
-      locationLayerRef.current.remove()
-      locationLayerRef.current = null
-    }
+    const collection = locationCollectionRef.current
+    if (!ymaps || !map || !collection || !isMapReady) return
+
+    collection.removeAll()
     if (!userLocation) return
 
-    const group = L.layerGroup()
     if (userLocation.accuracy) {
-      L.circle([userLocation.latitude, userLocation.longitude], {
-        radius: userLocation.accuracy,
-        color: '#3b82f6',
-        weight: 1,
-        opacity: 0.3,
-        fillColor: '#3b82f6',
-        fillOpacity: 0.08,
-        interactive: false,
-      }).addTo(group)
+      collection.add(
+        new ymaps.Circle(
+          [[userLocation.latitude, userLocation.longitude], userLocation.accuracy],
+          {},
+          {
+            fillColor: USER_LOCATION_COLOR,
+            fillOpacity: 0.08,
+            strokeColor: USER_LOCATION_COLOR,
+            strokeOpacity: 0.3,
+            strokeWidth: 1,
+            interactivityModel: 'default#transparent',
+          },
+        ),
+      )
     }
-    L.marker([userLocation.latitude, userLocation.longitude], {
-      icon: createLocationDivIcon(),
-      interactive: false,
-      zIndexOffset: 1000,
-    }).addTo(group)
-    group.addTo(map)
-    locationLayerRef.current = group
 
-    map.flyTo([userLocation.latitude, userLocation.longitude], LOCATION_ZOOM, { duration: 0.8 })
-  }, [userLocation])
+    collection.add(
+      new ymaps.Placemark(
+        [userLocation.latitude, userLocation.longitude],
+        {},
+        {
+          iconLayout: ymaps.templateLayoutFactory.createClass(LOCATION_TEMPLATE),
+          interactivityModel: 'default#transparent',
+        },
+      ),
+    )
+
+    map.setCenter([userLocation.latitude, userLocation.longitude], LOCATION_ZOOM, {
+      duration: LOCATION_FLY_DURATION_MS,
+    })
+  }, [userLocation, isMapReady])
 
   return <div ref={containerRef} className="absolute inset-0 z-0" />
 }

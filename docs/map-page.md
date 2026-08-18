@@ -1,8 +1,10 @@
 # Map page (`/map`)
 
-Frontend-only (mock data), vanilla Leaflet — not `react-leaflet`, chosen
-specifically to avoid a React 19 peer-dependency conflict (`leaflet` itself
-has zero peer deps). This doc covers the Map page only; see
+Frontend-only (mock data), built on the **Yandex Maps JS API v2.1**, loaded
+at runtime from Yandex's CDN by `utils/yandexMaps.js` (no npm map package, no
+React wrapper — the API is driven imperatively from `ApartmentMap`). The API
+key comes from `VITE_YANDEX_MAPS_API_KEY` and is never hardcoded; see
+`.env.example`. This doc covers the Map page only; see
 `PROJECT_ARCHITECTURE.md` for the rest of the app.
 
 ## Components
@@ -10,7 +12,8 @@ has zero peer deps). This doc covers the Map page only; see
 | File | Responsibility |
 |---|---|
 | `pages/MapPage.jsx` | Owns all Map-page state (selected apartment, geolocation status/error, user location) and layout. Derives `visibleApartments` from the shared `SearchContext` + `filterApartments`. Renders the compact glass control bar and the apartment preview; delegates actual map rendering to `ApartmentMap`. |
-| `components/ApartmentMap.jsx` | Thin, imperative Leaflet wrapper. Owns the `L.map` instance and all Leaflet layers (tiles, markers, district boundary/mask, user-location dot). Knows nothing about filters, geolocation UI, or routing — it just reflects whatever props it's given. |
+| `components/ApartmentMap.jsx` | Thin, imperative Yandex Maps wrapper. Owns the `ymaps.Map` instance and its geo-object collections (markers, district boundary/mask, user-location dot). Knows nothing about filters, geolocation UI, or routing — it just reflects whatever props it's given. |
+| `utils/yandexMaps.js` | Injects the Yandex Maps API script once and resolves with the `ymaps` namespace after `ymaps.ready`. |
 | `components/MapApartmentPreview.jsx` | The floating/bottom-sheet card shown for the selected apartment. Reused for marker clicks and the `?apartment=` deep link — one component, two `variant`s (`floating` | `sheet`), no duplicate details view. |
 | `components/FilterBar.jsx` / `FilterPanel.jsx` | Same shared, props-controlled filter UI used on Home/Wishlist. Map passes `glass` (see below) but the filtering logic itself is identical everywhere. |
 | `utils/filterApartments.js` | Single filtering pipeline — district + filters. No map-specific filtering exists. |
@@ -25,16 +28,20 @@ All Map-page state lives in `MapPage`, not in `ApartmentMap` or Context:
 - `districtId`, `filters` — from the existing `SearchContext` (shared with Home).
 - `selectedApartment` — which marker/deep-link apartment is previewed.
 - `userLocation`, `locationStatus` (`idle | locating | granted | error`), `locationErrorKey` — the geolocation flow.
-- `leafletMapRef` — a plain `useRef`, populated by `ApartmentMap` via its `mapRef` prop so `MapPage`'s own zoom buttons can call `map.zoomIn()`/`zoomOut()` without Leaflet's default zoom control.
+- `mapControllerRef` — a plain `useRef`, populated by `ApartmentMap` via its `mapRef` prop with a small `{ zoomIn, zoomOut }` adapter, so `MapPage`'s own zoom buttons drive the map without the provider's built-in zoom control.
 
-`ApartmentMap` only holds *internal* refs (the `L.map` instance, layer groups) — it is otherwise a controlled component driven entirely by props (`apartments`, `selectedDistrictId`, `focusApartmentId`, `userLocation`, `nearbyApartmentIds`, `onMarkerClick`).
+Because the Yandex API loads asynchronously, `ApartmentMap` keeps an
+`isMapReady` state flag and every effect below depends on it — otherwise the
+first render would run against a map instance that does not exist yet.
+
+`ApartmentMap` only holds *internal* refs (the `ymaps.Map` instance, geo-object collections) — it is otherwise a controlled component driven entirely by props (`apartments`, `selectedDistrictId`, `focusApartmentId`, `userLocation`, `nearbyApartmentIds`, `onMarkerClick`).
 
 ## Compact glass control bar
 
 One shared bar directly under the Header (`absolute inset-x-0 top-0 z-10` inside the map's `relative` container):
 
 - **Left:** `FilterBar` (with `glass` prop) + a result-count pill.
-- **Right:** Layers, My Location, Zoom In, Zoom Out — plain React buttons, not Leaflet controls, so they can live in the same bar as the filters. They call `leafletMapRef.current.zoomIn()/.zoomOut()` and the existing `handleLocateRequest`.
+- **Right:** Layers, My Location, Zoom In, Zoom Out — plain React buttons, not the map provider's own controls (the map is created with `controls: []`), so they can live in the same bar as the filters. They call `mapControllerRef.current.zoomIn()/.zoomOut()` and the existing `handleLocateRequest`.
 - **Desktop/tablet (`sm:` and up):** one row, `flex-row justify-between` — filters on the left, layers/location/zoom on the right.
 - **Mobile:** the *same* bar switches to `flex-col` — filter button/chips on the first row, the layers/location/zoom cluster on a second row inside the same container, right-aligned (`justify-end`). There is no second floating control container on mobile; it's the same glass `<div>`, just stacked.
 
@@ -42,9 +49,9 @@ Style: `bg-white/12` + `backdrop-blur-lg` (16px) + `border-white/25` + a soft sh
 
 ## Z-index / stacking
 
-The dropdown-under-map bug (Leaflet's own `.leaflet-top`/`.leaflet-bottom` panes ship with `z-index: 1000`) is fixed at the source, not by raising other z-indexes further:
+The dropdown-under-map bug (map libraries give their internal panes high `z-index` values) is fixed at the source, not by raising other z-indexes further:
 
-- `ApartmentMap`'s root div is `absolute inset-0 z-0` — an **explicit** `z-0` (not just `position`) so it establishes its own stacking context and *contains* Leaflet's internal z-1000 panes instead of letting them compete in the document root against `Header`'s `sticky z-30`.
+- `ApartmentMap`'s root div is `absolute inset-0 z-0` — an **explicit** `z-0` (not just `position`) so it establishes its own stacking context and *contains* the map's internal panes instead of letting them compete in the document root against `Header`'s `sticky z-30`.
 - The control bar is `z-10` (above the map, below nothing else that matters) and the apartment preview overlay is `z-20`. Both sit comfortably under `Header`'s `z-30`, so the district dropdown in the Header always renders on top.
 - `FilterPanel`'s own dropdown uses `z-40`, but that's scoped *inside* the bar's local stacking context, not competing globally — it only needs to beat the bar and the map, which it does.
 
@@ -78,13 +85,16 @@ matching `id`; no other code changes.
 
 ### Rendering
 
-`ApartmentMap` renders two `L.geoJSON` layers when a district is selected:
+`ApartmentMap` renders two `ymaps.Polygon` layers when a district is selected.
+Note that Yandex uses `[lat, lng]` while GeoJSON is `[lng, lat]`, so
+`outerRingsOf()` flips the coordinate order:
 
-1. A world-covering rectangle Polygon with the district's outer ring(s) as
-   holes (`buildMaskGeometry` — Leaflet's SVG renderer uses an even-odd
-   fill rule, so ring winding direction doesn't matter), semi-transparent
-   dark fill — dims everything outside the district without hiding
-   geographic context.
+1. A large rectangle Polygon with the district's outer ring(s) as
+   holes (`fillRule: 'evenOdd'`, so ring winding direction doesn't matter),
+   semi-transparent dark fill — dims everything outside the district without
+   hiding geographic context. The mask's outer ring is a generous box around
+   the Tashkent region (`MASK_OUTER_RING`) rather than the whole globe: a
+   full-globe rectangle is not rendered reliably by the Yandex renderer.
 2. The district's own GeoJSON feature, styled with a `--color-primary`
    green outline and no fill — a clear, accurate boundary rather than an
    approximate shape.
@@ -93,8 +103,8 @@ The map then calls `map.flyToBounds(boundaryLayer.getBounds(), { maxZoom, durati
 — fitting the *real* bounding box of whatever was selected, rather than
 flying to a single hardcoded center point per district.
 
-Markers render in Leaflet's `markerPane` (above the vector `overlayPane`),
-so the dim mask never obscures them. Apartments outside the district are
+Markers are placemarks in their own geo-object collection, added after the
+district collection, so the dim mask never obscures them. Apartments outside the district are
 filtered out upstream by `filterApartments` (same pipeline as Home) — they
 aren't hidden via CSS, they're just absent from `visibleApartments`.
 
@@ -151,26 +161,19 @@ separate code path.
 
 ## Map layer (base tile) switching
 
-`data/mapLayers.js` declares the available base layers (`street` — OSM;
-`satellite` — Esri World Imagery). Both are free and key-less, so no env
-config or secret is involved. Adding another style is one more entry there
-plus its `map.layer*` locale key; nothing else changes.
+`data/mapLayers.js` declares the available base layers as Yandex map types
+(`street` → `yandex#map`, `satellite` → `yandex#satellite`). Adding another
+style is one more entry there plus its `map.layer*` locale key; nothing else
+changes.
 
 `MapPage` owns the selected `layerId` (plain `useState`, defaulting to
 `street`) and renders the Layers button + panel in the shared glass control
 bar, dismissed via the same `useDismiss` hook every other popover uses.
-`ApartmentMap` takes `layerId` as a prop and swaps the tile layer in place:
-
-- The new `L.tileLayer` is added first, and the previous one is removed on
-  the new layer's `load` event, so the map never flashes an empty
-  background mid-switch. A `TILE_SWAP_FALLBACK_MS` timer guarantees the old
-  layer is dropped even if `load` never fires (Leaflet won't fire it if any
-  tile in the viewport fails), which would otherwise leave both styles
-  stacked.
-- Tiles live in Leaflet's `tilePane`, which sits *below* the overlay and
-  marker panes — so markers, the district boundary/dim mask, and the user
-  location dot are all unaffected by a layer change. Switching is purely a
-  base-layer swap with no page reload and no effect on filtering state.
+`ApartmentMap` takes `layerId` as a prop and calls `map.setType()` with the
+matching Yandex map type. The base map renders below all geo objects, so
+markers, the district boundary/dim mask, and the user location dot are
+unaffected by a layer change. Switching is purely a base-layer swap with no
+page reload and no effect on filtering state.
 
 ## My Location / geolocation flow
 

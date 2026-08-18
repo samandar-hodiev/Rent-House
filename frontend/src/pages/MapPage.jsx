@@ -33,7 +33,7 @@ function MapPage() {
   const [layerId, setLayerId] = useState(DEFAULT_MAP_LAYER_ID)
   const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false)
   const isLocatingRef = useRef(false)
-  const leafletMapRef = useRef(null)
+  const mapControllerRef = useRef(null)
   const skipNextUrlSync = useRef(false)
   const layerMenuRef = useRef(null)
 
@@ -148,7 +148,7 @@ function MapPage() {
         userLocation={locationStatus === 'granted' ? userLocation : null}
         nearbyApartmentIds={nearbyApartmentIds}
         layerId={layerId}
-        mapRef={leafletMapRef}
+        mapRef={mapControllerRef}
       />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-start gap-2 p-3 sm:p-4">
@@ -223,7 +223,7 @@ function MapPage() {
             </button>
             <button
               type="button"
-              onClick={() => leafletMapRef.current?.zoomIn()}
+              onClick={() => mapControllerRef.current?.zoomIn()}
               aria-label={t('map.zoomIn')}
               title={t('map.zoomIn')}
               className="flex size-8 shrink-0 items-center justify-center rounded-full text-text-secondary hover:bg-white/70 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -232,7 +232,7 @@ function MapPage() {
             </button>
             <button
               type="button"
-              onClick={() => leafletMapRef.current?.zoomOut()}
+              onClick={() => mapControllerRef.current?.zoomOut()}
               aria-label={t('map.zoomOut')}
               title={t('map.zoomOut')}
               className="flex size-8 shrink-0 items-center justify-center rounded-full text-text-secondary hover:bg-white/70 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"

@@ -1,21 +1,8 @@
-// Base tile layers offered by the Map page's Layers control. Both sources
-// are free and key-less, so no env config/secret is required.
+// Base map styles offered by the Map page's Layers control, expressed as
+// Yandex Maps map types (see ApartmentMap's `map.setType` call).
 export const MAP_LAYERS = [
-  {
-    id: 'street',
-    labelKey: 'map.layerStreet',
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 19,
-  },
-  {
-    id: 'satellite',
-    labelKey: 'map.layerSatellite',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Tiles &copy; Esri, Maxar, Earthstar Geographics',
-    maxZoom: 19,
-  },
+  { id: 'street', labelKey: 'map.layerStreet', type: 'yandex#map' },
+  { id: 'satellite', labelKey: 'map.layerSatellite', type: 'yandex#satellite' },
 ]
 
 export const DEFAULT_MAP_LAYER_ID = 'street'
