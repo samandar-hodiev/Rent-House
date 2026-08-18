@@ -11,7 +11,7 @@ npm run lint     # oxlint
 npm run preview  # preview production build
 ```
 
-## Structure
+## Structure.
 
 ```
 src/
