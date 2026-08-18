@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { TASHKENT_CENTER } from '../data/districts'
+import { getDistrictFeature } from '../data/districtBoundaries'
 import { formatUzsShort } from '../utils/formatPrice'
 
 const DEFAULT_ZOOM = 12
@@ -15,12 +16,34 @@ const DISTRICT_BORDER_COLOR = '#059669'
 const DIM_MASK_COLOR = '#0f172a'
 // A rectangle far larger than the Tashkent viewport, used with the district
 // boundary as a hole so everything outside the district reads as dimmed.
+// GeoJSON coordinate order is [lng, lat].
 const WORLD_MASK_RING = [
-  [-85, -180],
-  [-85, 180],
-  [85, 180],
-  [85, -180],
+  [-180, -85],
+  [180, -85],
+  [180, 85],
+  [-180, 85],
+  [-180, -85],
 ]
+
+// A district's real boundary (from districts.geo.json) is a Polygon or
+// MultiPolygon (e.g. a district with a disjoint exclave). Either way, we
+// only need its outer ring(s) — none of the source districts have holes.
+function outerRingsOf(geometry) {
+  if (geometry.type === 'Polygon') return [geometry.coordinates[0]]
+  if (geometry.type === 'MultiPolygon') return geometry.coordinates.map((polygon) => polygon[0])
+  return []
+}
+
+// A Polygon whose first ring is a world-covering rectangle and whose
+// remaining rings are the district's outer ring(s) as holes (Leaflet's SVG
+// renderer uses an even-odd fill rule, so ring winding direction doesn't
+// matter here) — dims everything outside the district in one layer.
+function buildMaskGeometry(feature) {
+  return {
+    type: 'Polygon',
+    coordinates: [WORLD_MASK_RING, ...outerRingsOf(feature.geometry)],
+  }
+}
 
 const MARKER_WIDTH = 64
 const MARKER_HEIGHT = 26
@@ -58,7 +81,7 @@ function createLocationDivIcon() {
 
 function ApartmentMap({
   apartments,
-  selectedDistrict,
+  selectedDistrictId,
   focusApartmentId,
   onMarkerClick,
   userLocation,
@@ -118,35 +141,40 @@ function ApartmentMap({
       districtLayerRef.current.remove()
       districtLayerRef.current = null
     }
-    if (selectedDistrict) {
+    const feature = selectedDistrictId ? getDistrictFeature(selectedDistrictId) : null
+    if (feature) {
       const group = L.layerGroup()
-      // Dim everything outside the district using the boundary as a hole
-      // in a world-covering mask (even-odd fill rule punches the hole).
-      L.polygon([WORLD_MASK_RING, selectedDistrict.boundary], {
-        stroke: false,
-        fillColor: DIM_MASK_COLOR,
-        fillOpacity: 0.22,
-        interactive: false,
-      }).addTo(group)
-      // Clear green outline for the district itself.
-      L.polygon(selectedDistrict.boundary, {
-        color: DISTRICT_BORDER_COLOR,
-        weight: 2.5,
-        opacity: 0.9,
-        fillOpacity: 0,
+      // Dim everything outside the district using its real boundary as a
+      // hole in a world-covering mask.
+      L.geoJSON(
+        { type: 'Feature', properties: {}, geometry: buildMaskGeometry(feature) },
+        { stroke: false, fillColor: DIM_MASK_COLOR, fillOpacity: 0.22, interactive: false },
+      ).addTo(group)
+      // Clear green outline for the district's actual boundary.
+      const boundaryLayer = L.geoJSON(feature, {
+        style: {
+          color: DISTRICT_BORDER_COLOR,
+          weight: 2.5,
+          opacity: 0.9,
+          fillOpacity: 0,
+        },
         interactive: false,
       }).addTo(group)
       group.addTo(map)
       districtLayerRef.current = group
 
-      const center = [selectedDistrict.latitude, selectedDistrict.longitude]
-      map.flyTo(center, DISTRICT_ZOOM, { duration: 0.6 })
+      map.flyToBounds(boundaryLayer.getBounds(), {
+        paddingTopLeft: [40, 40],
+        paddingBottomRight: [40, 40],
+        maxZoom: DISTRICT_ZOOM,
+        duration: 0.6,
+      })
     } else {
       map.flyTo([TASHKENT_CENTER.latitude, TASHKENT_CENTER.longitude], DEFAULT_ZOOM, {
         duration: 0.6,
       })
     }
-  }, [selectedDistrict])
+  }, [selectedDistrictId])
 
   useEffect(() => {
     const map = mapRef.current

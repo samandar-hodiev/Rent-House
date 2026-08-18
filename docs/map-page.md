@@ -15,7 +15,8 @@ has zero peer deps). This doc covers the Map page only; see
 | `components/FilterBar.jsx` / `FilterPanel.jsx` | Same shared, props-controlled filter UI used on Home/Wishlist. Map passes `glass` (see below) but the filtering logic itself is identical everywhere. |
 | `utils/filterApartments.js` | Single filtering pipeline — district + filters. No map-specific filtering exists. |
 | `utils/geo.js` | Isolated `getDistanceKm` (haversine) + `getNearbyApartments(apartments, userLocation, radiusKm)`, used only for the "nearby" status text/marker highlight. |
-| `data/districts.js` | `DISTRICTS`: `{ id, name, latitude, longitude, boundary }`, where `boundary` is a `[lat, lng][]` polygon ring. |
+| `data/districts.js` | `DISTRICTS`: `{ id, name }` — search/selection metadata only (`DistrictSelector`, filter chips, apartment cards). No geometry. |
+| `data/districts.geo.json` + `data/districtBoundaries.js` | The real district geometry — see "District selection" below. |
 
 ## State ownership
 
@@ -26,16 +27,18 @@ All Map-page state lives in `MapPage`, not in `ApartmentMap` or Context:
 - `userLocation`, `locationStatus` (`idle | locating | granted | error`), `locationErrorKey` — the geolocation flow.
 - `leafletMapRef` — a plain `useRef`, populated by `ApartmentMap` via its `mapRef` prop so `MapPage`'s own zoom buttons can call `map.zoomIn()`/`zoomOut()` without Leaflet's default zoom control.
 
-`ApartmentMap` only holds *internal* refs (the `L.map` instance, layer groups) — it is otherwise a controlled component driven entirely by props (`apartments`, `selectedDistrict`, `focusApartmentId`, `userLocation`, `nearbyApartmentIds`, `onMarkerClick`).
+`ApartmentMap` only holds *internal* refs (the `L.map` instance, layer groups) — it is otherwise a controlled component driven entirely by props (`apartments`, `selectedDistrictId`, `focusApartmentId`, `userLocation`, `nearbyApartmentIds`, `onMarkerClick`).
 
 ## Compact glass control bar
 
-One shared bar directly under the Header (`absolute inset-x-0 top-0 z-10` inside the map's `relative` container), split by `justify-between`:
+One shared bar directly under the Header (`absolute inset-x-0 top-0 z-10` inside the map's `relative` container):
 
 - **Left:** `FilterBar` (with `glass` prop) + a result-count pill.
 - **Right:** My Location, Zoom In, Zoom Out — plain React buttons, not Leaflet controls, so they can live in the same bar as the filters. They call `leafletMapRef.current.zoomIn()/.zoomOut()` and the existing `handleLocateRequest`.
+- **Desktop/tablet (`sm:` and up):** one row, `flex-row justify-between` — filters on the left, location/zoom on the right.
+- **Mobile:** the *same* bar switches to `flex-col` — filter button/chips on the first row, the location/zoom cluster on a second row inside the same container, right-aligned (`justify-end`). There is no second floating control container on mobile; it's the same glass `<div>`, just stacked.
 
-Style: `bg-white/80` + `backdrop-blur-md` (~12px) + `border-white/50` + a soft shadow — the map stays visible through it. `FilterBar`'s `glass` variant intentionally has **no border/blur/shadow of its own** (`border-transparent bg-white/55`) since it's nested inside the bar's own glass surface; giving it a second full glass treatment would double up the effect. A secondary small pill (locating/nearby-count/error status) renders in its own row below the bar only when there's something to show, so the primary bar's height stays fixed regardless of geolocation state.
+Style: `bg-white/12` + `backdrop-blur-lg` (16px) + `border-white/25` + a soft shadow — deliberately very translucent ("liquid glass floating over the map", not a white toolbar); the map stays clearly visible through it. `FilterBar`'s `glass` variant intentionally has **no border/blur/shadow of its own** (`border-transparent bg-white/55`) since it's nested inside the bar's own glass surface — giving it a second full glass treatment would double up the effect, and its higher, fixed opacity is what keeps filter text/chips/count readable even though the bar itself is only ~12% white. A secondary small pill (locating/nearby-count/error status) renders in its own row below the bar only when there's something to show, so the primary bar's height stays fixed regardless of geolocation state.
 
 ## Z-index / stacking
 
@@ -47,24 +50,53 @@ The dropdown-under-map bug (Leaflet's own `.leaflet-top`/`.leaflet-bottom` panes
 
 ## District selection
 
-`data/districts.js` boundaries are real (simplified) OpenStreetMap
-administrative-boundary polygons — not a circle/radius. `ApartmentMap`
-renders two `L.polygon` layers when a district is selected:
+### Boundary data source
 
-1. A world-covering rectangle with the district boundary as a hole (SVG
-   even-odd fill), semi-transparent dark fill — dims everything outside the
-   district without hiding geographic context.
-2. The boundary itself, outlined in `--color-primary` green, no fill.
+`data/districts.geo.json` is a real GeoJSON `FeatureCollection` — not a
+circle/radius, and not hand-approximated points. Each district's boundary
+was built from actual OpenStreetMap data:
+
+1. For each district's OSM administrative relation (`admin_level=6`,
+   `boundary=administrative`), fetch the full-resolution geometry via the
+   Overpass API (`out geom;`), which returns the relation's member ways as
+   ordered coordinate lists.
+2. Join the outer ways end-to-end into closed ring(s) — most districts
+   produce exactly one ring; `mirzo-ulugbek` produces two (a real disjoint
+   exclave in OSM's data), so its `geometry.type` is `MultiPolygon` while
+   every other district is a `Polygon`.
+3. Simplify each ring with the Ramer–Douglas–Peucker algorithm (~30m
+   tolerance) to keep bundle size reasonable (12 districts ≈ 21KB total)
+   while preserving the actual shape — this is standard cartographic
+   simplification of real survey data, not manual coordinate guessing.
+
+Each `Feature.properties.id` matches a `DISTRICTS` entry in `districts.js`.
+`data/districtBoundaries.js` wraps the raw GeoJSON with a small
+`getDistrictFeature(id)` lookup — `ApartmentMap` is the only consumer.
+**Extensibility:** adding another district (or swapping in a future
+backend-served GeoJSON dataset) means adding/replacing a `Feature` with a
+matching `id`; no other code changes.
+
+### Rendering
+
+`ApartmentMap` renders two `L.geoJSON` layers when a district is selected:
+
+1. A world-covering rectangle Polygon with the district's outer ring(s) as
+   holes (`buildMaskGeometry` — Leaflet's SVG renderer uses an even-odd
+   fill rule, so ring winding direction doesn't matter), semi-transparent
+   dark fill — dims everything outside the district without hiding
+   geographic context.
+2. The district's own GeoJSON feature, styled with a `--color-primary`
+   green outline and no fill — a clear, accurate boundary rather than an
+   approximate shape.
+
+The map then calls `map.flyToBounds(boundaryLayer.getBounds(), { maxZoom, duration })`
+— fitting the *real* bounding box of whatever was selected, rather than
+flying to a single hardcoded center point per district.
 
 Markers render in Leaflet's `markerPane` (above the vector `overlayPane`),
 so the dim mask never obscures them. Apartments outside the district are
 filtered out upstream by `filterApartments` (same pipeline as Home) — they
 aren't hidden via CSS, they're just absent from `visibleApartments`.
-
-If real per-district GeoJSON (e.g. from a future backend) becomes
-available, only `data/districts.js`'s `boundary` field needs to change —
-`ApartmentMap` already consumes it as a plain `[lat, lng][]` ring and has
-no other coupling to how that data was produced.
 
 ## Filter flow
 

@@ -159,22 +159,25 @@ map-specific duplicate:
   the single source both the marker list and the results-count pill read
   from — selecting a district or opening `FilterBar` narrows both
   identically, with no separate map query.
-- **District boundaries:** `data/districts.js` exports `DISTRICTS` as
-  `{ id, name, latitude, longitude, boundary }`, where `boundary` is a
-  simplified `[lat, lng][]` polygon ring (derived from OpenStreetMap
-  administrative-boundary relations via Nominatim/Overpass, stride-sampled
-  down to ≤40 points per district for bundle size — not survey-grade). This
-  replaced an earlier `radiusMeters` circle-based placeholder; every mock
-  apartment's `latitude`/`longitude` was re-validated (point-in-polygon) to
-  actually fall inside its `districtId`'s real boundary.
-- **District selection visuals:** when `selectedDistrict` is set,
-  `ApartmentMap` draws two `L.polygon` layers in a `layerGroup`: (1) a
-  world-covering rectangle with the district boundary as a hole (SVG
-  even-odd fill), semi-transparent dark fill, to dim everything outside the
-  district without hiding geographic context; (2) the district boundary
-  itself with a clear `--color-primary` (green) outline and no fill. Markers
-  live in Leaflet's `markerPane` (z-index above the vector `overlayPane`),
-  so they're never visually obscured by the mask. Apartments outside the
+- **District boundaries:** real GeoJSON, not hand-approximated. `data/districts.js`
+  is now just search/selection metadata (`{ id, name }`); the actual geometry
+  lives in `data/districts.geo.json` (a standard GeoJSON `FeatureCollection`,
+  `Feature.properties.id` matching a `DISTRICTS` entry) + `data/districtBoundaries.js`
+  (`getDistrictFeature(id)` lookup). Each boundary was built from the district's
+  real OSM administrative relation (fetched full-resolution via the Overpass
+  API, outer ways joined into closed ring(s), simplified with
+  Ramer–Douglas–Peucker) — not a circle, not stride-sampled, not eyeballed.
+  Full detail (including the `MultiPolygon` exclave case) is in
+  `docs/map-page.md`.
+- **District selection visuals:** when a district is selected, `ApartmentMap`
+  renders two `L.geoJSON` layers: (1) a world-covering mask Polygon with the
+  district's outer ring(s) as holes, semi-transparent dark fill, to dim
+  everything outside the district without hiding geographic context; (2) the
+  district's own feature, styled with a clear `--color-primary` (green)
+  outline and no fill. The map then `flyToBounds()`s the boundary layer's
+  *actual* bounding box (not a hardcoded per-district center point). Markers
+  live in Leaflet's `markerPane` (z-index above the vector `overlayPane`), so
+  they're never visually obscured by the mask. Apartments outside the
   district are simply absent from `visibleApartments` (filtered upstream),
   not hidden via CSS/opacity.
 - **Stacking/z-index:** `ApartmentMap`'s root div is `absolute inset-0 z-0`
@@ -566,10 +569,10 @@ backend database URL) — no secrets exist in the repository today.
   aren't actually delivered anywhere. This is intentional/scoped, not a bug.
 - **"Qo'ng'iroq qilish" (Call) is a plain `tel:` link** — no call-tracking,
   no backend involvement.
-- **District boundaries are simplified, not survey-grade.** `data/districts.js`'s
-  `boundary` polygons are derived from OpenStreetMap administrative
-  relations but stride-sampled down to ≤40 points per district for bundle
-  size — fine for a visual highlight, not for precise cadastral use.
+- **District boundaries are simplified, not survey-grade.** `data/districts.geo.json`'s
+  polygons are real OpenStreetMap administrative relations, Douglas-Peucker
+  simplified (~30m tolerance) for bundle size — fine for a visual highlight
+  and accurate to the real district shape, not for precise cadastral use.
 - **"Nearby apartments" is a client-side MVP.** `utils/geo.js` computes
   straight-line (haversine) distance against the full in-memory
   `APARTMENTS` array on every geolocation success — fine at 10 mock

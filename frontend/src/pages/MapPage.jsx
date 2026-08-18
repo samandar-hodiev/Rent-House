@@ -7,7 +7,6 @@ import FilterBar from '../components/FilterBar'
 import { useSearch } from '../context/SearchContext'
 import { useLocale } from '../context/LocaleContext'
 import { APARTMENTS } from '../data/apartments'
-import { getDistrictById } from '../data/districts'
 import { filterApartments } from '../utils/filterApartments'
 import { getNearbyApartments } from '../utils/geo'
 
@@ -34,8 +33,6 @@ function MapPage() {
     const raw = searchParams.get('apartment')
     return raw ? Number(raw) : null
   }, [searchParams])
-
-  const district = districtId ? getDistrictById(districtId) : null
 
   // Map MVP: district + filters only, no keyword search (kept disabled in
   // the header — see SearchBar.jsx).
@@ -106,7 +103,7 @@ function MapPage() {
 
       <ApartmentMap
         apartments={visibleApartments}
-        selectedDistrict={district}
+        selectedDistrictId={districtId}
         focusApartmentId={focusApartmentId}
         onMarkerClick={handleMarkerClick}
         userLocation={locationStatus === 'granted' ? userLocation : null}
@@ -115,7 +112,7 @@ function MapPage() {
       />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-start gap-2 p-3 sm:p-4">
-        <div className="pointer-events-auto flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-white/25 bg-white/20 px-2.5 py-2 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg">
+        <div className="pointer-events-auto flex w-full flex-col gap-2 rounded-xl border border-white/25 bg-white/12 px-2.5 py-2 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <FilterBar
               filters={filters}
@@ -129,7 +126,7 @@ function MapPage() {
             </span>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center justify-end gap-1">
             <button
               type="button"
               onClick={handleLocateRequest}
