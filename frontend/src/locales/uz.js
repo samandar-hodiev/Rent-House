@@ -23,6 +23,7 @@ export default {
   'search.keywordLabel': "Ko'cha, metro yoki turar joy nomi bo'yicha qidirish",
   'search.keywordPlaceholder': "Ko'cha, metro yoki turar joy nomi...",
   'search.button': 'Qidirish',
+  'search.keywordDisabledHint': 'Xarita sahifasida tuman va filtrlar orqali qidiring',
 
   'apartments.title': 'Ijara uchun uylar',
   'apartments.defaultCount': '{count} ta uy bor',
@@ -165,4 +166,7 @@ export default {
     'Yangi qurilgan turar-joy majmuasida joylashgan keng va yorug‘ kvartira. Metro Yunusobod bekatiga yaqin.',
   'apartmentDescription.10':
     "Yangi qurilgan uyda joylashgan, birinchi marta ijaraga beriladigan toza kvartira. Yangi infratuzilma va keng hudud.",
+
+  'map.pageTitle': 'Xarita',
+  'map.viewDetails': "Batafsil ko'rish",
 }

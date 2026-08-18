@@ -23,6 +23,7 @@ export default {
   'search.keywordLabel': 'Поиск по улице, метро или названию',
   'search.keywordPlaceholder': 'Улица, метро или название дома...',
   'search.button': 'Искать',
+  'search.keywordDisabledHint': 'На карте ищите по району и фильтрам',
 
   'apartments.title': 'Квартиры в аренду',
   'apartments.defaultCount': '{count} квартир',
@@ -165,4 +166,7 @@ export default {
     'Просторная светлая квартира в новом жилом комплексе. Рядом станция метро Юнусабад.',
   'apartmentDescription.10':
     'Чистая квартира в новостройке, сдаётся впервые. Новая инфраструктура и просторная территория.',
+
+  'map.pageTitle': 'Карта',
+  'map.viewDetails': 'Подробнее',
 }

@@ -1,6 +1,8 @@
 import { useEffect, useId, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useSearch } from '../context/SearchContext'
 import { useLocale } from '../context/LocaleContext'
+import { ROUTES } from '../routes/paths'
 import DistrictSelector from './DistrictSelector'
 
 function SearchIcon({ className = '' }) {
@@ -25,6 +27,11 @@ function SearchBar() {
   const { districtId, setDistrictId, keyword, submitKeyword } = useSearch()
   const [keywordInput, setKeywordInput] = useState(keyword)
   const keywordInputId = useId()
+  const location = useLocation()
+
+  // The Map MVP searches by district + filters only; keyword/address search
+  // is kept in the DOM (not removed) but visually muted and inert there.
+  const isKeywordSearchDisabled = location.pathname === ROUTES.map
 
   useEffect(() => {
     setKeywordInput(keyword)
@@ -32,6 +39,7 @@ function SearchBar() {
 
   const handleSubmit = (event) => {
     event.preventDefault()
+    if (isKeywordSearchDisabled) return
     submitKeyword(keywordInput)
   }
 
@@ -52,13 +60,17 @@ function SearchBar() {
         value={keywordInput}
         onChange={(event) => setKeywordInput(event.target.value)}
         placeholder={t('search.keywordPlaceholder')}
-        className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none lg:px-4 lg:py-2.5"
+        disabled={isKeywordSearchDisabled}
+        title={isKeywordSearchDisabled ? t('search.keywordDisabledHint') : undefined}
+        className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none disabled:cursor-not-allowed disabled:text-text-muted disabled:placeholder:text-border lg:px-4 lg:py-2.5"
       />
 
       <button
         type="submit"
         aria-label={t('search.button')}
-        className="flex shrink-0 items-center justify-center gap-1.5 rounded-r-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary min-[412px]:px-4 lg:px-5 lg:py-2.5"
+        disabled={isKeywordSearchDisabled}
+        title={isKeywordSearchDisabled ? t('search.keywordDisabledHint') : undefined}
+        className="flex shrink-0 items-center justify-center gap-1.5 rounded-r-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:bg-border disabled:text-text-muted disabled:hover:bg-border min-[412px]:px-4 lg:px-5 lg:py-2.5"
       >
         <SearchIcon className="min-[412px]:hidden" />
         <span className="hidden min-[412px]:inline">{t('search.button')}</span>

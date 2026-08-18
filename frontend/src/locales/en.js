@@ -23,6 +23,7 @@ export default {
   'search.keywordLabel': 'Search by street, metro or property name',
   'search.keywordPlaceholder': 'Street, metro or property name...',
   'search.button': 'Search',
+  'search.keywordDisabledHint': 'On the map, search by district and filters',
 
   'apartments.title': 'Apartments for rent',
   'apartments.defaultCount': '{count} homes available',
@@ -164,4 +165,7 @@ export default {
     'Spacious, bright apartment in a new residential complex. Near Yunusobod metro station.',
   'apartmentDescription.10':
     'Clean apartment in a newly built house, rented out for the first time. New infrastructure and spacious grounds.',
+
+  'map.pageTitle': 'Map',
+  'map.viewDetails': 'View details',
 }
