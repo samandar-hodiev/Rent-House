@@ -106,6 +106,32 @@ by Home, with `keyword` hard-disabled (see "Header search" below). The
 resulting array drives both the marker list and the result-count pill, so
 selecting a district or changing a filter narrows both identically.
 
+### URL persistence
+
+The active district + filters are mirrored into the URL query string
+(`?district=&min_price=&max_price=&rooms=&min_area=&max_area=&floor=&furnished=`,
+via `utils/mapFilterParams.js`) so they survive a reload, browser
+back/forward, and copy/paste of the URL:
+
+- **On mount**, if the URL has any of these params, they're parsed and
+  pushed into the shared `SearchContext` (`setDistrictId`/`setFilters`),
+  overriding whatever was already there — this is the "reload restores the
+  view" and "shared link opens filtered" path. If the URL has *none* of
+  them (e.g. arriving from Home with a district already active in the
+  shared context), the existing context state is left alone.
+- **After that**, any change to `districtId`/`filters` — from the Header's
+  district selector, `FilterBar`, or `clearFilters()` — is written back out
+  to the URL via `setSearchParams(..., { replace: true })`. `replace` (not
+  `push`) is deliberate: filter tweaks don't spam browser history, but
+  navigating away and back (a real history entry) still lands back on the
+  last URL this page had, which restores the same filtered view.
+- A ref-based `skipNextUrlSync` guard prevents the mount-time hydration
+  effect and the state→URL effect from fighting each other on the first
+  render (hydrate-from-URL always wins on mount; the URL write effect skips
+  exactly one cycle right after a hydration actually changed something).
+- This logic is entirely local to `MapPage` — `SearchContext` itself is
+  unchanged, so Home's behavior (no URL sync) is unaffected.
+
 ## Apartment marker + preview flow
 
 1. Marker click → `onMarkerClick(apartment)` → `MapPage` sets `selectedApartment`.

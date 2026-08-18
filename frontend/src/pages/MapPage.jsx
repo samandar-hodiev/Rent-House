@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { LocateFixed, Minus, Plus } from 'lucide-react'
 import ApartmentMap from '../components/ApartmentMap'
@@ -9,6 +9,7 @@ import { useLocale } from '../context/LocaleContext'
 import { APARTMENTS } from '../data/apartments'
 import { filterApartments } from '../utils/filterApartments'
 import { getNearbyApartments } from '../utils/geo'
+import { applyMapFiltersToParams, parseMapFiltersFromParams } from '../utils/mapFilterParams'
 
 const NEARBY_RADIUS_KM = 3
 
@@ -20,19 +21,49 @@ const GEOLOCATION_ERROR_KEYS = {
 
 function MapPage() {
   const { t } = useLocale()
-  const [searchParams] = useSearchParams()
-  const { districtId, filters, setFilters, clearFilters, activeFilterCount } = useSearch()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { districtId, setDistrictId, filters, setFilters, clearFilters, activeFilterCount } =
+    useSearch()
   const [selectedApartment, setSelectedApartment] = useState(null)
   const [userLocation, setUserLocation] = useState(null)
   const [locationStatus, setLocationStatus] = useState('idle') // idle | locating | granted | error
   const [locationErrorKey, setLocationErrorKey] = useState(null)
   const isLocatingRef = useRef(false)
   const leafletMapRef = useRef(null)
+  const skipNextUrlSync = useRef(false)
 
   const focusApartmentId = useMemo(() => {
     const raw = searchParams.get('apartment')
     return raw ? Number(raw) : null
   }, [searchParams])
+
+  // Restore district/filters from the URL once on mount — covers a reload,
+  // landing here via browser back/forward, or opening a shared/copied URL.
+  // If the URL has no district/filter params, leave whatever's already
+  // active (e.g. carried over from Home's shared SearchContext) alone.
+  useEffect(() => {
+    const parsed = parseMapFiltersFromParams(searchParams)
+    if (!parsed.hasAnyValue) return
+    skipNextUrlSync.current = true
+    if (parsed.districtId) setDistrictId(parsed.districtId)
+    setFilters(parsed.filters)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Keep the URL in sync with the active district/filters (district and
+  // "Clear all" clearing filters both flow through here too) so the
+  // selection can be reloaded, shared, or restored via back/forward.
+  // `replace` avoids spamming browser history on every filter tweak.
+  useEffect(() => {
+    if (skipNextUrlSync.current) {
+      skipNextUrlSync.current = false
+      return
+    }
+    setSearchParams((prev) => applyMapFiltersToParams(prev, districtId, filters), {
+      replace: true,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [districtId, filters])
 
   // Map MVP: district + filters only, no keyword search (kept disabled in
   // the header — see SearchBar.jsx).
