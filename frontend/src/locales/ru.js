@@ -170,6 +170,8 @@ export default {
   'map.pageTitle': 'Карта',
   'map.viewDetails': 'Подробнее',
   'map.locateMe': 'Показать моё местоположение',
+  'map.zoomIn': 'Приблизить',
+  'map.zoomOut': 'Отдалить',
   'map.locating': 'Определение местоположения…',
   'map.nearbyCount': '{count} квартир в радиусе 3 км',
   'map.locationDenied': 'Доступ к геолокации запрещён',

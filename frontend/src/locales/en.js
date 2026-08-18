@@ -169,6 +169,8 @@ export default {
   'map.pageTitle': 'Map',
   'map.viewDetails': 'View details',
   'map.locateMe': 'Show my location',
+  'map.zoomIn': 'Zoom in',
+  'map.zoomOut': 'Zoom out',
   'map.locating': 'Locating…',
   'map.nearbyCount': '{count} apartments within 3 km',
   'map.locationDenied': 'Location access denied',

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { LocateFixed, Minus, Plus } from 'lucide-react'
 import ApartmentMap from '../components/ApartmentMap'
 import MapApartmentPreview from '../components/MapApartmentPreview'
 import FilterBar from '../components/FilterBar'
@@ -27,6 +28,7 @@ function MapPage() {
   const [locationStatus, setLocationStatus] = useState('idle') // idle | locating | granted | error
   const [locationErrorKey, setLocationErrorKey] = useState(null)
   const isLocatingRef = useRef(false)
+  const leafletMapRef = useRef(null)
 
   const focusApartmentId = useMemo(() => {
     const raw = searchParams.get('apartment')
@@ -109,13 +111,12 @@ function MapPage() {
         onMarkerClick={handleMarkerClick}
         userLocation={locationStatus === 'granted' ? userLocation : null}
         nearbyApartmentIds={nearbyApartmentIds}
-        onLocateRequest={handleLocateRequest}
-        locateLabel={t('map.locateMe')}
+        mapRef={leafletMapRef}
       />
 
-      <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-start p-4">
-        <div className="flex w-full flex-col items-start gap-2">
-          <div className="pointer-events-auto flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-start gap-2 p-3 sm:p-4">
+        <div className="pointer-events-auto flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-white/50 bg-white/80 px-2.5 py-2 shadow-[0_2px_10px_rgba(15,23,42,0.10)] backdrop-blur-md">
+          <div className="flex flex-wrap items-center gap-2">
             <FilterBar
               filters={filters}
               setFilters={setFilters}
@@ -123,20 +124,50 @@ function MapPage() {
               activeFilterCount={activeFilterCount}
               glass
             />
-            <span className="rounded-full border border-white/50 bg-white/80 px-3 py-1.5 text-xs font-medium text-text-secondary shadow-[0_2px_10px_rgba(15,23,42,0.10)] backdrop-blur-md">
+            <span className="rounded-full bg-white/55 px-3 py-1.5 text-xs font-medium text-text-secondary">
               {countText}
             </span>
           </div>
 
-          {locationStatusText ? (
-            <span
-              role="status"
-              className="pointer-events-auto rounded-full border border-white/50 bg-white/80 px-3 py-1.5 text-xs font-medium text-text-secondary shadow-[0_2px_10px_rgba(15,23,42,0.10)] backdrop-blur-md"
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleLocateRequest}
+              aria-label={t('map.locateMe')}
+              title={t('map.locateMe')}
+              className="flex size-8 shrink-0 items-center justify-center rounded-full text-text-secondary hover:bg-white/70 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              {locationStatusText}
-            </span>
-          ) : null}
+              <LocateFixed aria-hidden="true" size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => leafletMapRef.current?.zoomIn()}
+              aria-label={t('map.zoomIn')}
+              title={t('map.zoomIn')}
+              className="flex size-8 shrink-0 items-center justify-center rounded-full text-text-secondary hover:bg-white/70 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <Plus aria-hidden="true" size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => leafletMapRef.current?.zoomOut()}
+              aria-label={t('map.zoomOut')}
+              title={t('map.zoomOut')}
+              className="flex size-8 shrink-0 items-center justify-center rounded-full text-text-secondary hover:bg-white/70 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <Minus aria-hidden="true" size={16} />
+            </button>
+          </div>
         </div>
+
+        {locationStatusText ? (
+          <span
+            role="status"
+            className="pointer-events-auto rounded-full border border-white/50 bg-white/80 px-3 py-1.5 text-xs font-medium text-text-secondary shadow-[0_2px_10px_rgba(15,23,42,0.10)] backdrop-blur-md"
+          >
+            {locationStatusText}
+          </span>
+        ) : null}
       </div>
 
       {selectedApartment ? (

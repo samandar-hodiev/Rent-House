@@ -25,8 +25,9 @@ function ChipRemoveIcon() {
   )
 }
 
-const GLASS_CLASS =
-  'border-white/50 bg-white/80 backdrop-blur-md shadow-[0_2px_10px_rgba(15,23,42,0.10)]'
+// Meant to sit inside the Map page's own glass control bar, so it stays
+// flat (no border/blur/shadow of its own — that would double up the effect).
+const GLASS_CLASS = 'border-transparent bg-white/55'
 
 function Chip({ label, onRemove, glass }) {
   return (
@@ -155,7 +156,7 @@ function FilterBar({
           aria-haspopup="true"
           aria-expanded={isOpen}
           className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-            glass ? `${GLASS_CLASS} hover:bg-white/90` : 'border-border bg-surface hover:bg-surface-secondary'
+            glass ? `${GLASS_CLASS} hover:bg-white/75` : 'border-border bg-surface hover:bg-surface-secondary'
           }`}
         >
           <FilterIcon />

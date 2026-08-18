@@ -56,32 +56,6 @@ function createLocationDivIcon() {
   })
 }
 
-const LocateControl = L.Control.extend({
-  options: { position: 'topright' },
-  onAdd() {
-    const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control')
-    const link = L.DomUtil.create('a', 'renthouse-locate-control', container)
-    link.href = '#'
-    link.setAttribute('role', 'button')
-    link.setAttribute('aria-label', this.options.label)
-    link.title = this.options.label
-    link.innerHTML =
-      '<svg viewBox="0 0 20 20" fill="currentColor" class="size-4" aria-hidden="true"><path d="M10 2a1 1 0 0 1 1 1v1.06a6.5 6.5 0 0 1 5.94 5.94H18a1 1 0 1 1 0 2h-1.06A6.5 6.5 0 0 1 11 17.94V19a1 1 0 1 1-2 0v-1.06A6.5 6.5 0 0 1 3.06 12H2a1 1 0 1 1 0-2h1.06A6.5 6.5 0 0 1 9 4.06V3a1 1 0 0 1 1-1Zm0 4.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/></svg>'
-    link.style.display = 'flex'
-    link.style.alignItems = 'center'
-    link.style.justifyContent = 'center'
-    link.style.width = '30px'
-    link.style.height = '30px'
-    link.style.color = '#334155'
-
-    L.DomEvent.disableClickPropagation(container)
-    L.DomEvent.on(link, 'click', L.DomEvent.stop)
-    L.DomEvent.on(link, 'click', () => this.options.onClick?.())
-
-    return container
-  },
-})
-
 function ApartmentMap({
   apartments,
   selectedDistrict,
@@ -89,8 +63,7 @@ function ApartmentMap({
   onMarkerClick,
   userLocation,
   nearbyApartmentIds,
-  onLocateRequest,
-  locateLabel,
+  mapRef: externalMapRef,
 }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
@@ -98,30 +71,24 @@ function ApartmentMap({
   const districtLayerRef = useRef(null)
   const locationLayerRef = useRef(null)
   const hasFocusedInitialApartment = useRef(false)
-  const onLocateRequestRef = useRef(onLocateRequest)
-
-  useEffect(() => {
-    onLocateRequestRef.current = onLocateRequest
-  }, [onLocateRequest])
 
   useEffect(() => {
     const map = L.map(containerRef.current, {
       center: [TASHKENT_CENTER.latitude, TASHKENT_CENTER.longitude],
       zoom: DEFAULT_ZOOM,
       scrollWheelZoom: true,
+      // Zoom controls live in the page's compact glass bar instead of
+      // Leaflet's own top-right control — see MapPage's mapRef usage.
       zoomControl: false,
     })
-    L.control.zoom({ position: 'topright' }).addTo(map)
-    new LocateControl({
-      label: locateLabel,
-      onClick: () => onLocateRequestRef.current?.(),
-    }).addTo(map)
     L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION, maxZoom: 19 }).addTo(map)
     markersLayerRef.current = L.layerGroup().addTo(map)
     mapRef.current = map
+    if (externalMapRef) externalMapRef.current = map
     return () => {
       map.remove()
       mapRef.current = null
+      if (externalMapRef) externalMapRef.current = null
       markersLayerRef.current = null
       districtLayerRef.current = null
       locationLayerRef.current = null

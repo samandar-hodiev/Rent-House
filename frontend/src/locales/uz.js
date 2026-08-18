@@ -170,6 +170,8 @@ export default {
   'map.pageTitle': 'Xarita',
   'map.viewDetails': "Batafsil ko'rish",
   'map.locateMe': "Joylashuvimni ko'rsatish",
+  'map.zoomIn': "Kattalashtirish",
+  'map.zoomOut': "Kichiklashtirish",
   'map.locating': 'Joylashuv aniqlanmoqda…',
   'map.nearbyCount': '3 km atrofida {count} ta kvartira',
   'map.locationDenied': 'Joylashuvga ruxsat berilmadi',
