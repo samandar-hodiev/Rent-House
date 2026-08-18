@@ -210,6 +210,16 @@ approach for MVP, swappable for cloud storage later.
 - After a task: report what changed, files changed, checks run, remaining
   issues — briefly. Then stop; don't keep building beyond what was asked.
 
+## Git Workflow
+
+- Commit author is the user (Samandar Hodiev / configured git identity) —
+  never add a `Co-Authored-By: Claude ...` trailer to commit messages.
+- This applies only to new commits going forward. Do not rewrite or amend
+  existing commit history to strip trailers already present.
+- Before committing/pushing: show the user which files changed, what
+  changed, why, the exact commit message, and the target branch, and wait
+  for confirmation before running `git commit` / `git push`.
+
 ## Project Phases
 
 0. Project foundation
@@ -226,7 +236,7 @@ approach for MVP, swappable for cloud storage later.
 11. Frontend + backend integration
 12. Map/location
 13. Admin moderation
-14. Testing.
+14. Testing
 15. Docker and deployment
 
 Don't skip architectural dependencies between phases. If reordering is
