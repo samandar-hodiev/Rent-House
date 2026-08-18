@@ -213,10 +213,12 @@ function ApartmentDetailsPage() {
             {facts.map((fact) => (
               <div
                 key={fact.label}
-                className="flex flex-col items-start gap-1 rounded-lg border border-border bg-surface p-3"
+                className="group flex flex-col items-start gap-1 rounded-lg border border-border bg-surface p-3 transition-all duration-200 hover:border-primary/30 hover:bg-surface-secondary hover:shadow-sm"
               >
                 <fact.Icon aria-hidden="true" size={18} className="text-primary" />
-                <p className="text-sm font-semibold text-text-primary">{fact.value}</p>
+                <p className="text-sm font-semibold text-text-primary transition-colors duration-200 group-hover:text-primary">
+                  {fact.value}
+                </p>
                 <p className="text-xs text-text-muted">{fact.label}</p>
               </div>
             ))}
