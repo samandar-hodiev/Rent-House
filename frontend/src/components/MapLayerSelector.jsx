@@ -129,7 +129,7 @@ function MapLayerSelector({ layerId, onLayerChange }) {
         aria-expanded={isOpen}
         title={t('map.layers')}
         className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-          isOpen ? 'bg-white/70 text-primary' : 'text-text-secondary hover:bg-white/70 hover:text-primary'
+          isOpen ? 'bg-white/70 text-primary' : 'text-slate-600 hover:bg-white/70 hover:text-primary'
         }`}
       >
         <span className="block size-6 shrink-0 overflow-hidden rounded-full border border-white/70">

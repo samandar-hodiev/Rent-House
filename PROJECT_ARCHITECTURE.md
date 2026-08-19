@@ -153,24 +153,62 @@ own header without the public search bar and without login/register buttons.
 instead. `/create-listing` sits outside the `/dashboard` path but renders inside
 the same shell, so posting a listing never drops the user out of their account.
 
+Unlike the public pages (which centre on `Container`'s 1344px max width), the
+dashboard is **full-bleed**: the sidebar is flush against the left edge of the
+viewport and the main area takes the remaining width, so there is no empty
+margin beside the navigation on wide screens.
+
 | File | Responsibility |
 |---|---|
 | `dashboard/DashboardLayout.jsx` | Account shell: header + persistent sidebar (`lg:` and up) + `<Outlet/>`, and owns the mobile drawer's open state. |
 | `dashboard/DashboardHeader.jsx` | Logo (links Home), hamburger below `lg:`, avatar + user name on the right. Deliberately has no `SearchBar` and no auth buttons. |
-| `dashboard/DashboardSidebar.jsx` | Desktop `<aside>`. Also exports `DashboardNavList`, the actual entry list, so the drawer reuses the exact same items instead of duplicating them. |
+| `dashboard/DashboardSidebar.jsx` | Desktop `<aside>` (`w-64`, flush left, sticky full-height below the header). Also exports `DashboardNavList`, the actual entry list, so the drawer reuses the exact same items instead of duplicating them. |
 | `dashboard/DashboardMobileMenu.jsx` | Slide-in drawer below `lg:`, portalled to `<body>` so no ancestor stacking context can clip or offset it. Closes on link tap, backdrop click and Escape. |
-| `dashboard/DashboardNavItem.jsx` | One entry. `variant="primary"` renders the emphasised "post a listing" action; `badge` renders the unread counter. Active state comes from `NavLink`'s `isActive`. |
+| `dashboard/DashboardNavItem.jsx` | One entry. Every item shares the same size/padding/structure; `accent` only tints the icon (used by "post a listing", which is important but must not be a differently-shaped CTA) and `badge` renders the unread counter. Active state comes from `NavLink`'s `isActive`. |
 | `dashboard/ProfileOverview.jsx` | Read-only account overview + the three stat cards. |
 | `dashboard/UserAvatar.jsx` | Initials-based avatar, so the account UI needs no image asset or upload pipeline yet. |
 | `data/currentUser.js` | **Mock** signed-in user (name, email, phone, stats). The single place to replace when auth arrives. |
 
-Navigation order is: post a listing (emphasised) → Profile → My listings →
-Chats (unread badge) → Settings, with **Log out separated** below a divider.
-Log out is UI only — there is no session to clear, so it just returns Home.
+Navigation order is: Profile → Post a listing (green icon accent) → My listings
+→ Chats (unread badge) → Settings. **Log out is pinned to the very bottom** of
+the column via `mt-auto`, in both the sidebar and the drawer, so it never sits
+directly under Settings. Log out is UI only — there is no session to clear, so
+it just returns Home.
+
+`/dashboard/settings` is a **real section**, not a placeholder: an edit-profile
+card (name/email/phone + avatar preview, save is UI-only), a language chooser
+that calls the existing `LocaleContext`, and an appearance chooser
+(light/dark/system) backed by `ThemeContext` — see below. My listings, Chats and
+`/create-listing` remain professional empty states.
+
+**Theme system.** `context/ThemeContext.jsx` follows the same shape as
+`LocaleContext`: `light | dark | system`, persisted to `localStorage`
+(`renthouse_theme`). It **defaults to `light`** — the app shipped light-only, so
+only an explicitly stored preference switches it; `system` is opt-in from
+Settings and then tracks `prefers-color-scheme`. It toggles a `dark` class on
+`<html>`; `index.css` declares a `@custom-variant dark` plus a `html.dark`
+block that re-declares the **same token names** with dark values, so components
+keep using the semantic classes (`bg-surface`, `text-text-primary`,
+`border-border`) and inherit dark mode without per-component changes.
+
+It is one app-wide system: `components/ThemeToggle.jsx` (a Light/Dark switch)
+sits in **both** the public `Header` and the account `DashboardHeader`, and
+Settings additionally exposes the three-way choice. There is no second theme
+implementation.
+
+**Surfaces that deliberately stay light in dark mode.** Anything floating over
+a photo or over the always-light Yandex map keeps fixed light-scheme colours
+(`text-slate-600/700/900` on white glass) instead of theme tokens — the map
+price markers, the map glass control bar and its filter chips, the map controls,
+the gallery arrows and the wishlist buttons. Using tokens there would make them
+light-on-light and unreadable. Modal scrims likewise use a fixed
+`bg-slate-900/40` rather than a token, so the overlay stays dark in both themes.
 
 **Currently UI only:** the user is mocked, no route is protected, the stats and
-the unread badge are placeholders, and Edit profile / listings / chats /
-settings / create-listing have no forms or data behind them.
+the unread badge are placeholders, and saving the profile / listings / chats /
+create-listing have no data behind them. Avatar upload is not implemented
+(initials only). Language and appearance are the two settings that genuinely
+persist and take effect.
 
 **Planned backend integration:** replace `data/currentUser.js` with the session
 user from `GET /api/v1/auth/me`; guard the `/dashboard` and `/create-listing`
@@ -365,7 +403,7 @@ All routes render inside `RootLayout` (Header + `<Outlet/>` + Footer).
 | `/dashboard/profile` | `DashboardPage` → `ProfileOverview` | Account overview: avatar, name, email, phone, stat cards, "Edit profile" | UI only (mock user) |
 | `/dashboard/listings` | `DashboardListingsPage` | My listings — empty state + "post a listing" action | UI only |
 | `/dashboard/chats` | `DashboardChatsPage` | Chats — empty state | UI only |
-| `/dashboard/settings` | `DashboardSettingsPage` | Settings — empty state | UI only |
+| `/dashboard/settings` | `DashboardSettingsPage` | Settings: edit profile, language (existing i18n), appearance (light/dark/system) | Language + appearance work; profile save is UI only |
 | `/create-listing` | `CreateListingPage` | Listing form shell, rendered inside the account layout | UI only |
 | `/owner` | `OwnerDashboardPage` | Placeholder | Not implemented |
 | `/admin` | `AdminPage` | Placeholder | Not implemented |
@@ -433,6 +471,7 @@ in `App.jsx` around the router (`LocaleProvider` → `SearchProvider` →
 | **Locale** | `LocaleContext` | `useState` + `localStorage` (`renthouse_locale`) | Holds `locale` (`'uz' \| 'ru' \| 'en'`), `setLocale`, and `t(key, params)` — a flat-dictionary lookup with `{param}` interpolation, no external i18n library. Falls back to `uz` for missing keys. |
 | **Search (Home page only)** | `SearchContext` | `useState` (in-memory, not persisted) | `districtId`, `keyword`, `filters` (price/rooms/area/floor/furnished), `sort`. This is explicitly **Home-page-scoped** — Wishlist does *not* use this context, it keeps its own local `filters`/`sort` state in `WishlistPage` itself, because its filterable field set differs (district instead of floor) and its results are the saved subset, not the global catalog. |
 | **Wishlist** | `WishlistContext` | `useState` (`Map<id, savedAtISOString>`) + `localStorage` (`renthouse_wishlist`) | `toggleWishlist(id)`, `isSaved(id)`, `getSavedAt(id)`, `savedCount`. The only client state that survives a reload. `ApartmentCard` reads this directly (not via props) so wishlist toggles stay in sync across every page that renders a card. |
+| **Theme** | `ThemeContext` | `useState` + `localStorage` (`renthouse_theme`) | `theme` (`'light' \| 'dark' \| 'system'`), `setTheme`, `resolvedTheme`. Toggles a `dark` class on `<html>`; dark values are token overrides in `index.css`, so components need no per-element dark classes. **Defaults to `light`**; `system` is opt-in and then tracks `prefers-color-scheme`. Switched from `ThemeToggle` in both headers, or the three-way chooser in Settings. |
 | **UI-local state** | plain `useState` in each component | in-memory only | Dropdown open/closed (district, language, sort, filter panel — all via `useDismiss`), gallery active image index, chat modal messages, mobile menu open/closed, share-copied toast, per-page `loading` flags. |
 
 Filters/apartments are **not** in Context globally — each page (Home,
@@ -572,6 +611,8 @@ backend database URL) — no secrets exist in the repository today.
 - [x] Mock "chat" UI on the details page (no backend)
 - [x] Responsive header/footer/grid/details across desktop/tablet/mobile
 - [x] uz/ru/en localization (default uz), persisted language choice
+- [x] Light/Dark theme (default light, persisted; toggle in both headers plus a
+      light/dark/system chooser in account Settings)
 - [x] Loading skeletons and empty/not-found states throughout
 - [x] Map (`/map`): Leaflet tiles/markers, district boundary highlight +
       dimmed surroundings, existing filters reused (no second filtering

@@ -74,6 +74,18 @@ export default {
   'currency.somPerMonth': 'UZS / mo',
 
   'city.tashkent': 'Tashkent',
+  'theme.toggleToDark': 'Switch to dark mode',
+  'theme.toggleToLight': 'Switch to light mode',
+  'dashboard.settingsProfile': 'Edit profile',
+  'dashboard.settingsLanguage': 'Language',
+  'dashboard.settingsAppearance': 'Appearance',
+  'dashboard.avatar': 'Avatar',
+  'dashboard.avatarHint': 'Image upload will be added in a later step.',
+  'dashboard.saveChanges': 'Save changes',
+  'dashboard.saveNote': 'The details are valid. Saving will be connected in a later step.',
+  'dashboard.themeLight': 'Light',
+  'dashboard.themeDark': 'Dark',
+  'dashboard.themeSystem': 'System',
 
   // User account dashboard (UI only — no auth/backend yet).
   'dashboard.navLabel': 'Account navigation',

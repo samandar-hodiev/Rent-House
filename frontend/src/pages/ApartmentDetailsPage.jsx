@@ -179,7 +179,7 @@ function ApartmentDetailsPage() {
                 className={`flex size-9 items-center justify-center rounded-full shadow-[0_2px_10px_rgba(15,23,42,0.10)] ring-1 backdrop-blur-md transition-all duration-150 hover:scale-105 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   saved
                     ? 'bg-primary-light/80 text-primary ring-primary/30'
-                    : 'bg-white/70 text-text-secondary ring-white/60 hover:bg-white/90'
+                    : 'bg-white/70 text-slate-600 ring-white/60 hover:bg-white/90'
                 }`}
               >
                 <HeartIcon filled={saved} />

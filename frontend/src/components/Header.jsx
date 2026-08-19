@@ -6,6 +6,7 @@ import { useDismiss } from '../hooks/useDismiss'
 import Container from './Container'
 import SearchBar from './SearchBar'
 import LanguageSelector from './LanguageSelector'
+import ThemeToggle from './ThemeToggle'
 
 const navLinkClass = ({ isActive }) =>
   `text-sm font-medium transition-colors hover:text-primary ${
@@ -66,6 +67,7 @@ function Header() {
             <NavLink to={ROUTES.map} className={navLinkClass}>
               {t('header.mapNav')}
             </NavLink>
+            <ThemeToggle />
             <LanguageSelector />
             <NavLink to={ROUTES.login} className={navLinkClass}>
               {t('header.login')}
@@ -90,6 +92,7 @@ function Header() {
             </Link>
 
             <div className="flex shrink-0 items-center gap-1">
+              <ThemeToggle />
               <LanguageSelector />
               <button
                 type="button"

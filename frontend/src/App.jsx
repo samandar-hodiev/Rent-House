@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { LocaleProvider } from './context/LocaleContext'
+import { ThemeProvider } from './context/ThemeContext'
 import { SearchProvider } from './context/SearchContext'
 import { WishlistProvider } from './context/WishlistContext'
 import RootLayout from './layouts/RootLayout'
@@ -25,6 +26,7 @@ import { ROUTES } from './routes/paths'
 function App() {
   return (
     <LocaleProvider>
+      <ThemeProvider>
       <SearchProvider>
         <WishlistProvider>
           <BrowserRouter>
@@ -59,6 +61,7 @@ function App() {
           </BrowserRouter>
         </WishlistProvider>
       </SearchProvider>
+      </ThemeProvider>
     </LocaleProvider>
   )
 }

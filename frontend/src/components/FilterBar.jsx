@@ -29,13 +29,15 @@ function ChipRemoveIcon() {
 
 // Meant to sit inside the Map page's own glass control bar, so it stays
 // flat (no border/blur/shadow of its own — that would double up the effect).
-const GLASS_CLASS = 'border-transparent bg-white/55'
+// The bar floats over the always-light map, so its text stays dark in dark
+// mode too — theme tokens would turn it light-on-light and unreadable.
+const GLASS_CLASS = 'border-transparent bg-white/55 text-slate-700'
 
 function Chip({ label, onRemove, glass }) {
   return (
     <span
-      className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border py-1 pl-3 pr-1.5 text-sm text-text-secondary ${
-        glass ? GLASS_CLASS : 'border-border bg-surface-secondary'
+      className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border py-1 pl-3 pr-1.5 text-sm ${
+        glass ? GLASS_CLASS : 'border-border bg-surface-secondary text-text-secondary'
       }`}
     >
       {label}
@@ -197,8 +199,10 @@ function FilterBar({
           onClick={() => setIsOpen((open) => !open)}
           aria-haspopup="true"
           aria-expanded={isOpen}
-          className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-            glass ? `${GLASS_CLASS} hover:bg-white/75` : 'border-border bg-surface hover:bg-surface-secondary'
+          className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+            glass
+              ? `${GLASS_CLASS} hover:bg-white/75`
+              : 'border-border bg-surface text-text-primary hover:bg-surface-secondary'
           }`}
         >
           <FilterIcon />
@@ -235,7 +239,7 @@ function FilterBar({
       ? createPortal(
             <>
               <div
-                className="fixed inset-0 z-40 bg-text-primary/30"
+                className="fixed inset-0 z-40 bg-slate-900/40"
                 onClick={close}
                 aria-hidden="true"
               />

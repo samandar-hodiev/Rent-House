@@ -35,7 +35,7 @@ const MARKER_HEIGHT = 26
 // and any marker lookups keep working unchanged.
 const MARKER_TEMPLATE = `
   <div class="renthouse-map-marker" style="position:absolute;transform:translate(-50%,-50%);">
-    <div class="flex h-[26px] w-16 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-border bg-white text-xs font-semibold text-text-primary shadow-sm transition-all duration-200 hover:shadow-md $[properties.accentClass]">
+    <div class="flex h-[26px] w-16 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-900 shadow-sm transition-all duration-200 hover:shadow-md $[properties.accentClass]">
       $[properties.priceLabel]
     </div>
   </div>

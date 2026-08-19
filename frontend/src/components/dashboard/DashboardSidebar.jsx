@@ -24,19 +24,16 @@ export function DashboardNavList({ onNavigate }) {
   return (
     <nav aria-label={t('dashboard.navLabel')} className="flex h-full flex-col gap-1">
       <DashboardNavItem
-        to={ROUTES.createListing}
-        icon={<PlusCircle aria-hidden="true" size={ICON_SIZE} />}
-        label={t('dashboard.postListing')}
-        variant="primary"
-        onNavigate={onNavigate}
-      />
-
-      <div className="my-2 border-t border-border" />
-
-      <DashboardNavItem
         to={ROUTES.dashboardProfile}
         icon={<User aria-hidden="true" size={ICON_SIZE} />}
         label={t('dashboard.profile')}
+        onNavigate={onNavigate}
+      />
+      <DashboardNavItem
+        to={ROUTES.createListing}
+        icon={<PlusCircle aria-hidden="true" size={ICON_SIZE} />}
+        label={t('dashboard.postListing')}
+        accent
         onNavigate={onNavigate}
       />
       <DashboardNavItem
@@ -59,7 +56,7 @@ export function DashboardNavList({ onNavigate }) {
         onNavigate={onNavigate}
       />
 
-      {/* Log out is deliberately separated from the navigation entries. */}
+      {/* `mt-auto` keeps Log out pinned to the very bottom of the column. */}
       <div className="mt-auto border-t border-border pt-2">
         <button
           type="button"
@@ -74,10 +71,11 @@ export function DashboardNavList({ onNavigate }) {
   )
 }
 
+// Flush against the left edge of the viewport, full height below the header.
 function DashboardSidebar() {
   return (
-    <aside className="hidden w-60 shrink-0 lg:block">
-      <div className="sticky top-6 rounded-xl border border-border bg-surface p-3">
+    <aside className="hidden w-64 shrink-0 border-r border-border bg-surface lg:block">
+      <div className="sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto p-3">
         <DashboardNavList />
       </div>
     </aside>

@@ -21,6 +21,28 @@
   --color-warning: #f59e0b;
 }
 
+/* Class-based dark mode: ThemeContext toggles `.dark` on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Dark palette — same token names, so components keep using the semantic
+   classes (bg-surface, text-text-primary, border-border...) unchanged.
+   `html.dark` outranks the `:root` block Tailwind generates from @theme. */
+html.dark {
+  --color-background: #0b1220;
+  --color-surface: #131c2e;
+  --color-surface-secondary: #1e293b;
+
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+
+  --color-border: #29354a;
+
+  --color-primary: #10b981;
+  --color-primary-hover: #34d399;
+  --color-primary-light: #0d3b2e;
+}
+
 body {
   @apply bg-background text-text-primary font-sans antialiased;
 }

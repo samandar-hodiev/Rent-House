@@ -24,7 +24,7 @@ function ImageGallery({ images, title }) {
               type="button"
               onClick={goPrev}
               aria-label={t('apartmentDetails.gallery.prev')}
-              className="absolute left-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-text-primary shadow-sm backdrop-blur-md transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="absolute left-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-slate-900 shadow-sm backdrop-blur-md transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <ChevronLeft aria-hidden="true" size={20} />
             </button>
@@ -32,7 +32,7 @@ function ImageGallery({ images, title }) {
               type="button"
               onClick={goNext}
               aria-label={t('apartmentDetails.gallery.next')}
-              className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-text-primary shadow-sm backdrop-blur-md transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-slate-900 shadow-sm backdrop-blur-md transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <ChevronRight aria-hidden="true" size={20} />
             </button>

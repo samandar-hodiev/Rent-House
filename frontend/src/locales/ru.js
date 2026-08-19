@@ -74,6 +74,18 @@ export default {
   'currency.somPerMonth': 'сум / мес',
 
   'city.tashkent': 'Ташкент',
+  'theme.toggleToDark': 'Включить тёмную тему',
+  'theme.toggleToLight': 'Включить светлую тему',
+  'dashboard.settingsProfile': 'Редактировать профиль',
+  'dashboard.settingsLanguage': 'Язык',
+  'dashboard.settingsAppearance': 'Оформление',
+  'dashboard.avatar': 'Аватар',
+  'dashboard.avatarHint': 'Загрузка изображения появится на следующем этапе.',
+  'dashboard.saveChanges': 'Сохранить изменения',
+  'dashboard.saveNote': 'Данные корректны. Сохранение появится на следующем этапе.',
+  'dashboard.themeLight': 'Светлая',
+  'dashboard.themeDark': 'Тёмная',
+  'dashboard.themeSystem': 'Как в системе',
 
   // User account dashboard (UI only — no auth/backend yet).
   'dashboard.navLabel': 'Навигация по аккаунту',

@@ -27,7 +27,7 @@ function MapApartmentPreview({ apartment, onClose, variant = 'floating' }) {
           type="button"
           onClick={onClose}
           aria-label={t('chat.close')}
-          className="absolute right-2 top-2 flex size-8 items-center justify-center rounded-full bg-white/90 text-text-secondary shadow-sm hover:bg-white hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="absolute right-2 top-2 flex size-8 items-center justify-center rounded-full bg-white/90 text-slate-600 shadow-sm hover:bg-white hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <X aria-hidden="true" size={16} />
         </button>

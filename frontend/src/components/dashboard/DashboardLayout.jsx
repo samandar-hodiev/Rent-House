@@ -14,9 +14,11 @@ function DashboardLayout() {
     <div className="flex min-h-screen flex-col bg-background">
       <DashboardHeader onOpenMenu={() => setIsMenuOpen(true)} />
 
-      <div className="mx-auto flex w-full max-w-336 flex-1 gap-6 px-4 py-6 sm:px-6">
+      {/* Full-bleed: the sidebar sits against the viewport edge and the main
+          area takes the rest of the width — no centered max-width wrapper. */}
+      <div className="flex flex-1">
         <DashboardSidebar />
-        <main className="min-w-0 flex-1">
+        <main className="min-w-0 flex-1 p-4 sm:p-6">
           <Outlet />
         </main>
       </div>

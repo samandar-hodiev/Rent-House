@@ -3,6 +3,7 @@ import { Menu } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { CURRENT_USER } from '../../data/currentUser'
 import { ROUTES } from '../../routes/paths'
+import ThemeToggle from '../ThemeToggle'
 import UserAvatar from './UserAvatar'
 
 // Account-area header: no public search bar and no login/register buttons,
@@ -12,7 +13,7 @@ function DashboardHeader({ onOpenMenu }) {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-surface">
-      <div className="mx-auto flex h-16 w-full max-w-336 items-center justify-between gap-3 px-4 sm:px-6">
+      <div className="flex h-16 w-full items-center justify-between gap-3 px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
@@ -31,15 +32,18 @@ function DashboardHeader({ onOpenMenu }) {
           </Link>
         </div>
 
-        <Link
-          to={ROUTES.dashboardProfile}
-          className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          <UserAvatar name={CURRENT_USER.name} />
-          <span className="hidden truncate text-sm font-medium text-text-primary sm:block">
-            {CURRENT_USER.name}
-          </span>
-        </Link>
+        <div className="flex min-w-0 items-center gap-1">
+          <ThemeToggle />
+          <Link
+            to={ROUTES.dashboardProfile}
+            className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <UserAvatar name={CURRENT_USER.name} />
+            <span className="hidden truncate text-sm font-medium text-text-primary sm:block">
+              {CURRENT_USER.name}
+            </span>
+          </Link>
+        </div>
       </div>
     </header>
   )

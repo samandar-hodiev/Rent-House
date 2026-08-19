@@ -175,7 +175,7 @@ function MapPage() {
               sheetOnMobile
               singleRow
               trailing={
-                <span className="shrink-0 whitespace-nowrap rounded-full bg-white/55 px-3 py-1.5 text-xs font-medium text-text-secondary">
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-white/55 px-3 py-1.5 text-xs font-medium text-slate-600">
                   {countText}
                 </span>
               }
@@ -186,7 +186,7 @@ function MapPage() {
         {locationStatusText ? (
           <span
             role="status"
-            className="pointer-events-auto rounded-full border border-white/50 bg-white/80 px-3 py-1.5 text-xs font-medium text-text-secondary shadow-[0_2px_10px_rgba(15,23,42,0.10)] backdrop-blur-md"
+            className="pointer-events-auto rounded-full border border-white/50 bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-600 shadow-[0_2px_10px_rgba(15,23,42,0.10)] backdrop-blur-md"
           >
             {locationStatusText}
           </span>

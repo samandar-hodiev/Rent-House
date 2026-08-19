@@ -24,7 +24,7 @@ function DashboardMobileMenu({ isOpen, onClose }) {
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-40 bg-text-primary/30 lg:hidden" onClick={onClose} aria-hidden="true" />
+      <div className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden" onClick={onClose} aria-hidden="true" />
 
       <div
         role="dialog"

@@ -74,6 +74,18 @@ export default {
   'currency.somPerMonth': "so'm / oy",
 
   'city.tashkent': 'Toshkent',
+  'theme.toggleToDark': "Tund rejimga o'tish",
+  'theme.toggleToLight': "Yorug' rejimga o'tish",
+  'dashboard.settingsProfile': 'Profilni tahrirlash',
+  'dashboard.settingsLanguage': 'Til',
+  'dashboard.settingsAppearance': "Ko'rinish",
+  'dashboard.avatar': 'Avatar',
+  'dashboard.avatarHint': "Rasm yuklash keyingi bosqichda qo'shiladi.",
+  'dashboard.saveChanges': "O'zgarishlarni saqlash",
+  'dashboard.saveNote': "Ma'lumotlar to'g'ri. Saqlash backend keyingi bosqichda ulanadi.",
+  'dashboard.themeLight': "Yorug'",
+  'dashboard.themeDark': 'Tund',
+  'dashboard.themeSystem': "Tizim bo'yicha",
 
   // User account dashboard (UI only — no auth/backend yet).
   'dashboard.navLabel': 'Hisob navigatsiyasi',
@@ -98,10 +110,10 @@ export default {
   'dashboard.chatsEmptyHint': 'Xabar almashinuvi keyingi bosqichda ulanadi.',
   'dashboard.settingsTitle': 'Sozlamalar',
   'dashboard.settingsEmpty': 'Sozlamalar tayyorlanmoqda',
-  'dashboard.settingsEmptyHint': 'Hisob sozlamalari keyingi bosqichda qo‘shiladi.',
+  'dashboard.settingsEmptyHint': "Hisob sozlamalari keyingi bosqichda qo'shiladi.",
   'dashboard.createListingTitle': "E'lon joylash",
   'dashboard.createListingEmpty': "E'lon joylash shakli tayyorlanmoqda",
-  'dashboard.createListingHint': 'Uy qo‘shish shakli keyingi bosqichda qo‘shiladi.',
+  'dashboard.createListingHint': "Uy qo'shish shakli keyingi bosqichda qo'shiladi.",
 
   // Authentication UI (forms only — no backend yet).
   'auth.loginTitle': 'Kirish',
