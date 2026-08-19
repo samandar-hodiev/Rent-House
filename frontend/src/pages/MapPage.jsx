@@ -7,7 +7,7 @@ import FilterBar from '../components/FilterBar'
 import { useSearch } from '../context/SearchContext'
 import { useLocale } from '../context/LocaleContext'
 import { APARTMENTS } from '../data/apartments'
-import { DEFAULT_MAP_LAYER_ID } from '../data/mapLayers'
+import { readStoredMapLayerId, storeMapLayerId } from '../data/mapLayers'
 import { filterApartments } from '../utils/filterApartments'
 import { getNearbyApartments } from '../utils/geo'
 import { applyMapFiltersToParams, parseMapFiltersFromParams } from '../utils/mapFilterParams'
@@ -29,10 +29,15 @@ function MapPage() {
   const [userLocation, setUserLocation] = useState(null)
   const [locationStatus, setLocationStatus] = useState('idle') // idle | locating | granted | error
   const [locationErrorKey, setLocationErrorKey] = useState(null)
-  const [layerId, setLayerId] = useState(DEFAULT_MAP_LAYER_ID)
+  const [layerId, setLayerId] = useState(readStoredMapLayerId)
   const isLocatingRef = useRef(false)
   const mapControllerRef = useRef(null)
   const skipNextUrlSync = useRef(false)
+
+  const handleLayerChange = useCallback((nextLayerId) => {
+    setLayerId(nextLayerId)
+    storeMapLayerId(nextLayerId)
+  }, [])
 
   const handleZoomIn = useCallback(() => mapControllerRef.current?.zoomIn(), [])
   const handleZoomOut = useCallback(() => mapControllerRef.current?.zoomOut(), [])
@@ -198,7 +203,7 @@ function MapPage() {
         <div className="pointer-events-auto rounded-xl border border-white/25 bg-white/12 px-1.5 py-1 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg">
           <MapControls
             layerId={layerId}
-            onLayerChange={setLayerId}
+            onLayerChange={handleLayerChange}
             onLocate={handleLocateRequest}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
