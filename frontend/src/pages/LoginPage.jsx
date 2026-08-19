@@ -1,12 +1,15 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import AuthCard from '../components/AuthCard'
 import FormField from '../components/FormField'
 import { useLocale } from '../context/LocaleContext'
+import { useAuth } from '../context/AuthContext'
 import { ROUTES } from '../routes/paths'
 
 function LoginPage() {
   const { t } = useLocale()
+  const { signIn } = useAuth()
+  const navigate = useNavigate()
   const [values, setValues] = useState({ identifier: '', password: '' })
   const [errors, setErrors] = useState({})
   const [isValid, setIsValid] = useState(false)
@@ -24,8 +27,14 @@ function LoginPage() {
     if (!values.password) nextErrors.password = t('auth.errorRequired')
 
     setErrors(nextErrors)
-    // UI only for now — no session is created and no request is sent.
-    setIsValid(Object.keys(nextErrors).length === 0)
+    const ok = Object.keys(nextErrors).length === 0
+    setIsValid(ok)
+    if (ok) {
+      // UI-only session: no request, no credential check, no token. It only
+      // flips the signed-in header/dashboard state.
+      signIn()
+      navigate(ROUTES.dashboardProfile)
+    }
   }
 
   return (

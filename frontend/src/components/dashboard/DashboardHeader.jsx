@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
-import { CURRENT_USER } from '../../data/currentUser'
+import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../routes/paths'
 import ThemeToggle from '../ThemeToggle'
 import UserAvatar from './UserAvatar'
@@ -10,6 +10,7 @@ import UserAvatar from './UserAvatar'
 // since the user is already inside their account.
 function DashboardHeader({ onOpenMenu }) {
   const { t } = useLocale()
+  const { user } = useAuth()
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-surface">
@@ -38,9 +39,9 @@ function DashboardHeader({ onOpenMenu }) {
             to={ROUTES.dashboardProfile}
             className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <UserAvatar name={CURRENT_USER.name} />
+            <UserAvatar name={user.name} />
             <span className="hidden truncate text-sm font-medium text-text-primary sm:block">
-              {CURRENT_USER.name}
+              {user.name}
             </span>
           </Link>
         </div>

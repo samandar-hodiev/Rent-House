@@ -3,6 +3,8 @@
 // Once auth exists this is replaced by the session user coming from the API.
 export const CURRENT_USER = {
   id: 1,
+  firstName: 'Samandar',
+  lastName: 'Hodiev',
   name: 'Samandar Hodiev',
   email: 'samandar@example.com',
   phone: '+998 90 123 45 67',

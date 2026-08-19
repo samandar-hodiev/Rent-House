@@ -11,7 +11,7 @@ export const ROUTES = {
   dashboardProfile: '/dashboard/profile',
   dashboardListings: '/dashboard/listings',
   dashboardChats: '/dashboard/chats',
-  dashboardSettings: '/dashboard/settings',
+  dashboardEditProfile: '/dashboard/edit-profile',
   createListing: '/create-listing',
   owner: '/owner',
   admin: '/admin',

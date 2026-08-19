@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext'
 import { LocaleProvider } from './context/LocaleContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { SearchProvider } from './context/SearchContext'
@@ -18,7 +19,7 @@ import AdminPage from './pages/AdminPage'
 import DashboardPage from './pages/DashboardPage'
 import DashboardListingsPage from './pages/DashboardListingsPage'
 import DashboardChatsPage from './pages/DashboardChatsPage'
-import DashboardSettingsPage from './pages/DashboardSettingsPage'
+import DashboardEditProfilePage from './pages/DashboardEditProfilePage'
 import CreateListingPage from './pages/CreateListingPage'
 import NotFoundPage from './pages/NotFoundPage'
 import { ROUTES } from './routes/paths'
@@ -27,6 +28,7 @@ function App() {
   return (
     <LocaleProvider>
       <ThemeProvider>
+        <AuthProvider>
       <SearchProvider>
         <WishlistProvider>
           <BrowserRouter>
@@ -53,7 +55,7 @@ function App() {
                   <Route path="profile" element={<DashboardPage />} />
                   <Route path="listings" element={<DashboardListingsPage />} />
                   <Route path="chats" element={<DashboardChatsPage />} />
-                  <Route path="settings" element={<DashboardSettingsPage />} />
+                  <Route path="edit-profile" element={<DashboardEditProfilePage />} />
                 </Route>
                 <Route path={ROUTES.createListing} element={<CreateListingPage />} />
               </Route>
@@ -61,6 +63,7 @@ function App() {
           </BrowserRouter>
         </WishlistProvider>
       </SearchProvider>
+        </AuthProvider>
       </ThemeProvider>
     </LocaleProvider>
   )

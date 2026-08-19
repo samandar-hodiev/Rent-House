@@ -25,3 +25,6 @@ backend/tmp/
 # Logs
 *.log
 npm-debug.log*
+
+# Local Claude Code settings
+.claude/

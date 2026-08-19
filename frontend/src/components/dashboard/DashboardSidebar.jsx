@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router-dom'
-import { Building2, LogOut, MessageSquare, PlusCircle, Settings, User } from 'lucide-react'
+import { Building2, LogOut, MessageSquare, PlusCircle, User } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
-import { CURRENT_USER } from '../../data/currentUser'
+import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../routes/paths'
 import DashboardNavItem from './DashboardNavItem'
+import DashboardSettingsMenu from './DashboardSettingsMenu'
 
 const ICON_SIZE = 18
 
@@ -12,12 +13,13 @@ const ICON_SIZE = 18
 export function DashboardNavList({ onNavigate }) {
   const { t } = useLocale()
   const navigate = useNavigate()
-  const unread = CURRENT_USER.stats.unreadMessages
+  const { user, signOut } = useAuth()
+  const unread = user.stats?.unreadMessages ?? 0
 
   const handleLogout = () => {
     onNavigate?.()
-    // UI only: there is no session to clear yet, so this just leaves the
-    // account area. Replace with a real sign-out once auth exists.
+    // Clears the UI-only session flag; there is still no token or API call.
+    signOut()
     navigate(ROUTES.home)
   }
 
@@ -49,12 +51,8 @@ export function DashboardNavList({ onNavigate }) {
         badge={unread > 0 ? unread : null}
         onNavigate={onNavigate}
       />
-      <DashboardNavItem
-        to={ROUTES.dashboardSettings}
-        icon={<Settings aria-hidden="true" size={ICON_SIZE} />}
-        label={t('dashboard.settings')}
-        onNavigate={onNavigate}
-      />
+      {/* Settings opens a popover instead of navigating to a body section. */}
+      <DashboardSettingsMenu onNavigate={onNavigate} />
 
       {/* `mt-auto` keeps Log out pinned to the very bottom of the column. */}
       <div className="mt-auto border-t border-border pt-2">

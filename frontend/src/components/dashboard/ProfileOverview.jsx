@@ -1,6 +1,8 @@
+import { Link } from 'react-router-dom'
 import { Building2, Eye, MessageSquare } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
-import { CURRENT_USER } from '../../data/currentUser'
+import { useAuth } from '../../context/AuthContext'
+import { ROUTES } from '../../routes/paths'
 import UserAvatar from './UserAvatar'
 
 function StatCard({ icon, label, value }) {
@@ -15,11 +17,11 @@ function StatCard({ icon, label, value }) {
   )
 }
 
-// Account overview — intentionally read-only for now; editing arrives with the
-// real profile form.
+// Account overview — read-only; editing lives on its own dashboard section.
 function ProfileOverview() {
   const { t } = useLocale()
-  const { name, email, phone, stats } = CURRENT_USER
+  const { user } = useAuth()
+  const { name, email, phone, stats } = user
 
   return (
     <div className="flex flex-col gap-6">
@@ -34,12 +36,12 @@ function ProfileOverview() {
             </div>
           </div>
 
-          <button
-            type="button"
-            className="shrink-0 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          <Link
+            to={ROUTES.dashboardEditProfile}
+            className="shrink-0 rounded-md border border-border bg-surface px-4 py-2 text-center text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             {t('dashboard.editProfile')}
-          </button>
+          </Link>
         </div>
       </section>
 

@@ -2,11 +2,13 @@ import { useRef, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { ROUTES } from '../routes/paths'
 import { useLocale } from '../context/LocaleContext'
+import { useAuth } from '../context/AuthContext'
 import { useDismiss } from '../hooks/useDismiss'
 import Container from './Container'
 import SearchBar from './SearchBar'
 import LanguageSelector from './LanguageSelector'
 import ThemeToggle from './ThemeToggle'
+import AuthedHeaderActions from './AuthedHeaderActions'
 
 const navLinkClass = ({ isActive }) =>
   `text-sm font-medium transition-colors hover:text-primary ${
@@ -40,6 +42,7 @@ function CloseIcon() {
 
 function Header() {
   const { t } = useLocale()
+  const { isAuthenticated } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuRef = useRef(null)
 
@@ -69,15 +72,21 @@ function Header() {
             </NavLink>
             <ThemeToggle />
             <LanguageSelector />
-            <NavLink to={ROUTES.login} className={navLinkClass}>
-              {t('header.login')}
-            </NavLink>
-            <Link
-              to={ROUTES.register}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              {t('header.register')}
-            </Link>
+            {isAuthenticated ? (
+              <AuthedHeaderActions />
+            ) : (
+              <>
+                <NavLink to={ROUTES.login} className={navLinkClass}>
+                  {t('header.login')}
+                </NavLink>
+                <Link
+                  to={ROUTES.register}
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {t('header.register')}
+                </Link>
+              </>
+            )}
           </nav>
         </div>
 
@@ -123,16 +132,22 @@ function Header() {
               <NavLink to={ROUTES.map} className={mobileNavLinkClass} onClick={closeMenu}>
                 {t('header.mapNav')}
               </NavLink>
-              <NavLink to={ROUTES.login} className={mobileNavLinkClass} onClick={closeMenu}>
-                {t('header.login')}
-              </NavLink>
-              <Link
-                to={ROUTES.register}
-                onClick={closeMenu}
-                className="mt-1 rounded-md bg-primary px-3 py-2.5 text-center text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                {t('header.register')}
-              </Link>
+              {isAuthenticated ? (
+                <AuthedHeaderActions variant="mobile" onNavigate={closeMenu} />
+              ) : (
+                <>
+                  <NavLink to={ROUTES.login} className={mobileNavLinkClass} onClick={closeMenu}>
+                    {t('header.login')}
+                  </NavLink>
+                  <Link
+                    to={ROUTES.register}
+                    onClick={closeMenu}
+                    className="mt-1 rounded-md bg-primary px-3 py-2.5 text-center text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    {t('header.register')}
+                  </Link>
+                </>
+              )}
             </nav>
           ) : null}
         </div>

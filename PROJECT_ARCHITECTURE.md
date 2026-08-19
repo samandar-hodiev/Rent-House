@@ -164,22 +164,37 @@ margin beside the navigation on wide screens.
 | `dashboard/DashboardHeader.jsx` | Logo (links Home), hamburger below `lg:`, avatar + user name on the right. Deliberately has no `SearchBar` and no auth buttons. |
 | `dashboard/DashboardSidebar.jsx` | Desktop `<aside>` (`w-64`, flush left, sticky full-height below the header). Also exports `DashboardNavList`, the actual entry list, so the drawer reuses the exact same items instead of duplicating them. |
 | `dashboard/DashboardMobileMenu.jsx` | Slide-in drawer below `lg:`, portalled to `<body>` so no ancestor stacking context can clip or offset it. Closes on link tap, backdrop click and Escape. |
-| `dashboard/DashboardNavItem.jsx` | One entry. Every item shares the same size/padding/structure; `accent` only tints the icon (used by "post a listing", which is important but must not be a differently-shaped CTA) and `badge` renders the unread counter. Active state comes from `NavLink`'s `isActive`. |
+| `dashboard/DashboardNavItem.jsx` | One entry. Every item shares the same size/padding/structure; `accent` only tints the icon (used by "post a listing", which is important but must not be a differently-shaped CTA) and `badge` renders the unread counter. Active state comes from `NavLink`'s `isActive`. Also exports `NAV_ITEM_BASE`/`NAV_ITEM_ACTIVE`/`NAV_ITEM_IDLE` so the Settings `<button>` can look identical to the `NavLink` entries without duplicating classes. |
+| `dashboard/DashboardSettingsMenu.jsx` | Settings entry + its popover (language, theme, "edit profile"). Opens below its trigger and flips above when the viewport has no room, measured in a `useLayoutEffect`; dismissed via the shared `useDismiss`. |
 | `dashboard/ProfileOverview.jsx` | Read-only account overview + the three stat cards. |
 | `dashboard/UserAvatar.jsx` | Initials-based avatar, so the account UI needs no image asset or upload pipeline yet. |
-| `data/currentUser.js` | **Mock** signed-in user (name, email, phone, stats). The single place to replace when auth arrives. |
+| `data/currentUser.js` | **Mock** signed-in user (first/last name, name, email, phone, stats). Read only by `AuthContext`, which is the single place to replace when auth arrives. |
 
 Navigation order is: Profile → Post a listing (green icon accent) → My listings
 → Chats (unread badge) → Settings. **Log out is pinned to the very bottom** of
 the column via `mt-auto`, in both the sidebar and the drawer, so it never sits
-directly under Settings. Log out is UI only — there is no session to clear, so
-it just returns Home.
+directly under Settings. Log out clears the UI-only session flag (`AuthContext`)
+and returns Home — there is still no token or API call.
 
-`/dashboard/settings` is a **real section**, not a placeholder: an edit-profile
-card (name/email/phone + avatar preview, save is UI-only), a language chooser
-that calls the existing `LocaleContext`, and an appearance chooser
-(light/dark/system) backed by `ThemeContext` — see below. My listings, Chats and
+**Settings is a popover, not a page.** There is no `/dashboard/settings` route:
+the entry is a `<button>` that opens `DashboardSettingsMenu` next to itself,
+holding a three-option language row (existing `LocaleContext`), a Light/Dark row
+(`ThemeContext`) and, at the bottom, "Edit profile", which closes the popover and
+navigates to `/dashboard/edit-profile`. Keeping it in place means changing the
+language or theme never costs the user their current dashboard section.
+
+`/dashboard/edit-profile` renders the edit form in the **main dashboard body**
+(avatar preview + change-avatar action, first name, last name, email, phone,
+save) using the shared `FormField`. The picked file is previewed locally via
+`URL.createObjectURL` and never uploaded; save only updates `AuthContext` in
+memory. `/dashboard/profile` stays a read-only overview. My listings, Chats and
 `/create-listing` remain professional empty states.
+
+**Authenticated public header.** When `AuthContext` reports a session, the public
+`Header` swaps its "log in" link and "register" button for
+`components/AuthedHeaderActions.jsx`: a chat shortcut (unread badge → 
+`/dashboard/chats`) plus avatar + name (→ `/dashboard/profile`), in both the
+desktop nav and the mobile drawer. The signed-out header is untouched.
 
 **Theme system.** `context/ThemeContext.jsx` follows the same shape as
 `LocaleContext`: `light | dark | system`, persisted to `localStorage`
@@ -193,8 +208,8 @@ keep using the semantic classes (`bg-surface`, `text-text-primary`,
 
 It is one app-wide system: `components/ThemeToggle.jsx` (a Light/Dark switch)
 sits in **both** the public `Header` and the account `DashboardHeader`, and
-Settings additionally exposes the three-way choice. There is no second theme
-implementation.
+the Settings popover additionally exposes an explicit Light/Dark choice. There is
+no second theme implementation.
 
 **Surfaces that deliberately stay light in dark mode.** Anything floating over
 a photo or over the always-light Yandex map keeps fixed light-scheme colours
@@ -204,14 +219,15 @@ the gallery arrows and the wishlist buttons. Using tokens there would make them
 light-on-light and unreadable. Modal scrims likewise use a fixed
 `bg-slate-900/40` rather than a token, so the overlay stays dark in both themes.
 
-**Currently UI only:** the user is mocked, no route is protected, the stats and
-the unread badge are placeholders, and saving the profile / listings / chats /
-create-listing have no data behind them. Avatar upload is not implemented
-(initials only). Language and appearance are the two settings that genuinely
-persist and take effect.
+**Currently UI only:** the user is mocked, the "session" is a single
+`localStorage` flag set by any valid login-form submit (no credential check, no
+token), no route is protected, the stats and the unread badge are placeholders,
+and saving the profile / listings / chats / create-listing have no data behind
+them. Avatar changes are a local object-URL preview only — nothing is uploaded.
+Language and appearance are the two settings that genuinely persist.
 
-**Planned backend integration:** replace `data/currentUser.js` with the session
-user from `GET /api/v1/auth/me`; guard the `/dashboard` and `/create-listing`
+**Planned backend integration:** replace `data/currentUser.js` + `AuthContext`'s
+flag with the session user from `GET /api/v1/auth/me` and a real token; guard the `/dashboard` and `/create-listing`
 routes once auth exists; back My listings with apartment CRUD
 (`POST/PATCH/DELETE /api/v1/apartments`), Chats with a real messaging endpoint,
 and the stat cards + unread badge with server-side counts.
@@ -400,10 +416,10 @@ All routes render inside `RootLayout` (Header + `<Outlet/>` + Footer).
 | `/register` | `RegisterPage` | Sign-up form: name, email, phone, password + confirmation, password visibility toggles, login link | UI only (no backend, no account created) |
 | `/profile` | `ProfilePage` | Placeholder (superseded by `/dashboard/profile`) | Not implemented |
 | `/dashboard` | — | Redirects to `/dashboard/profile` | Implemented |
-| `/dashboard/profile` | `DashboardPage` → `ProfileOverview` | Account overview: avatar, name, email, phone, stat cards, "Edit profile" | UI only (mock user) |
+| `/dashboard/profile` | `DashboardPage` → `ProfileOverview` | Account overview: avatar, name, email, phone, stat cards, "Edit profile" link | UI only (mock user) |
 | `/dashboard/listings` | `DashboardListingsPage` | My listings — empty state + "post a listing" action | UI only |
 | `/dashboard/chats` | `DashboardChatsPage` | Chats — empty state | UI only |
-| `/dashboard/settings` | `DashboardSettingsPage` | Settings: edit profile, language (existing i18n), appearance (light/dark/system) | Language + appearance work; profile save is UI only |
+| `/dashboard/edit-profile` | `DashboardEditProfilePage` | Profile edit form in the dashboard body: avatar preview + change action, first/last name, email, phone, save | UI only (in-memory save, no upload) |
 | `/create-listing` | `CreateListingPage` | Listing form shell, rendered inside the account layout | UI only |
 | `/owner` | `OwnerDashboardPage` | Placeholder | Not implemented |
 | `/admin` | `AdminPage` | Placeholder | Not implemented |
@@ -471,7 +487,8 @@ in `App.jsx` around the router (`LocaleProvider` → `SearchProvider` →
 | **Locale** | `LocaleContext` | `useState` + `localStorage` (`renthouse_locale`) | Holds `locale` (`'uz' \| 'ru' \| 'en'`), `setLocale`, and `t(key, params)` — a flat-dictionary lookup with `{param}` interpolation, no external i18n library. Falls back to `uz` for missing keys. |
 | **Search (Home page only)** | `SearchContext` | `useState` (in-memory, not persisted) | `districtId`, `keyword`, `filters` (price/rooms/area/floor/furnished), `sort`. This is explicitly **Home-page-scoped** — Wishlist does *not* use this context, it keeps its own local `filters`/`sort` state in `WishlistPage` itself, because its filterable field set differs (district instead of floor) and its results are the saved subset, not the global catalog. |
 | **Wishlist** | `WishlistContext` | `useState` (`Map<id, savedAtISOString>`) + `localStorage` (`renthouse_wishlist`) | `toggleWishlist(id)`, `isSaved(id)`, `getSavedAt(id)`, `savedCount`. The only client state that survives a reload. `ApartmentCard` reads this directly (not via props) so wishlist toggles stay in sync across every page that renders a card. |
-| **Theme** | `ThemeContext` | `useState` + `localStorage` (`renthouse_theme`) | `theme` (`'light' \| 'dark' \| 'system'`), `setTheme`, `resolvedTheme`. Toggles a `dark` class on `<html>`; dark values are token overrides in `index.css`, so components need no per-element dark classes. **Defaults to `light`**; `system` is opt-in and then tracks `prefers-color-scheme`. Switched from `ThemeToggle` in both headers, or the three-way chooser in Settings. |
+| **Theme** | `ThemeContext` | `useState` + `localStorage` (`renthouse_theme`) | `theme` (`'light' \| 'dark' \| 'system'`), `setTheme`, `resolvedTheme`. Toggles a `dark` class on `<html>`; dark values are token overrides in `index.css`, so components need no per-element dark classes. **Defaults to `light`**; `system` is opt-in and then tracks `prefers-color-scheme`. Switched from `ThemeToggle` in both headers, or the Light/Dark row in the Settings popover. |
+| **Session (UI only)** | `AuthContext` | `useState` + `localStorage` (`renthouse_session`) | `isAuthenticated`, `user`, `signIn()`, `signOut()`, `updateUser()`. Defaults to signed out. There is no credential check, request or token behind it — it only decides whether the public header shows its signed-in variant and gives log out / profile edit something real to change. Replace wholesale when the auth API lands. |
 | **UI-local state** | plain `useState` in each component | in-memory only | Dropdown open/closed (district, language, sort, filter panel — all via `useDismiss`), gallery active image index, chat modal messages, mobile menu open/closed, share-copied toast, per-page `loading` flags. |
 
 Filters/apartments are **not** in Context globally — each page (Home,
