@@ -1,6 +1,8 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocale } from '../context/LocaleContext'
 import { useDismiss } from '../hooks/useDismiss'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { getDistrictById } from '../data/districts'
 import { formatUzsAmount } from '../utils/formatPrice'
 import FilterPanel from './FilterPanel'
@@ -32,7 +34,7 @@ const GLASS_CLASS = 'border-transparent bg-white/55'
 function Chip({ label, onRemove, glass }) {
   return (
     <span
-      className={`flex items-center gap-1.5 rounded-full border py-1 pl-3 pr-1.5 text-sm text-text-secondary ${
+      className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border py-1 pl-3 pr-1.5 text-sm text-text-secondary ${
         glass ? GLASS_CLASS : 'border-border bg-surface-secondary'
       }`}
     >
@@ -57,13 +59,24 @@ function FilterBar({
   showDistrict = false,
   showFloor = true,
   glass = false,
+  sheetOnMobile = false,
+  // Keep the button + chips on one horizontal row (they scroll instead of
+  // wrapping) — used by the Map page's compact glass bar.
+  singleRow = false,
 }) {
   const { t } = useLocale()
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef(null)
+  const sheetRef = useRef(null)
+  // Opt-in per caller (only the Map page), so Home/Wishlist keep the dropdown.
+  const isMobile = useMediaQuery('(max-width: 639px)')
+  const useSheet = sheetOnMobile && isMobile
 
   const close = () => setIsOpen(false)
-  useDismiss(containerRef, isOpen, close)
+  // The sheet is portalled outside `containerRef`, so it has to be treated as
+  // "inside" too — otherwise picking any filter option would dismiss it.
+  const sheetDismissTargets = useMemo(() => [containerRef, sheetRef], [])
+  useDismiss(useSheet ? sheetDismissTargets : containerRef, isOpen, close)
 
   const chips = []
 
@@ -148,8 +161,14 @@ function FilterBar({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div ref={containerRef} className="relative">
+    <div
+      className={`flex items-center gap-2 ${
+        singleRow
+          ? 'min-w-0 flex-nowrap overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          : 'flex-wrap'
+      }`}
+    >
+      <div ref={containerRef} className="relative shrink-0">
         <button
           type="button"
           onClick={() => setIsOpen((open) => !open)}
@@ -168,7 +187,7 @@ function FilterBar({
           ) : null}
         </button>
 
-        {isOpen ? (
+        {isOpen && !useSheet ? (
           <div className="absolute left-0 top-full z-40 mt-2">
             <FilterPanel
               filters={filters}
@@ -182,6 +201,45 @@ function FilterBar({
         ) : null}
       </div>
 
+      {/* Mobile: a bottom sheet instead of the dropdown. Portalled to <body>
+          because an ancestor with `backdrop-filter` (the map's glass bar)
+          would otherwise become the containing block for `position: fixed`,
+          and so the sheet could not anchor to the viewport. It also keeps the
+          sheet clear of the map's stacking context. */}
+      {isOpen && useSheet
+        ? createPortal(
+            <>
+              <div
+                className="fixed inset-0 z-40 bg-text-primary/30"
+                onClick={close}
+                aria-hidden="true"
+              />
+              <div
+                ref={sheetRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={t('filters.button')}
+                className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4 shadow-lg"
+              >
+                <div
+                  aria-hidden="true"
+                  className="mx-auto mb-3 h-1 w-10 rounded-full bg-border"
+                />
+                <FilterPanel
+                  filters={filters}
+                  onChange={setFilters}
+                  onReset={clearFilters}
+                  onApply={close}
+                  showDistrict={showDistrict}
+                  showFloor={showFloor}
+                  variant="sheet"
+                />
+              </div>
+            </>,
+            document.body,
+          )
+        : null}
+
       {chips.map((chip) => (
         <Chip key={chip.key} label={chip.label} onRemove={chip.onRemove} glass={glass} />
       ))}
@@ -190,7 +248,7 @@ function FilterBar({
         <button
           type="button"
           onClick={clearFilters}
-          className="text-sm font-medium text-text-secondary hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="shrink-0 whitespace-nowrap text-sm font-medium text-text-secondary hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           {t('filters.clearAll')}
         </button>

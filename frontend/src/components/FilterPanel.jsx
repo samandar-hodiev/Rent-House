@@ -16,7 +16,17 @@ function optionButtonClass(isActive) {
   }`
 }
 
-function FilterPanel({ filters, onChange, onReset, onApply, showDistrict = false, showFloor = true }) {
+function FilterPanel({
+  filters,
+  onChange,
+  onReset,
+  onApply,
+  showDistrict = false,
+  showFloor = true,
+  // 'sheet' drops the panel's own width/frame so it can fill a bottom sheet
+  // that already provides them.
+  variant = 'panel',
+}) {
   const { t } = useLocale()
 
   const numberInputClass =
@@ -25,7 +35,13 @@ function FilterPanel({ filters, onChange, onReset, onApply, showDistrict = false
   const toNumberOrNull = (value) => (value === '' ? null : Number(value))
 
   return (
-    <div className="w-80 rounded-md border border-border bg-surface p-4 shadow-md">
+    <div
+      className={
+        variant === 'sheet'
+          ? 'w-full'
+          : 'w-80 rounded-md border border-border bg-surface p-4 shadow-md'
+      }
+    >
       {showDistrict ? (
         <fieldset className="mb-4">
           <legend className="mb-2 text-sm font-medium text-text-primary">

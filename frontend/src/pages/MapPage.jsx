@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Check, Layers, LocateFixed, Minus, Plus } from 'lucide-react'
 import ApartmentMap from '../components/ApartmentMap'
 import MapApartmentPreview from '../components/MapApartmentPreview'
+import MapControls from '../components/MapControls'
 import FilterBar from '../components/FilterBar'
 import { useSearch } from '../context/SearchContext'
 import { useLocale } from '../context/LocaleContext'
-import { useDismiss } from '../hooks/useDismiss'
 import { APARTMENTS } from '../data/apartments'
-import { DEFAULT_MAP_LAYER_ID, MAP_LAYERS } from '../data/mapLayers'
+import { DEFAULT_MAP_LAYER_ID } from '../data/mapLayers'
 import { filterApartments } from '../utils/filterApartments'
 import { getNearbyApartments } from '../utils/geo'
 import { applyMapFiltersToParams, parseMapFiltersFromParams } from '../utils/mapFilterParams'
@@ -31,14 +30,12 @@ function MapPage() {
   const [locationStatus, setLocationStatus] = useState('idle') // idle | locating | granted | error
   const [locationErrorKey, setLocationErrorKey] = useState(null)
   const [layerId, setLayerId] = useState(DEFAULT_MAP_LAYER_ID)
-  const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false)
   const isLocatingRef = useRef(false)
   const mapControllerRef = useRef(null)
   const skipNextUrlSync = useRef(false)
-  const layerMenuRef = useRef(null)
 
-  const closeLayerMenu = useCallback(() => setIsLayerMenuOpen(false), [])
-  useDismiss(layerMenuRef, isLayerMenuOpen, closeLayerMenu)
+  const handleZoomIn = useCallback(() => mapControllerRef.current?.zoomIn(), [])
+  const handleZoomOut = useCallback(() => mapControllerRef.current?.zoomOut(), [])
 
   const focusApartmentId = useMemo(() => {
     const raw = searchParams.get('apartment')
@@ -151,94 +148,38 @@ function MapPage() {
         mapRef={mapControllerRef}
       />
 
+      {/* Top glass bar: filter + chips + result count. On mobile the map
+          controls join this same container; on desktop they move to the
+          map's bottom-right corner instead. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-start gap-2 p-3 sm:p-4">
         <div className="pointer-events-auto flex w-full flex-col gap-2 rounded-xl border border-white/25 bg-white/12 px-2.5 py-2 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Filter button + active chips + result count stay on one
+              horizontal row; they scroll sideways rather than wrapping. */}
+          <div className="flex min-w-0 items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <FilterBar
               filters={filters}
               setFilters={setFilters}
               clearFilters={clearFilters}
               activeFilterCount={activeFilterCount}
               glass
+              sheetOnMobile
+              singleRow
             />
-            <span className="rounded-full bg-white/55 px-3 py-1.5 text-xs font-medium text-text-secondary">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-white/55 px-3 py-1.5 text-xs font-medium text-text-secondary">
               {countText}
             </span>
           </div>
 
-          <div className="flex items-center justify-end gap-1">
-            <div ref={layerMenuRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setIsLayerMenuOpen((open) => !open)}
-                aria-haspopup="true"
-                aria-expanded={isLayerMenuOpen}
-                aria-label={t('map.layers')}
-                title={t('map.layers')}
-                className={`flex size-8 shrink-0 items-center justify-center rounded-full hover:bg-white/70 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                  isLayerMenuOpen ? 'bg-white/70 text-primary' : 'text-text-secondary'
-                }`}
-              >
-                <Layers aria-hidden="true" size={16} />
-              </button>
-
-              {isLayerMenuOpen ? (
-                <div
-                  role="dialog"
-                  aria-label={t('map.layers')}
-                  className="absolute right-0 top-full z-40 mt-2 w-44 rounded-md border border-border bg-surface p-1.5 shadow-md"
-                >
-                  {MAP_LAYERS.map((layer) => {
-                    const isActive = layer.id === layerId
-                    return (
-                      <button
-                        key={layer.id}
-                        type="button"
-                        onClick={() => {
-                          setLayerId(layer.id)
-                          closeLayerMenu()
-                        }}
-                        aria-pressed={isActive}
-                        className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                          isActive ? 'font-medium text-primary' : 'text-text-primary'
-                        }`}
-                      >
-                        {t(layer.labelKey)}
-                        {isActive ? <Check aria-hidden="true" size={14} /> : null}
-                      </button>
-                    )
-                  })}
-                </div>
-              ) : null}
-            </div>
-
-            <button
-              type="button"
-              onClick={handleLocateRequest}
-              aria-label={t('map.locateMe')}
-              title={t('map.locateMe')}
-              className="flex size-8 shrink-0 items-center justify-center rounded-full text-text-secondary hover:bg-white/70 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <LocateFixed aria-hidden="true" size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => mapControllerRef.current?.zoomIn()}
-              aria-label={t('map.zoomIn')}
-              title={t('map.zoomIn')}
-              className="flex size-8 shrink-0 items-center justify-center rounded-full text-text-secondary hover:bg-white/70 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <Plus aria-hidden="true" size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => mapControllerRef.current?.zoomOut()}
-              aria-label={t('map.zoomOut')}
-              title={t('map.zoomOut')}
-              className="flex size-8 shrink-0 items-center justify-center rounded-full text-text-secondary hover:bg-white/70 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <Minus aria-hidden="true" size={16} />
-            </button>
+          <div className="sm:hidden">
+            <MapControls
+              layerId={layerId}
+              onLayerChange={setLayerId}
+              onLocate={handleLocateRequest}
+              onZoomIn={handleZoomIn}
+              onZoomOut={handleZoomOut}
+              orientation="horizontal"
+              menuPlacement="bottom"
+            />
           </div>
         </div>
 
@@ -250,6 +191,22 @@ function MapPage() {
             {locationStatusText}
           </span>
         ) : null}
+      </div>
+
+      {/* Desktop: Google-Maps-style control stack in the bottom-right corner,
+          clear of the Yandex copyright strip along the bottom edge. */}
+      <div className="pointer-events-none absolute bottom-0 right-0 z-10 hidden p-4 pb-8 sm:block">
+        <div className="pointer-events-auto rounded-xl border border-white/25 bg-white/12 p-1 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg">
+          <MapControls
+            layerId={layerId}
+            onLayerChange={setLayerId}
+            onLocate={handleLocateRequest}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            orientation="vertical"
+            menuPlacement="top"
+          />
+        </div>
       </div>
 
       {selectedApartment ? (

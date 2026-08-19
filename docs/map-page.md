@@ -40,10 +40,11 @@ first render would run against a map instance that does not exist yet.
 
 One shared bar directly under the Header (`absolute inset-x-0 top-0 z-10` inside the map's `relative` container):
 
-- **Left:** `FilterBar` (with `glass` prop) + a result-count pill.
-- **Right:** Layers, My Location, Zoom In, Zoom Out — plain React buttons, not the map provider's own controls (the map is created with `controls: []`), so they can live in the same bar as the filters. They call `mapControllerRef.current.zoomIn()/.zoomOut()` and the existing `handleLocateRequest`.
-- **Desktop/tablet (`sm:` and up):** one row, `flex-row justify-between` — filters on the left, layers/location/zoom on the right.
-- **Mobile:** the *same* bar switches to `flex-col` — filter button/chips on the first row, the layers/location/zoom cluster on a second row inside the same container, right-aligned (`justify-end`). There is no second floating control container on mobile; it's the same glass `<div>`, just stacked.
+- **Left:** `FilterBar` (with `glass` + `singleRow` props) + a result-count pill.
+- **Map controls** (`components/MapControls.jsx`): Layers, My Location, Zoom In, Zoom Out — plain React buttons, not the map provider's own controls (the map is created with `controls: []`). They call `mapControllerRef.current.zoomIn()/.zoomOut()` and the existing `handleLocateRequest`. The component is rendered twice, once per breakpoint, so each instance owns its layers-popover state:
+  - **Desktop/tablet (`sm:` and up):** a vertical stack in the map's **bottom-right** corner (Google-Maps style), in its own compact glass container, offset up (`pb-8`) to clear the Yandex copyright strip. Its layers menu opens **upward** (`menuPlacement="top"`) so it never runs off the bottom edge.
+  - **Mobile:** a horizontal row inside the *same* top glass bar as the filters (the bar switches to `flex-col`), right-aligned. There is no second floating control container on mobile.
+- **Single-row filter row:** the filter button, active chips and the count pill never wrap — `FilterBar`'s `singleRow` prop switches the row to `flex-nowrap` with horizontal overflow scrolling (scrollbar hidden), and chips get `shrink-0 whitespace-nowrap`. This keeps the `[Filtrlar 2] [Xonalar: 1 xona] [Qavat: 1–5] …` layout intact on narrow screens.
 
 Style: `bg-white/12` + `backdrop-blur-lg` (16px) + `border-white/25` + a soft shadow — deliberately very translucent ("liquid glass floating over the map", not a white toolbar); the map stays clearly visible through it. `FilterBar`'s `glass` variant intentionally has **no border/blur/shadow of its own** (`border-transparent bg-white/55`) since it's nested inside the bar's own glass surface — giving it a second full glass treatment would double up the effect, and its higher, fixed opacity is what keeps filter text/chips/count readable even though the bar itself is only ~12% white. A secondary small pill (locating/nearby-count/error status) renders in its own row below the bar only when there's something to show, so the primary bar's height stays fixed regardless of geolocation state.
 
@@ -115,6 +116,29 @@ No second filtering system. `MapPage` calls the exact same
 by Home, with `keyword` hard-disabled (see "Header search" below). The
 resulting array drives both the marker list and the result-count pill, so
 selecting a district or changing a filter narrows both identically.
+
+### Mobile filter sheet
+
+On the Map page only (`sheetOnMobile` prop, so Home/Wishlist keep their
+dropdown), `FilterBar` renders `FilterPanel` as a **bottom sheet** below the
+`sm` breakpoint instead of an anchored dropdown. `useMediaQuery` picks the
+variant in JS rather than CSS so only one copy is in the DOM — rendering both
+would duplicate `FilterPanel`'s element ids.
+
+Two details make it work:
+
+- The sheet is **portalled to `document.body`**. The glass bar it lives in has
+  `backdrop-filter`, which makes it a containing block for `position: fixed`
+  descendants — a nested sheet would anchor to the bar instead of the
+  viewport. The portal also lifts it clear of the map's stacking context.
+- `useDismiss` accepts an **array of refs** so both the trigger and the
+  portalled sheet count as "inside". Without that, the sheet is outside its
+  trigger's subtree, so clicking any filter option inside it would register as
+  an outside click and dismiss the sheet immediately.
+
+The sheet uses the same `filters`/`setFilters`/`clearFilters` props as the
+desktop dropdown — there is no separate mobile filter state or logic, so chips
+and the URL update identically from either.
 
 ### URL persistence
 
