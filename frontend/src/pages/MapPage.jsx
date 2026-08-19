@@ -152,7 +152,7 @@ function MapPage() {
           controls join this same container; on desktop they move to the
           map's bottom-right corner instead. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-start gap-2 p-3 sm:p-4">
-        <div className="pointer-events-auto flex w-full flex-col gap-2 rounded-xl border border-white/25 bg-white/12 px-2.5 py-2 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg sm:flex-row sm:items-center sm:justify-between">
+        <div className="pointer-events-auto flex w-full flex-col gap-2 rounded-xl border border-white/25 bg-white/8 px-2.5 py-2 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg sm:flex-row sm:items-center sm:justify-between">
           {/* Filter button stays pinned; the active chips scroll sideways
               next to it rather than wrapping. */}
           <div className="flex min-w-0 items-center gap-2">
@@ -172,22 +172,12 @@ function MapPage() {
             </span>
           </div>
 
-          {/* Mobile second row: result count on the left, map controls on the
-              right — reuses the row the controls already occupied, so this
-              costs no extra height. */}
-          <div className="flex items-center justify-between gap-2 sm:hidden">
+          {/* Mobile: the result count sits on its own line so it never eats
+              the width the active chips need. */}
+          <div className="flex items-center sm:hidden">
             <span className="shrink-0 whitespace-nowrap rounded-full bg-white/55 px-3 py-1.5 text-xs font-medium text-text-secondary">
               {countText}
             </span>
-            <MapControls
-              layerId={layerId}
-              onLayerChange={setLayerId}
-              onLocate={handleLocateRequest}
-              onZoomIn={handleZoomIn}
-              onZoomOut={handleZoomOut}
-              orientation="horizontal"
-              menuPlacement="bottom"
-            />
           </div>
         </div>
 
@@ -201,10 +191,10 @@ function MapPage() {
         ) : null}
       </div>
 
-      {/* Desktop: one horizontal control row in the bottom-right corner,
-          sitting above the Yandex attribution/logo strip (pb-10) so it never
-          covers the copyright or legal text. */}
-      <div className="pointer-events-none absolute bottom-0 right-0 z-10 hidden p-4 pb-10 sm:block">
+      {/* One horizontal control row in the map's bottom-right corner on every
+          breakpoint, sitting above the Yandex attribution/logo strip so it
+          never covers the copyright or legal text. */}
+      <div className="pointer-events-none absolute bottom-0 right-0 z-10 p-3 pb-9 sm:p-4 sm:pb-10">
         <div className="pointer-events-auto rounded-xl border border-white/25 bg-white/12 px-1.5 py-1 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg">
           <MapControls
             layerId={layerId}

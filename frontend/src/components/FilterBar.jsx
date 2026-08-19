@@ -72,6 +72,10 @@ function FilterBar({
   const isMobile = useMediaQuery('(max-width: 639px)')
   const useSheet = sheetOnMobile && isMobile
 
+  // On the map's mobile bar the clear action is pinned next to the filter
+  // button (short label) so active chips can never scroll it out of reach.
+  const pinClear = singleRow && isMobile
+
   const close = () => setIsOpen(false)
   // The sheet is portalled outside `containerRef`, so it has to be treated as
   // "inside" too — otherwise picking any filter option would dismiss it.
@@ -166,7 +170,7 @@ function FilterBar({
         <Chip key={chip.key} label={chip.label} onRemove={chip.onRemove} glass={glass} />
       ))}
 
-      {activeFilterCount > 0 ? (
+      {activeFilterCount > 0 && !pinClear ? (
         <button
           type="button"
           onClick={clearFilters}
@@ -255,6 +259,18 @@ function FilterBar({
             document.body,
           )
         : null}
+
+      {pinClear && activeFilterCount > 0 ? (
+        <button
+          type="button"
+          onClick={clearFilters}
+          className={`shrink-0 whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium text-text-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+            glass ? `${GLASS_CLASS} hover:bg-white/75` : 'border-border bg-surface hover:bg-surface-secondary'
+          }`}
+        >
+          {t('filters.reset')}
+        </button>
+      ) : null}
 
       {/* Only the chips scroll — the filter button stays pinned at the start
           of the row. A single scroll container here (rather than one on an
