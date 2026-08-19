@@ -325,8 +325,8 @@ All routes render inside `RootLayout` (Header + `<Outlet/>` + Footer).
 | `/apartment/:id` | `ApartmentDetailsPage` | Full listing detail: gallery, facts, description, amenities, owner, similar listings | Implemented |
 | `/map` | `MapPage` | Leaflet map: district boundaries, filters, geolocation/nearby apartments, `?apartment=` deep link | Implemented (frontend-only, mock data) |
 | `/wishlist` | `WishlistPage` | Saved apartments, own filter/sort, empty states | Implemented |
-| `/login` | `LoginPage` | Placeholder | Not implemented |
-| `/register` | `RegisterPage` | Placeholder | Not implemented |
+| `/login` | `LoginPage` | Sign-in form: identifier + password, password visibility toggle, forgot-password and register links | UI only (no backend, no session) |
+| `/register` | `RegisterPage` | Sign-up form: name, email, phone, password + confirmation, password visibility toggles, login link | UI only (no backend, no account created) |
 | `/profile` | `ProfilePage` | Placeholder | Not implemented |
 | `/owner` | `OwnerDashboardPage` | Placeholder | Not implemented |
 | `/admin` | `AdminPage` | Placeholder | Not implemented |
@@ -541,8 +541,10 @@ backend database URL) — no secrets exist in the repository today.
       into the shared apartment preview
 - [ ] Address/street/metro text search on the Map page (explicitly deferred
       — district + filters only for the Map MVP)
-- [ ] Authentication (login/register pages are placeholders; no session,
-      no protected routes, no role checks)
+- [x] Authentication **UI** (`/login`, `/register` forms with client-side
+      validation and full uz/ru/en localization)
+- [ ] Authentication **behaviour** (no session, no token, no protected
+      routes, no role checks — the forms do not talk to anything yet)
 - [ ] Go backend / REST API (no backend code exists)
 - [ ] PostgreSQL / any database
 - [ ] Apartment CRUD (owner dashboard is a placeholder)
@@ -625,10 +627,14 @@ Entities per CLAUDE.md: `User`, `District`, `Apartment`, `ApartmentImage`,
 up front.
 
 ### Authentication / JWT
-Login/Register pages already exist as routed placeholders
-(`/login`, `/register`) ready to receive real forms. `WishlistContext` and
-any future "my listings" state would need to move from `localStorage` to
-being scoped by an authenticated user id once auth exists.
+The `/login` and `/register` **forms already exist** (see Section 6) with
+required-field, email-format and password-match validation, but they are
+deliberately inert: submitting a valid form only renders a "backend pending"
+note — no request, no token, no session, no redirect. Wiring them up means
+replacing that branch with a call to `POST /api/v1/auth/login|register` and
+storing the returned session. `WishlistContext` and any future "my listings"
+state would then move from `localStorage` to being scoped by the
+authenticated user id.
 
 ### Wishlist persistence (server-side)
 Today: `localStorage` only. Future: `POST/DELETE /api/v1/wishlist/:apartmentId`

@@ -75,6 +75,31 @@ export default {
 
   'city.tashkent': 'Ташкент',
 
+  // Authentication UI (forms only — no backend yet).
+  'auth.loginTitle': 'Вход',
+  'auth.loginSubtitle': 'Войдите в аккаунт и смотрите сохранённое жильё.',
+  'auth.registerTitle': 'Регистрация',
+  'auth.registerSubtitle': 'Создайте аккаунт и сохраняйте понравившееся жильё.',
+  'auth.identifier': 'Email или телефон',
+  'auth.identifierPlaceholder': 'email@example.com или +998901234567',
+  'auth.name': 'Имя',
+  'auth.namePlaceholder': 'Ваше имя',
+  'auth.email': 'Email',
+  'auth.emailPlaceholder': 'email@example.com',
+  'auth.phone': 'Номер телефона',
+  'auth.phonePlaceholder': '+998 90 123 45 67',
+  'auth.password': 'Пароль',
+  'auth.confirmPassword': 'Подтвердите пароль',
+  'auth.showPassword': 'Показать пароль',
+  'auth.hidePassword': 'Скрыть пароль',
+  'auth.forgotPassword': 'Забыли пароль?',
+  'auth.noAccount': 'Нет аккаунта?',
+  'auth.hasAccount': 'Уже есть аккаунт?',
+  'auth.errorRequired': 'Это поле обязательно',
+  'auth.errorEmail': 'Неверный формат email',
+  'auth.errorPasswordMatch': 'Пароли не совпадают',
+  'auth.backendPending': 'Форма заполнена верно. Аутентификация появится на следующем этапе.',
+
   // District display names, keyed by the district id from data/districts.js
   // (ids and filter values are language-independent and never change).
   'district.sergeli': 'Сергелий',

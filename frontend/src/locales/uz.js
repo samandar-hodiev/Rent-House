@@ -75,6 +75,31 @@ export default {
 
   'city.tashkent': 'Toshkent',
 
+  // Authentication UI (forms only — no backend yet).
+  'auth.loginTitle': 'Kirish',
+  'auth.loginSubtitle': "Hisobingizga kiring va saqlangan uylaringizni ko'ring.",
+  'auth.registerTitle': "Ro'yxatdan o'tish",
+  'auth.registerSubtitle': 'Hisob yarating va uylarni saqlab boring.',
+  'auth.identifier': 'Email yoki telefon',
+  'auth.identifierPlaceholder': 'email@example.com yoki +998901234567',
+  'auth.name': 'Ism',
+  'auth.namePlaceholder': 'Ismingiz',
+  'auth.email': 'Email',
+  'auth.emailPlaceholder': 'email@example.com',
+  'auth.phone': 'Telefon raqam',
+  'auth.phonePlaceholder': '+998 90 123 45 67',
+  'auth.password': 'Parol',
+  'auth.confirmPassword': 'Parolni tasdiqlash',
+  'auth.showPassword': "Parolni ko'rsatish",
+  'auth.hidePassword': 'Parolni yashirish',
+  'auth.forgotPassword': 'Parolni unutdingizmi?',
+  'auth.noAccount': "Account yo'qmi?",
+  'auth.hasAccount': 'Account bormi?',
+  'auth.errorRequired': "Bu maydon to'ldirilishi shart",
+  'auth.errorEmail': "Email manzil noto'g'ri",
+  'auth.errorPasswordMatch': 'Parollar mos kelmadi',
+  'auth.backendPending': "Shakl to'g'ri to'ldirildi. Autentifikatsiya backend keyingi bosqichda ulanadi.",
+
   // District display names, keyed by the district id from data/districts.js
   // (ids and filter values are language-independent and never change).
   'district.sergeli': 'Sergeli',

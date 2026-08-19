@@ -75,6 +75,31 @@ export default {
 
   'city.tashkent': 'Tashkent',
 
+  // Authentication UI (forms only — no backend yet).
+  'auth.loginTitle': 'Log in',
+  'auth.loginSubtitle': 'Sign in to your account and see your saved homes.',
+  'auth.registerTitle': 'Sign up',
+  'auth.registerSubtitle': 'Create an account and start saving homes.',
+  'auth.identifier': 'Email or phone',
+  'auth.identifierPlaceholder': 'email@example.com or +998901234567',
+  'auth.name': 'Name',
+  'auth.namePlaceholder': 'Your name',
+  'auth.email': 'Email',
+  'auth.emailPlaceholder': 'email@example.com',
+  'auth.phone': 'Phone number',
+  'auth.phonePlaceholder': '+998 90 123 45 67',
+  'auth.password': 'Password',
+  'auth.confirmPassword': 'Confirm password',
+  'auth.showPassword': 'Show password',
+  'auth.hidePassword': 'Hide password',
+  'auth.forgotPassword': 'Forgot your password?',
+  'auth.noAccount': "Don't have an account?",
+  'auth.hasAccount': 'Already have an account?',
+  'auth.errorRequired': 'This field is required',
+  'auth.errorEmail': 'Enter a valid email address',
+  'auth.errorPasswordMatch': 'Passwords do not match',
+  'auth.backendPending': 'The form is valid. Authentication will be connected in a later step.',
+
   // District display names, keyed by the district id from data/districts.js
   // (ids and filter values are language-independent and never change).
   'district.sergeli': 'Sergeli',
