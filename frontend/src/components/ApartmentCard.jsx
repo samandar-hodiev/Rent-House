@@ -28,14 +28,18 @@ function HeartIcon({ filled }) {
   )
 }
 
-function ApartmentCard({ apartment }) {
+// `title` and `interactive` exist for the listing-form preview, which renders a
+// not-yet-saved apartment: it has no `apartmentTitle.<id>` translation and must
+// not navigate or toggle a wishlist. Both default to today's behaviour, so
+// every existing call site is unaffected.
+function ApartmentCard({ apartment, title: titleOverride, interactive = true }) {
   const { t } = useLocale()
   const navigate = useNavigate()
   const { isSaved, toggleWishlist } = useWishlist()
   const isWishlisted = isSaved(apartment.id)
 
   const district = getDistrictById(apartment.districtId)
-  const title = t(`apartmentTitle.${apartment.id}`)
+  const title = titleOverride ?? t(`apartmentTitle.${apartment.id}`)
 
   const handleWishlistClick = (event) => {
     event.stopPropagation()
@@ -49,16 +53,26 @@ function ApartmentCard({ apartment }) {
     navigate(`/map?apartment=${apartment.id}`)
   }
 
+  const Wrapper = interactive ? 'a' : 'div'
+  const wrapperProps = interactive
+    ? {
+        href: apartmentDetailsPath(apartment.id),
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        'aria-label': t('apartmentCard.detailsAriaLabel', { title }),
+      }
+    : {}
+
   return (
-    <a
-      href={apartmentDetailsPath(apartment.id)}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label={t('apartmentCard.detailsAriaLabel', { title })}
-      className="group flex cursor-pointer flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    <Wrapper
+      {...wrapperProps}
+      className={`group flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+        interactive ? 'cursor-pointer' : ''
+      }`}
     >
       <div className="relative aspect-4/3 w-full overflow-hidden bg-surface-secondary">
         <img src={apartment.image} alt={title} loading="lazy" className="size-full object-cover" />
+        {interactive ? (
         <button
           type="button"
           onClick={handleWishlistClick}
@@ -74,6 +88,7 @@ function ApartmentCard({ apartment }) {
         >
           <HeartIcon filled={isWishlisted} />
         </button>
+        ) : null}
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-5">
@@ -99,6 +114,7 @@ function ApartmentCard({ apartment }) {
 
         <div className="mt-auto flex items-center justify-between pt-3 text-sm">
           <span className="text-text-muted">{formatPostedAt(apartment.postedAt, t)}</span>
+          {interactive ? (
           <button
             type="button"
             onClick={handleMapClick}
@@ -107,9 +123,10 @@ function ApartmentCard({ apartment }) {
             <Map aria-hidden="true" size={14} className="shrink-0" />
             {t('apartmentCard.mapView')}
           </button>
+          ) : null}
         </div>
       </div>
-    </a>
+    </Wrapper>
   )
 }
 

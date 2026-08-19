@@ -167,6 +167,13 @@ margin beside the navigation on wide screens.
 | `dashboard/DashboardNavItem.jsx` | One entry. Every item shares the same size/padding/structure; `accent` only tints the icon (used by "post a listing", which is important but must not be a differently-shaped CTA) and `badge` renders the unread counter. Active state comes from `NavLink`'s `isActive`. Also exports `NAV_ITEM_BASE`/`NAV_ITEM_ACTIVE`/`NAV_ITEM_IDLE` so the Settings `<button>` can look identical to the `NavLink` entries without duplicating classes. |
 | `dashboard/DashboardSettingsMenu.jsx` | Settings entry + its popover (language, theme, "edit profile"). Opens below its trigger and flips above when the viewport has no room, measured in a `useLayoutEffect`; dismissed via the shared `useDismiss`. |
 | `dashboard/ProfileOverview.jsx` | Read-only account overview + the three stat cards. |
+| `listing/FormSection.jsx` | One titled card per group of fields, so the form reads as sections rather than one long column. |
+| `listing/ImageUploader.jsx` | Drag & drop / picker, previews, remove, cover selection. Files stay in the browser as object URLs. |
+| `listing/SegmentedField.jsx` | Row of mutually exclusive choices (rooms, currency, period, furnishing) as a `radiogroup`. |
+| `listing/CheckboxGroup.jsx` | Multi-select toggle chips (amenities, rental rules). |
+| `listing/SelectField.jsx` / `listing/TextAreaField.jsx` | Native select and a textarea with a live character counter, both styled like `FormField`'s input. |
+| `listing/ListingLocationPicker.jsx` | Click/drag-to-pick Yandex map writing latitude+longitude. |
+| `listing/ListingPreview.jsx` | Maps form state onto the shape `ApartmentCard` consumes. |
 | `dashboard/MyListingCard.jsx` | One owner-side listing row: image, title, district, price, specs, status badge, views/saves/date and the per-listing actions. Image left / details right from `sm:` up, stacked below. |
 | `dashboard/UserAvatar.jsx` | Initials-based avatar, so the account UI needs no image asset or upload pipeline yet. Reused by the chat list, thread header and public header. |
 | `chat/ChatConversationList.jsx` | Left panel: title, search field, scrollable list. Filters on participant name **and** last-message preview; orders by newest activity (deliberately not unread-first — that reorders the list under the pointer that just cleared a badge). |
@@ -216,6 +223,23 @@ is the mock dataset; message text goes through i18n keys
 (`chatMessage.<conversationId>.<messageId>`) exactly like apartment titles, so the
 demo content translates with the rest of the app, while locally sent messages
 carry their text directly.
+
+**Post a listing (`/create-listing`).** A sectioned form — photos, basics,
+apartment, amenities, description, location, rental terms — with a live
+`ApartmentCard` preview beside it on `xl:` and below it under that. The preview
+is the **real card component**, not a second card design: `ApartmentCard` gained
+two optional props (`title`, `interactive`) that default to today's behaviour, so
+it can render a not-yet-saved listing that has no `apartmentTitle.<id>` key and
+must not navigate or toggle a wishlist. Every existing call site is unaffected.
+
+`data/listingForm.js` owns the listing shape, the option sets and
+`validateListing()`, which returns `{ field: messageKey }` so the validator stays
+free of translation concerns. Photos become object URLs that are revoked on
+removal — nothing is uploaded. `listing/ListingLocationPicker.jsx` is a
+click-to-pick map that reuses the shared `loadYandexMaps()` loader but
+deliberately **not** `ApartmentMap`, which belongs to the Map page and carries
+markers, district boundaries, layers and traffic that do not apply here.
+Submitting validates and shows a mock success state; nothing is sent anywhere.
 
 **My listings (`/dashboard/listings`).** `data/myListings.js` holds the owner-side
 fields (status, created date, views, saves) and references the apartment by id,
@@ -460,7 +484,7 @@ All routes render inside `RootLayout` (Header + `<Outlet/>` + Footer).
 | `/dashboard/listings` | `DashboardListingsPage` | My listings: summary counts, "+ post a listing" action, one card per listing with status and metrics. Falls back to the empty state when there are none | UI only (mock data) |
 | `/dashboard/chats` | `DashboardChatsPage` | Two-panel chat: conversation list + search, thread with listing context, composer. `?c=<id>` selects a conversation | UI only (mock data, in-memory sends) |
 | `/dashboard/edit-profile` | `DashboardEditProfilePage` | Profile edit form in the dashboard body: avatar preview + change action, first/last name, email, phone, save | UI only (in-memory save, no upload) |
-| `/create-listing` | `CreateListingPage` | Listing form shell, rendered inside the account layout | UI only |
+| `/create-listing` | `CreateListingPage` | Listing form: photos, basics, apartment, amenities, description, location + map picker, rental terms, live card preview | UI only (validation + mock submit) |
 | `/owner` | `OwnerDashboardPage` | Placeholder | Not implemented |
 | `/admin` | `AdminPage` | Placeholder | Not implemented |
 | `*` | `NotFoundPage` | 404 | Implemented |
