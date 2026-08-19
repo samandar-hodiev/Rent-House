@@ -157,7 +157,7 @@ function MapPage() {
       {/* Top glass bar: filter controls, active chips and the result count.
           The map controls live in their own group at the bottom-right. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-start gap-2 p-3 sm:p-4">
-        <div className="pointer-events-auto flex w-full flex-col gap-2 rounded-xl border border-white/25 bg-white/8 px-2.5 py-2 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg dark:bg-surface/40 sm:flex-row sm:items-center sm:justify-between">
+        <div className="pointer-events-auto flex w-full flex-col gap-2 rounded-xl border border-white/25 bg-white/8 px-2.5 py-2 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg dark:bg-surface/20 sm:flex-row sm:items-center sm:justify-between">
           {/* Desktop: filter button, chips and count on one row. Mobile:
               FilterBar splits into a compact controls row (button, clear,
               count) plus a chips row that only appears while filters are
@@ -199,7 +199,7 @@ function MapPage() {
       <div className="pointer-events-none absolute bottom-0 right-0 z-10 flex justify-end p-3 pb-9 sm:p-4 sm:pb-10">
         {/* Layers, My Location and both zoom buttons share a single glass
             container so they read as one control group. */}
-        <div className="pointer-events-auto relative flex items-center gap-1 rounded-xl border border-white/25 bg-white/12 px-1.5 py-1 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg dark:bg-surface/40">
+        <div className="pointer-events-auto relative flex items-center gap-1 rounded-xl border border-white/25 bg-white/12 px-1.5 py-1 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg dark:bg-surface/20">
           <MapLayerSelector layerId={layerId} onLayerChange={handleLayerChange} />
           <MapControls
             onLocate={handleLocateRequest}

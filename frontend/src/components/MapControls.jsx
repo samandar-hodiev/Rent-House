@@ -2,7 +2,7 @@ import { LocateFixed, Minus, Plus } from 'lucide-react'
 import { useLocale } from '../context/LocaleContext'
 
 const BUTTON_CLASS =
-  'flex size-8 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-white/70 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+  'flex size-8 shrink-0 items-center justify-center rounded-full text-slate-600 dark:text-slate-700 hover:bg-white/70 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
 
 // My Location / Zoom in / Zoom out. The layer picker is its own card next to
 // this row — see MapLayerSelector.
