@@ -189,6 +189,14 @@ export default {
   'apartmentTitle.8': 'Small studio-style room',
   'apartmentTitle.9': 'Yunusobod, new 3-room apartment',
   'apartmentTitle.10': 'Sergeli, newly built housing',
+  'apartmentTitle.11': 'Mirzo Ulugbek, 2-room flat by the university',
+  'apartmentTitle.12': 'Yashnobod, spacious flat near the metro',
+  'apartmentTitle.13': 'Uchtepa, family 4-room apartment',
+  'apartmentTitle.14': 'Bektemir, affordable flat in a quiet area',
+  'apartmentTitle.15': 'Yangihayot, studio in a new building',
+  'apartmentTitle.16': 'Mirobod, luxury flat near the business centre',
+  'apartmentTitle.17': 'Olmazor, comfortable flat for students',
+  'apartmentTitle.18': 'Shayxontohur, 3-room flat in the historic centre',
 
   'posted.minutesAgo': '{count} minutes ago',
   'posted.hoursAgo': '{count} hours ago',
@@ -381,6 +389,22 @@ export default {
     'Spacious, bright apartment in a new residential complex. Near Yunusobod metro station.',
   'apartmentDescription.10':
     'Clean apartment in a newly built house, rented out for the first time. New infrastructure and spacious grounds.',
+  'apartmentDescription.11':
+    'A bright, furnished flat close to the universities and the metro station. Balcony and lift included.',
+  'apartmentDescription.12':
+    'A spacious flat near Parkent market and the metro. Unfurnished, so you can move in with your own.',
+  'apartmentDescription.13':
+    'A comfortable, fully furnished 4-room apartment for a family. Parking in the courtyard.',
+  'apartmentDescription.14':
+    'A compact flat in a quiet neighbourhood away from the noise. A good fit if you are watching the budget.',
+  'apartmentDescription.15':
+    'A modern studio in a new high-rise. Lift, security and full furnishing.',
+  'apartmentDescription.16':
+    'A luxury flat in the centre near the business districts, with air conditioning and parking.',
+  'apartmentDescription.17':
+    'A compact furnished flat next to the university. Convenient for students and young professionals.',
+  'apartmentDescription.18':
+    'A spacious flat in the historic centre on Navoiy street. Transport and shops right nearby.',
 
   'map.pageTitle': 'Map',
   'map.viewDetails': 'View details',

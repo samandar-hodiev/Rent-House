@@ -189,6 +189,14 @@ export default {
   'apartmentTitle.8': 'Yotoqxona turidagi kichik xona',
   'apartmentTitle.9': 'Yunusobod, yangi uy 3 xona',
   'apartmentTitle.10': 'Sergeli, yangi qurilgan turar-joy',
+  'apartmentTitle.11': "Mirzo Ulug'bek, universitet yonida 2 xonali",
+  'apartmentTitle.12': 'Yashnobod, metro yaqinidagi keng kvartira',
+  'apartmentTitle.13': 'Uchtepa, oilaviy 4 xonali kvartira',
+  'apartmentTitle.14': 'Bektemir, tinch hududda arzon kvartira',
+  'apartmentTitle.15': 'Yangihayot, yangi binoda studiya',
+  'apartmentTitle.16': 'Mirobod, biznes markaz yaqinida lyuks kvartira',
+  'apartmentTitle.17': 'Olmazor, talabalar uchun qulay kvartira',
+  'apartmentTitle.18': 'Shayxontohur, tarixiy markazda 3 xonali',
 
   'posted.minutesAgo': '{count} daqiqa oldin',
   'posted.hoursAgo': '{count} soat oldin',
@@ -382,6 +390,22 @@ export default {
     'Yangi qurilgan turar-joy majmuasida joylashgan keng va yorug‘ kvartira. Metro Yunusobod bekatiga yaqin.',
   'apartmentDescription.10':
     "Yangi qurilgan uyda joylashgan, birinchi marta ijaraga beriladigan toza kvartira. Yangi infratuzilma va keng hudud.",
+  'apartmentDescription.11':
+    "Universitetlar va Buyuk Ipak Yo'li metro bekatiga yaqin, jihozlangan yorug' kvartira. Balkon va lift mavjud.",
+  'apartmentDescription.12':
+    "Parkent bozori va metroga yaqin joylashgan keng kvartira. Jihozsiz, o'z mebelingiz bilan ko'chib kelishingiz mumkin.",
+  'apartmentDescription.13':
+    "Kichik oila uchun qulay, to'liq jihozlangan 4 xonali kvartira. Hovlida avtoturargoh bor.",
+  'apartmentDescription.14':
+    'Shovqindan uzoq, tinch mahallada joylashgan ixcham kvartira. Byudjetni tejamoqchilar uchun mos.',
+  'apartmentDescription.15':
+    "Yangi ko'p qavatli binodagi zamonaviy studiya. Lift, qo'riqlash va to'liq jihoz bilan.",
+  'apartmentDescription.16':
+    "Shahar markazidagi biznes markazlarga yaqin, konditsioner va avtoturargoh bilan ta'minlangan lyuks kvartira.",
+  'apartmentDescription.17':
+    'Universitet yonidagi ixcham va jihozlangan kvartira. Talabalar va yosh mutaxassislar uchun qulay.',
+  'apartmentDescription.18':
+    "Tarixiy markazda, Navoiy ko'chasida joylashgan keng kvartira. Transport va do'konlar yonginasida.",
 
   'map.pageTitle': 'Xarita',
   'map.viewDetails': "Batafsil ko'rish",

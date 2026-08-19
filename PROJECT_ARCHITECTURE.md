@@ -399,6 +399,14 @@ provider per concern (see [Section 8](#8-state-management)).
 Every page reads apartment data by importing `APARTMENTS` from
 `src/data/apartments.js` directly and filtering/sorting it in memory.
 
+That array is treated as the **loaded page** of a larger catalog, not the whole
+of it: `TOTAL_CATALOG_COUNT` (also exported from `apartments.js`) is what Home's
+*unfiltered* result count reports, so the page reads like a real listing site
+while only a page of data sits in memory. Any active district/keyword/filter
+reports the real number of matches instead, so filtering and sorting stay
+truthful. Both are replaced by the `items` + `total` of a paginated
+`GET /api/v1/apartments`.
+
 ### Design system
 
 Centralized as Tailwind `@theme` tokens in `src/index.css` — see
@@ -756,8 +764,8 @@ backend database URL) — no secrets exist in the repository today.
   and accurate to the real district shape, not for precise cadastral use.
 - **"Nearby apartments" is a client-side MVP.** `utils/geo.js` computes
   straight-line (haversine) distance against the full in-memory
-  `APARTMENTS` array on every geolocation success — fine at 10 mock
-  listings, would need to move to a backend geo-query (e.g. PostGIS) at
+  `APARTMENTS` array on every geolocation success — fine at the current
+  mock-listing count, would need to move to a backend geo-query (e.g. PostGIS) at
   real scale. The util is intentionally isolated so that move doesn't
   touch `MapPage`/`ApartmentMap`.
 - **Search is substring matching against a precomputed `searchText`

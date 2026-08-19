@@ -5,7 +5,7 @@ import SortDropdown from '../components/SortDropdown'
 import ApartmentGrid from '../components/ApartmentGrid'
 import { useSearch } from '../context/SearchContext'
 import { useLocale } from '../context/LocaleContext'
-import { APARTMENTS } from '../data/apartments'
+import { APARTMENTS, TOTAL_CATALOG_COUNT } from '../data/apartments'
 import { filterApartments } from '../utils/filterApartments'
 import { sortApartments } from '../utils/sortApartments'
 
@@ -46,7 +46,10 @@ function HomePage() {
   } else if (isSearchActive) {
     countText = t('apartments.foundCount', { count: apartments.length })
   } else {
-    countText = t('apartments.defaultCount', { count: apartments.length })
+    // Unfiltered: report the whole catalog, not just the page held in memory.
+    // Any active filter falls into the branch above and reports what actually
+    // matched, so filtering and sorting stay truthful.
+    countText = t('apartments.defaultCount', { count: TOTAL_CATALOG_COUNT })
   }
 
   return (
