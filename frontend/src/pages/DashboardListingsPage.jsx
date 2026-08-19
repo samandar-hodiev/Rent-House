@@ -44,8 +44,12 @@ function DashboardListingsPage() {
   }
 
   return (
-    <section className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    // From `lg:` the section is pinned to the viewport (minus the 4rem header
+    // and the main padding) and only the list below scrolls, so the title,
+    // summary and post action stay put. Below `lg:` the page scrolls normally —
+    // nested scrolling on a phone fights the natural gesture.
+    <section className="flex flex-col gap-5 lg:h-[calc(100vh-7rem)] lg:overflow-hidden">
+      <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">{t('dashboard.listingsTitle')}</h1>
 
@@ -68,7 +72,7 @@ function DashboardListingsPage() {
 
       {/* A single readable column rather than a grid: these rows carry more
           metadata than a public apartment card and need the width. */}
-      <ul className="flex max-w-3xl flex-col gap-3">
+      <ul className="flex max-w-3xl flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
         {listings.map((listing) => (
           <li key={listing.id}>
             <MyListingCard listing={listing} />
