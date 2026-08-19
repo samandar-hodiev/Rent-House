@@ -13,8 +13,11 @@ export const ROUTES = {
   dashboardChats: '/dashboard/chats',
   dashboardEditProfile: '/dashboard/edit-profile',
   createListing: '/create-listing',
+  editListing: '/edit-listing/:id',
   owner: '/owner',
   admin: '/admin',
 }
 
 export const apartmentDetailsPath = (id) => `/apartment/${id}`
+
+export const editListingPath = (id) => `/edit-listing/${id}`

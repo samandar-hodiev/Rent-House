@@ -224,7 +224,17 @@ is the mock dataset; message text goes through i18n keys
 demo content translates with the rest of the app, while locally sent messages
 carry their text directly.
 
-**Post a listing (`/create-listing`).** A sectioned form — photos, basics,
+**Post a listing / edit a listing.** One component, `CreateListingPage`, serves
+both `/create-listing` (empty, "E'lon joylash", publish) and `/edit-listing/:id`
+(pre-filled, "E'lonni tahrirlash", save changes). `listingToFormValues()` seeds
+the form **once** so the working copy is the form's own — cancelling or
+navigating back cannot mutate the stored listing — and `formValuesToListing()`
+writes it back on save. That patch deliberately omits `status`, so editing never
+moves a listing between Faol / Kutilmoqda / Yopilgan. An owner-edited title is
+stored as `customTitle`, which the listing card prefers over the translated
+`apartmentTitle.<id>`, so untouched listings stay translated.
+
+**The form itself.** A sectioned form — photos, basics,
 apartment, amenities, description, location, rental terms — with a live
 `ApartmentCard` preview beside it on `xl:` and below it under that. The preview
 is the **real card component**, not a second card design: `ApartmentCard` gained
@@ -485,6 +495,7 @@ All routes render inside `RootLayout` (Header + `<Outlet/>` + Footer).
 | `/dashboard/chats` | `DashboardChatsPage` | Two-panel chat: conversation list + search, thread with listing context, composer. `?c=<id>` selects a conversation | UI only (mock data, in-memory sends) |
 | `/dashboard/edit-profile` | `DashboardEditProfilePage` | Profile edit form in the dashboard body: avatar preview + change action, first/last name, email, phone, save | UI only (in-memory save, no upload) |
 | `/create-listing` | `CreateListingPage` | Listing form: photos, basics, apartment, amenities, description, location + map picker, rental terms, live card preview | UI only (validation + mock submit) |
+| `/edit-listing/:id` | `CreateListingPage` | The same form in edit mode: pre-filled from `ListingsContext`, saves back to it and returns to My listings | UI only (in-memory update) |
 | `/owner` | `OwnerDashboardPage` | Placeholder | Not implemented |
 | `/admin` | `AdminPage` | Placeholder | Not implemented |
 | `*` | `NotFoundPage` | 404 | Implemented |
@@ -553,6 +564,7 @@ in `App.jsx` around the router (`LocaleProvider` → `SearchProvider` →
 | **Wishlist** | `WishlistContext` | `useState` (`Map<id, savedAtISOString>`) + `localStorage` (`renthouse_wishlist`) | `toggleWishlist(id)`, `isSaved(id)`, `getSavedAt(id)`, `savedCount`. The only client state that survives a reload. `ApartmentCard` reads this directly (not via props) so wishlist toggles stay in sync across every page that renders a card. |
 | **Theme** | `ThemeContext` | `useState` + `localStorage` (`renthouse_theme`) | `theme` (`'light' \| 'dark' \| 'system'`), `setTheme`, `resolvedTheme`. Toggles a `dark` class on `<html>`; dark values are token overrides in `index.css`, so components need no per-element dark classes. **Defaults to `light`**; `system` is opt-in and then tracks `prefers-color-scheme`. Switched from `ThemeToggle` in both headers, or the Light/Dark row in the Settings popover. |
 | **Session (UI only)** | `AuthContext` | `useState` + `localStorage` (`renthouse_session`) | `isAuthenticated`, `user`, `signIn()`, `signOut()`, `updateUser()`. Defaults to signed out. There is no credential check, request or token behind it — it only decides whether the public header shows its signed-in variant and gives log out / profile edit something real to change. Replace wholesale when the auth API lands. |
+| **Listings (UI only)** | `ListingsContext` | `useState` (in-memory, not persisted) | `listings`, `getListing(id)`, `updateListing(id, patch)`. Seeded from `data/myListings.js` and shared by "Mening e'lonlarim" and the edit form, so a saved edit updates the card behind it. `updateListing` always preserves `status`. Replaced by `GET/PATCH /api/v1/apartments/:id`. |
 | **Chat (UI only)** | `ChatContext` | `useState` (in-memory, not persisted) | `conversations`, `unreadTotal`, `markRead(id)`, `sendMessage(id, text)`. Seeded from `data/conversations.js`. The single unread source for the chat page, the sidebar badge and the public header's chat icon. Sent messages live until reload — this is the seam a messaging API replaces. |
 | **UI-local state** | plain `useState` in each component | in-memory only | Dropdown open/closed (district, language, sort, filter panel — all via `useDismiss`), gallery active image index, chat modal messages, mobile menu open/closed, share-copied toast, per-page `loading` flags. |
 

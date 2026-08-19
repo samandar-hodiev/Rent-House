@@ -105,3 +105,77 @@ export function validateListing(listing) {
 
   return errors
 }
+
+// Maps a stored listing onto the form's shape so edit mode opens pre-filled.
+// `title` is passed in because the canonical title is translated
+// (`apartmentTitle.<id>`) unless the owner has already overridden it.
+export function listingToFormValues(listing, title, description) {
+  const gallery = listing.images?.length ? listing.images : [listing.image].filter(Boolean)
+  const images = gallery.map((url, index) => ({
+    id: `existing-${listing.id}-${index}`,
+    name: `${index + 1}`,
+    url,
+  }))
+
+  const rooms = String(listing.rooms ?? '')
+  return {
+    title,
+    description,
+    price: String(listing.price ?? ''),
+    currency: listing.currency ?? CURRENCIES[0].id,
+    rentalPeriod: listing.rentalPeriod ?? RENTAL_PERIODS[0].id,
+    // The catalog stores a number; the form offers "5+" as the top option.
+    rooms: ROOM_OPTIONS.includes(rooms) ? rooms : Number(rooms) >= 5 ? '5+' : '',
+    area: String(listing.area ?? ''),
+    floor: String(listing.floor ?? ''),
+    totalFloors: String(listing.totalFloors ?? ''),
+    furnished: listing.furnished ? FURNISHING[0].id : FURNISHING[1].id,
+    // The catalog carries a couple of tags the form does not offer as amenities.
+    amenities: (listing.amenities ?? []).filter((id) => AMENITIES.includes(id)),
+    images,
+    coverImageId: images[0]?.id ?? null,
+    location: {
+      city: listing.location?.city ?? 'Toshkent',
+      district: listing.districtId ?? '',
+      neighborhood: listing.location?.neighborhood ?? '',
+      address: listing.address ?? '',
+      latitude: listing.latitude ?? TASHKENT_CENTER.latitude,
+      longitude: listing.longitude ?? TASHKENT_CENTER.longitude,
+    },
+    rentalConditions: listing.rentalConditions ?? {
+      deposit: '',
+      utilities: UTILITIES[0].id,
+      minimumMonths: '',
+      rules: [],
+    },
+  }
+}
+
+// Inverse of the above: what an edit writes back onto the stored listing.
+// Deliberately omits `status` — editing never moves a listing between states.
+export function formValuesToListing(values) {
+  const cover =
+    values.images.find((image) => image.id === values.coverImageId) ?? values.images[0] ?? null
+
+  return {
+    customTitle: values.title.trim(),
+    description: values.description,
+    price: Number(values.price) || 0,
+    currency: values.currency,
+    rentalPeriod: values.rentalPeriod,
+    rooms: Number(values.rooms.replace('+', '')) || 0,
+    area: Number(values.area) || 0,
+    floor: Number(values.floor) || 0,
+    totalFloors: Number(values.totalFloors) || 0,
+    furnished: values.furnished === FURNISHING[0].id,
+    amenities: values.amenities,
+    image: cover?.url ?? '',
+    images: values.images.map((image) => image.url),
+    districtId: values.location.district,
+    address: values.location.address,
+    latitude: values.location.latitude,
+    longitude: values.location.longitude,
+    location: { ...values.location },
+    rentalConditions: { ...values.rentalConditions },
+  }
+}

@@ -3,7 +3,7 @@ import { Eye, Heart, Pencil } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { districtNameKey, getDistrictById } from '../../data/districts'
 import { LISTING_STATUS } from '../../data/myListings'
-import { apartmentDetailsPath } from '../../routes/paths'
+import { apartmentDetailsPath, editListingPath } from '../../routes/paths'
 import { formatUzsAmount } from '../../utils/formatPrice'
 import { formatPostedAt } from '../../utils/formatRelativeTime'
 
@@ -19,7 +19,8 @@ const STATUS_CLASS = {
 // stacked below that.
 function MyListingCard({ listing }) {
   const { t } = useLocale()
-  const title = t(`apartmentTitle.${listing.id}`)
+  // An owner-edited title wins; otherwise the catalog title stays translated.
+  const title = listing.customTitle ?? t(`apartmentTitle.${listing.id}`)
   const district = getDistrictById(listing.districtId)
 
   return (
@@ -68,17 +69,13 @@ function MyListingCard({ listing }) {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {/* Editing needs a listing form and an owner-side API, neither of
-              which exists yet — disabled rather than silently doing nothing. */}
-          <button
-            type="button"
-            disabled
-            title={t('dashboard.editPending')}
-            className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-text-primary disabled:cursor-not-allowed disabled:opacity-60"
+          <Link
+            to={editListingPath(listing.id)}
+            className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Pencil aria-hidden="true" size={14} />
             {t('dashboard.listingEdit')}
-          </button>
+          </Link>
 
           <Link
             to={apartmentDetailsPath(listing.id)}

@@ -1,10 +1,11 @@
 import { useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Building2, Plus } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Building2, Check, Plus } from 'lucide-react'
 import EmptyState from '../components/EmptyState'
 import MyListingCard from '../components/dashboard/MyListingCard'
 import { useLocale } from '../context/LocaleContext'
-import { getMyListings, getMyListingsSummary } from '../data/myListings'
+import { useListings } from '../context/ListingsContext'
+import { getMyListingsSummary } from '../data/myListings'
 import { ROUTES } from '../routes/paths'
 
 function SummaryItem({ label, value }) {
@@ -20,9 +21,10 @@ function DashboardListingsPage() {
   const { t } = useLocale()
   const navigate = useNavigate()
 
-  // Mock source for now; a real `GET /api/v1/users/me/listings` returns the
-  // same shape, so only this line changes.
-  const listings = useMemo(() => getMyListings(), [])
+  // Shared with the edit form, so saving an edit updates the card here.
+  const { listings } = useListings()
+  // Set by the edit form when it navigates back after a successful save.
+  const justSaved = Boolean(useLocation().state?.saved)
   const summary = useMemo(() => getMyListingsSummary(listings), [listings])
 
   if (listings.length === 0) {
@@ -69,6 +71,16 @@ function DashboardListingsPage() {
           {t('dashboard.postListing')}
         </Link>
       </div>
+
+      {justSaved ? (
+        <p
+          role="status"
+          className="flex shrink-0 max-w-3xl items-center gap-2 rounded-md border border-primary bg-primary-light px-3 py-2.5 text-sm text-primary-hover dark:text-primary"
+        >
+          <Check aria-hidden="true" size={16} />
+          {t('listing.changesSaved')}
+        </p>
+      ) : null}
 
       {/* A single readable column rather than a grid: these rows carry more
           metadata than a public apartment card and need the width. */}

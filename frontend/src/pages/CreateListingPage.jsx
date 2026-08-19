@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Check } from 'lucide-react'
 import FormField from '../components/FormField'
 import CheckboxGroup from '../components/listing/CheckboxGroup'
@@ -11,6 +11,7 @@ import SegmentedField from '../components/listing/SegmentedField'
 import SelectField from '../components/listing/SelectField'
 import TextAreaField from '../components/listing/TextAreaField'
 import { useLocale } from '../context/LocaleContext'
+import { useListings } from '../context/ListingsContext'
 import { DISTRICTS, districtNameKey } from '../data/districts'
 import {
   AMENITIES,
@@ -22,15 +23,34 @@ import {
   ROOM_OPTIONS,
   UTILITIES,
   createEmptyListing,
+  formValuesToListing,
+  listingToFormValues,
   validateListing,
 } from '../data/listingForm'
 import { ROUTES } from '../routes/paths'
 
+// One component, two modes: `/create-listing` starts empty, `/edit-listing/:id`
+// opens the same form pre-filled with the selected listing.
 function CreateListingPage() {
   const { t } = useLocale()
   const navigate = useNavigate()
+  const { id } = useParams()
+  const { getListing, updateListing } = useListings()
 
-  const [listing, setListing] = useState(createEmptyListing)
+  const isEditMode = Boolean(id)
+  const existing = isEditMode ? getListing(id) : null
+
+  // Seeded once: the form owns a working copy from here on, so leaving without
+  // saving (cancel, back) cannot mutate the stored listing.
+  const [listing, setListing] = useState(() =>
+    existing
+      ? listingToFormValues(
+          existing,
+          existing.customTitle ?? t(`apartmentTitle.${existing.id}`),
+          existing.description ?? t(`apartmentDescription.${existing.id}`),
+        )
+      : createEmptyListing(),
+  )
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState(null) // null | 'published' | 'draft'
 
@@ -73,6 +93,17 @@ function CreateListingPage() {
       setStatus(null)
       return
     }
+
+    if (isEditMode) {
+      // Writes the working copy back to the shared listing state; `status` is
+      // deliberately not part of the patch, so Faol/Kutilmoqda/Yopilgan stays.
+      updateListing(id, formValuesToListing(listing))
+      // The project has no toast system; confirmation uses the same inline
+      // `role="status"` pattern the rest of the app uses, rendered on the page
+      // the user lands on.
+      navigate(ROUTES.dashboardListings, { state: { saved: true } })
+      return
+    }
     // Mock submission: the listing object is complete and matches what
     // `POST /api/v1/apartments` will take, but nothing is sent anywhere.
     setStatus('published')
@@ -93,10 +124,28 @@ function CreateListingPage() {
   const ruleOptions = RENTAL_RULES.map((id) => ({ id, label: t(`listing.rule${id}`) }))
   const errorText = (field) => (errors[field] ? t(errors[field]) : undefined)
 
+  if (isEditMode && !existing) {
+    return (
+      <section className="flex flex-col gap-4">
+        <h1 className="text-xl font-semibold text-text-primary">{t('listing.editTitle')}</h1>
+        <p className="text-sm text-text-secondary">{t('listing.notFound')}</p>
+        <div>
+          <button
+            type="button"
+            onClick={() => navigate(ROUTES.dashboardListings)}
+            className="rounded-md border border-border px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {t('listing.backToListings')}
+          </button>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="flex flex-col gap-5">
       <h1 className="text-xl font-semibold text-text-primary">
-        {t('dashboard.createListingTitle')}
+        {isEditMode ? t('listing.editTitle') : t('dashboard.createListingTitle')}
       </h1>
 
       {/* Form left, live card preview right on `xl:`; single column below. */}
@@ -307,7 +356,7 @@ function CreateListingPage() {
                 type="submit"
                 className="rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
-                {t('listing.publish')}
+                {isEditMode ? t('listing.saveChanges') : t('listing.publish')}
               </button>
               <button
                 type="button"
