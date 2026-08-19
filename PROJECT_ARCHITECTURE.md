@@ -167,6 +167,7 @@ margin beside the navigation on wide screens.
 | `dashboard/DashboardNavItem.jsx` | One entry. Every item shares the same size/padding/structure; `accent` only tints the icon (used by "post a listing", which is important but must not be a differently-shaped CTA) and `badge` renders the unread counter. Active state comes from `NavLink`'s `isActive`. Also exports `NAV_ITEM_BASE`/`NAV_ITEM_ACTIVE`/`NAV_ITEM_IDLE` so the Settings `<button>` can look identical to the `NavLink` entries without duplicating classes. |
 | `dashboard/DashboardSettingsMenu.jsx` | Settings entry + its popover (language, theme, "edit profile"). Opens below its trigger and flips above when the viewport has no room, measured in a `useLayoutEffect`; dismissed via the shared `useDismiss`. |
 | `dashboard/ProfileOverview.jsx` | Read-only account overview + the three stat cards. |
+| `dashboard/MyListingCard.jsx` | One owner-side listing row: image, title, district, price, specs, status badge, views/saves/date and the per-listing actions. Image left / details right from `sm:` up, stacked below. |
 | `dashboard/UserAvatar.jsx` | Initials-based avatar, so the account UI needs no image asset or upload pipeline yet. Reused by the chat list, thread header and public header. |
 | `chat/ChatConversationList.jsx` | Left panel: title, search field, scrollable list. Filters on participant name **and** last-message preview; orders by newest activity (deliberately not unread-first — that reorders the list under the pointer that just cleared a badge). |
 | `chat/ChatConversationItem.jsx` | One row: avatar, name, preview, compact time, unread badge. Unread rows are distinguished by weight + badge, not by position. |
@@ -215,6 +216,17 @@ is the mock dataset; message text goes through i18n keys
 (`chatMessage.<conversationId>.<messageId>`) exactly like apartment titles, so the
 demo content translates with the rest of the app, while locally sent messages
 carry their text directly.
+
+**My listings (`/dashboard/listings`).** `data/myListings.js` holds the owner-side
+fields (status, created date, views, saves) and references the apartment by id,
+so listing content — image, title, price, district, specs — has one source of
+truth and no second set of images or translated titles. `getMyListings()` merges
+the two into the flat shape the UI consumes, which is what
+`GET /api/v1/users/me/listings` would return: swapping the source out later does
+not touch the components. Statuses are `APPROVED` / `PENDING` / `CLOSED`
+(`CLOSED` is the owner-side end state, alongside the documented apartment
+statuses), labelled through `listingStatus.<id>` keys. The page keeps its empty
+state for the zero-listing case.
 
 **Authenticated public header.** When `AuthContext` reports a session, the public
 `Header` swaps its "log in" link and "register" button for
@@ -445,7 +457,7 @@ All routes render inside `RootLayout` (Header + `<Outlet/>` + Footer).
 | `/profile` | `ProfilePage` | Placeholder (superseded by `/dashboard/profile`) | Not implemented |
 | `/dashboard` | — | Redirects to `/dashboard/profile` | Implemented |
 | `/dashboard/profile` | `DashboardPage` → `ProfileOverview` | Account overview: avatar, name, email, phone, stat cards, "Edit profile" link | UI only (mock user) |
-| `/dashboard/listings` | `DashboardListingsPage` | My listings — empty state + "post a listing" action | UI only |
+| `/dashboard/listings` | `DashboardListingsPage` | My listings: summary counts, "+ post a listing" action, one card per listing with status and metrics. Falls back to the empty state when there are none | UI only (mock data) |
 | `/dashboard/chats` | `DashboardChatsPage` | Two-panel chat: conversation list + search, thread with listing context, composer. `?c=<id>` selects a conversation | UI only (mock data, in-memory sends) |
 | `/dashboard/edit-profile` | `DashboardEditProfilePage` | Profile edit form in the dashboard body: avatar preview + change action, first/last name, email, phone, save | UI only (in-memory save, no upload) |
 | `/create-listing` | `CreateListingPage` | Listing form shell, rendered inside the account layout | UI only |
