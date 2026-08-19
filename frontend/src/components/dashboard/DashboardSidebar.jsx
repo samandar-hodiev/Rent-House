@@ -51,11 +51,9 @@ export function DashboardNavList({ onNavigate }) {
         badge={unread > 0 ? unread : null}
         onNavigate={onNavigate}
       />
-      {/* Settings opens a popover instead of navigating to a body section. */}
-      <DashboardSettingsMenu onNavigate={onNavigate} />
-
-      {/* `mt-auto` keeps Log out pinned to the very bottom of the column. */}
-      <div className="mt-auto border-t border-border pt-2">
+      {/* `mt-auto` keeps Log out and Settings pinned to the very bottom of the
+          column, with Log out directly above Settings. */}
+      <div className="mt-auto flex flex-col gap-1 border-t border-border pt-2">
         <button
           type="button"
           onClick={handleLogout}
@@ -64,6 +62,9 @@ export function DashboardNavList({ onNavigate }) {
           <LogOut aria-hidden="true" size={ICON_SIZE} />
           {t('dashboard.logout')}
         </button>
+
+        {/* Settings opens a popover instead of navigating to a body section. */}
+        <DashboardSettingsMenu onNavigate={onNavigate} />
       </div>
     </nav>
   )

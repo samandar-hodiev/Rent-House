@@ -8,7 +8,7 @@ import { LANGUAGES } from '../../locales/languages'
 import { ROUTES } from '../../routes/paths'
 import { NAV_ITEM_BASE, NAV_ITEM_IDLE } from './DashboardNavItem'
 
-const MENU_HEIGHT_ESTIMATE = 230
+const VIEWPORT_MARGIN = 12
 
 // Settings is a popover next to its sidebar entry rather than a body section.
 function DashboardSettingsMenu({ onNavigate }) {
@@ -17,19 +17,20 @@ function DashboardSettingsMenu({ onNavigate }) {
   const navigate = useNavigate()
 
   const [isOpen, setIsOpen] = useState(false)
-  const [placement, setPlacement] = useState('bottom')
+  const [maxHeight, setMaxHeight] = useState(null)
   const containerRef = useRef(null)
   const triggerRef = useRef(null)
 
   const close = () => setIsOpen(false)
   useDismiss(containerRef, isOpen, close)
 
-  // Prefer opening below; flip above when the viewport has no room.
+  // Settings sits at the bottom of the sidebar, so the popover always opens
+  // upward. Cap its height to the space above the trigger so it can never run
+  // past the top of the viewport.
   useLayoutEffect(() => {
     if (!isOpen || !triggerRef.current) return
     const rect = triggerRef.current.getBoundingClientRect()
-    const below = window.innerHeight - rect.bottom
-    setPlacement(below < MENU_HEIGHT_ESTIMATE && rect.top > below ? 'top' : 'bottom')
+    setMaxHeight(Math.max(rect.top - VIEWPORT_MARGIN * 2, 160))
   }, [isOpen])
 
   const themeOptions = [
@@ -62,9 +63,8 @@ function DashboardSettingsMenu({ onNavigate }) {
         <div
           role="dialog"
           aria-label={t('dashboard.settingsMenu')}
-          className={`absolute inset-x-0 z-40 rounded-md border border-border bg-surface p-3 shadow-md ${
-            placement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
-          }`}
+          style={maxHeight ? { maxHeight } : undefined}
+          className="absolute inset-x-0 bottom-full z-40 mb-2 overflow-y-auto rounded-md border border-border bg-surface p-3 shadow-md"
         >
           <p className="text-xs font-medium text-text-muted">{t('dashboard.language')}</p>
           <div className="mt-1.5 flex gap-1.5">
