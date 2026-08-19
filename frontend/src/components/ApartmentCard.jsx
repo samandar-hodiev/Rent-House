@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { MapPin, Map } from 'lucide-react'
 import { useLocale } from '../context/LocaleContext'
 import { useWishlist } from '../context/WishlistContext'
-import { getDistrictById } from '../data/districts'
+import { getDistrictById, districtNameKey } from '../data/districts'
 import { apartmentDetailsPath } from '../routes/paths'
 import { formatUzsAmount } from '../utils/formatPrice'
 import { formatPostedAt } from '../utils/formatRelativeTime'
@@ -85,7 +85,7 @@ function ApartmentCard({ apartment }) {
 
         <p className="flex items-center gap-1 text-sm text-text-secondary">
           <MapPin aria-hidden="true" size={14} className="shrink-0" />
-          {district ? district.name : ''}, {t('city.tashkent')}
+          {district ? t(districtNameKey(district.id)) : ''}, {t('city.tashkent')}
         </p>
 
         <p className="text-sm text-text-muted">

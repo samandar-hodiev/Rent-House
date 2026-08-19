@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { useLocale } from '../context/LocaleContext'
-import { getDistrictById } from '../data/districts'
+import { getDistrictById, districtNameKey } from '../data/districts'
 import { apartmentDetailsPath } from '../routes/paths'
 import { formatUzsAmount } from '../utils/formatPrice'
 
@@ -39,7 +39,7 @@ function MapApartmentPreview({ apartment, onClose, variant = 'floating' }) {
         </p>
         <p className="text-sm font-medium text-text-primary">{title}</p>
         <p className="text-sm text-text-muted">
-          {district ? district.name : ''}, {t('city.tashkent')}
+          {district ? t(districtNameKey(district.id)) : ''}, {t('city.tashkent')}
         </p>
         <p className="text-sm text-text-muted">
           {t('apartmentCard.specs', {

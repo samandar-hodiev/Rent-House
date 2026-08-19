@@ -75,6 +75,21 @@ export default {
 
   'city.tashkent': 'Toshkent',
 
+  // District display names, keyed by the district id from data/districts.js
+  // (ids and filter values are language-independent and never change).
+  'district.sergeli': 'Sergeli',
+  'district.chilonzor': 'Chilonzor',
+  'district.yunusobod': 'Yunusobod',
+  'district.shayxontohur': 'Shayxontohur',
+  'district.mirobod': 'Mirobod',
+  'district.yakkasaroy': 'Yakkasaroy',
+  'district.olmazor': 'Olmazor',
+  'district.uchtepa': 'Uchtepa',
+  'district.bektemir': 'Bektemir',
+  'district.yashnobod': 'Yashnobod',
+  'district.yangihayot': 'Yangihayot',
+  'district.mirzo-ulugbek': "Mirzo Ulug'bek",
+
   'apartmentCard.specs': '{rooms} xona · {area} m² · {floor}/{totalFloors} qavat',
   'apartmentCard.mapView': "Xaritada ko'rish",
   'apartmentCard.wishlistAdd': 'Saqlash',

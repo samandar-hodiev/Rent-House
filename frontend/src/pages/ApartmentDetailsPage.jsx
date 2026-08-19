@@ -30,7 +30,7 @@ import ApartmentCard from '../components/ApartmentCard'
 import { useLocale } from '../context/LocaleContext'
 import { useWishlist } from '../context/WishlistContext'
 import { APARTMENTS } from '../data/apartments'
-import { getDistrictById } from '../data/districts'
+import { getDistrictById, districtNameKey } from '../data/districts'
 import { ROUTES } from '../routes/paths'
 import { formatUzsAmount } from '../utils/formatPrice'
 import { formatPostedAt } from '../utils/formatRelativeTime'
@@ -155,7 +155,7 @@ function ApartmentDetailsPage() {
         <ChevronRight aria-hidden="true" size={14} className="shrink-0 text-text-muted" />
         {district ? (
           <>
-            <span className="text-text-secondary">{district.name}</span>
+            <span className="text-text-secondary">{t(districtNameKey(district.id))}</span>
             <ChevronRight aria-hidden="true" size={14} className="shrink-0 text-text-muted" />
           </>
         ) : null}
@@ -204,7 +204,7 @@ function ApartmentDetailsPage() {
 
           <p className="mt-2 flex items-center gap-1 text-sm text-text-secondary">
             <MapPin aria-hidden="true" size={15} className="shrink-0" />
-            {district ? district.name : ''}, {t('city.tashkent')} — {apartment.address}
+            {district ? t(districtNameKey(district.id)) : ''}, {t('city.tashkent')} — {apartment.address}
           </p>
 
           <p className="mt-1 text-xs text-text-muted">{formatPostedAt(apartment.postedAt, t)}</p>

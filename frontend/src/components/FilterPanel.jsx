@@ -1,5 +1,5 @@
 import { useLocale } from '../context/LocaleContext'
-import { DISTRICTS } from '../data/districts'
+import { DISTRICTS, districtNameKey } from '../data/districts'
 
 const ROOM_OPTIONS = [1, 2, 3, 4]
 const FLOOR_OPTIONS = [
@@ -58,7 +58,7 @@ function FilterPanel({
                 aria-pressed={filters.districtId === district.id}
                 className={optionButtonClass(filters.districtId === district.id)}
               >
-                {district.name}
+                {t(districtNameKey(district.id))}
               </button>
             ))}
           </div>

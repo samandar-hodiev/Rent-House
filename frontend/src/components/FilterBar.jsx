@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useLocale } from '../context/LocaleContext'
 import { useDismiss } from '../hooks/useDismiss'
 import { useMediaQuery } from '../hooks/useMediaQuery'
-import { getDistrictById } from '../data/districts'
+import { getDistrictById, districtNameKey } from '../data/districts'
 import { formatUzsAmount } from '../utils/formatPrice'
 import FilterPanel from './FilterPanel'
 
@@ -96,7 +96,7 @@ function FilterBar({
     const district = getDistrictById(filters.districtId)
     chips.push({
       key: 'district',
-      label: `${t('filters.district')}: ${district ? district.name : ''}`,
+      label: `${t('filters.district')}: ${district ? t(districtNameKey(district.id)) : ''}`,
       onRemove: () => setFilters({ districtId: null }),
     })
   }

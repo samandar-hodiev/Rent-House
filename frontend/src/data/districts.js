@@ -21,6 +21,13 @@ export const DISTRICTS = [
 // Rough center of Tashkent, used for the default all-districts map view.
 export const TASHKENT_CENTER = { latitude: 41.2995, longitude: 69.2401 }
 
+// District names are shown through i18n (`district.<id>` keys in src/locales),
+// so the `name` field above stays the canonical Uzbek value and the id — which
+// filtering, the URL and the GeoJSON boundaries all key off — never changes.
+export function districtNameKey(id) {
+  return `district.${id}`
+}
+
 export function getDistrictById(id) {
   return DISTRICTS.find((district) => district.id === id) ?? null
 }
