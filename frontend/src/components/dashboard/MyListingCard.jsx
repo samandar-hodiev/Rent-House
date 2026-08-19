@@ -21,7 +21,10 @@ function MyListingCard({ listing }) {
   const galleryImages = listing.images?.length ? listing.images : [listing.image].filter(Boolean)
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition-shadow hover:shadow-md sm:flex-row">
+    // Fixed height from `sm:` up so every row matches regardless of the photo's
+    // aspect ratio — a portrait image used to stretch its card taller than the
+    // rest. Below `sm:` the stacked card already has a fixed 4:3 image.
+    <article className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition-shadow hover:shadow-md sm:h-56 sm:flex-row">
       {/* The image opens the photo viewer; "Ko'rish" still goes to the
           apartment page. On hover the overlay signals it is openable; on touch
           the tap does the same thing without needing hover. */}
@@ -29,7 +32,7 @@ function MyListingCard({ listing }) {
         type="button"
         onClick={() => setIsGalleryOpen(true)}
         aria-label={t('listing.galleryOpen', { title })}
-        className="group relative block aspect-4/3 w-full shrink-0 overflow-hidden bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:aspect-auto sm:h-auto sm:w-48"
+        className="group relative block aspect-4/3 w-full shrink-0 overflow-hidden bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:aspect-auto sm:h-full sm:w-48"
       >
         <img src={listing.image} alt={title} className="size-full object-cover" />
 
