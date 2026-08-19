@@ -99,6 +99,7 @@ function ApartmentMap({
   const districtCollectionRef = useRef(null)
   const locationCollectionRef = useRef(null)
   const markerLayoutRef = useRef(null)
+  const trafficProviderRef = useRef(null)
   const hasFocusedInitialApartment = useRef(false)
   // The Yandex API loads asynchronously, so the effects below have to wait
   // for the map instance instead of assuming it exists on first render.
@@ -161,6 +162,7 @@ function ApartmentMap({
       districtCollectionRef.current = null
       locationCollectionRef.current = null
       markerLayoutRef.current = null
+      trafficProviderRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -169,8 +171,26 @@ function ApartmentMap({
   // geo objects, so markers and the district overlay are unaffected.
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !isMapReady) return
-    map.setType(getMapLayerById(layerId).type)
+    const ymaps = ymapsRef.current
+    if (!map || !ymaps || !isMapReady) return
+
+    const layer = getMapLayerById(layerId)
+    map.setType(layer.type)
+
+    // Traffic is an overlay provider rather than a base type. The provider is
+    // used directly instead of ymaps.control.TrafficControl, which would also
+    // inject its own on-map widget.
+    if (layer.traffic) {
+      if (!trafficProviderRef.current) {
+        trafficProviderRef.current = new ymaps.traffic.provider.Actual(
+          {},
+          { infoLayerShown: false },
+        )
+      }
+      trafficProviderRef.current.setMap(map)
+    } else {
+      trafficProviderRef.current?.setMap(null)
+    }
   }, [layerId, isMapReady])
 
   useEffect(() => {

@@ -3,6 +3,9 @@
 export const MAP_LAYERS = [
   { id: 'street', labelKey: 'map.layerStreet', type: 'yandex#map' },
   { id: 'satellite', labelKey: 'map.layerSatellite', type: 'yandex#satellite' },
+  // Traffic is an overlay in the Yandex 2.1 API rather than a base map type,
+  // so it pairs the standard base map with the live traffic provider.
+  { id: 'traffic', labelKey: 'map.layerTraffic', type: 'yandex#map', traffic: true },
 ]
 
 export const DEFAULT_MAP_LAYER_ID = 'street'

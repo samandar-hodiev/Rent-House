@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import ApartmentMap from '../components/ApartmentMap'
 import MapApartmentPreview from '../components/MapApartmentPreview'
 import MapControls from '../components/MapControls'
+import MapLayerSelector from '../components/MapLayerSelector'
 import FilterBar from '../components/FilterBar'
 import { useSearch } from '../context/SearchContext'
 import { useLocale } from '../context/LocaleContext'
@@ -199,16 +200,16 @@ function MapPage() {
       {/* One horizontal control row in the map's bottom-right corner on every
           breakpoint, sitting above the Yandex attribution/logo strip so it
           never covers the copyright or legal text. */}
-      <div className="pointer-events-none absolute bottom-0 right-0 z-10 p-3 pb-9 sm:p-4 sm:pb-10">
+      <div className="pointer-events-none absolute bottom-0 right-0 z-10 flex items-end gap-2 p-3 pb-9 sm:p-4 sm:pb-10">
+        <div className="pointer-events-auto">
+          <MapLayerSelector layerId={layerId} onLayerChange={handleLayerChange} />
+        </div>
         <div className="pointer-events-auto rounded-xl border border-white/25 bg-white/12 px-1.5 py-1 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg">
           <MapControls
-            layerId={layerId}
-            onLayerChange={handleLayerChange}
             onLocate={handleLocateRequest}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
             orientation="horizontal"
-            menuPlacement="top"
           />
         </div>
       </div>

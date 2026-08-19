@@ -186,19 +186,34 @@ separate code path.
 
 ## Map layer (base tile) switching
 
-`data/mapLayers.js` declares the available base layers as Yandex map types
-(`street` → `yandex#map`, `satellite` → `yandex#satellite`). Adding another
-style is one more entry there plus its `map.layer*` locale key; nothing else
-changes.
+`data/mapLayers.js` declares the available layers: `street` → `yandex#map`,
+`satellite` → `yandex#satellite`, and `traffic` → the standard base map plus
+the live traffic overlay. Adding another style is one more entry there plus its
+`map.layer*` locale key.
 
-`MapPage` owns the selected `layerId` (plain `useState`, defaulting to
-`street`) and renders the Layers button + panel in the shared glass control
-bar, dismissed via the same `useDismiss` hook every other popover uses.
-`ApartmentMap` takes `layerId` as a prop and calls `map.setType()` with the
-matching Yandex map type. The base map renders below all geo objects, so
-markers, the district boundary/dim mask, and the user location dot are
-unaffected by a layer change. Switching is purely a base-layer swap with no
-page reload and no effect on filtering state.
+`components/MapLayerSelector.jsx` renders the picker as a compact preview card
+in the map's bottom-right corner that expands into a horizontal row of layer
+cards (thumbnail + name, selected state shown with a primary-green border and a
+check badge). Thumbnails are inline SVGs rather than fetched images — Yandex's
+raster tile endpoints are undocumented, and a preview should not depend on a
+network round-trip. The panel opens upward and is width-capped/scrollable so it
+fits a mobile viewport. It sits beside `MapControls`, which now holds only the
+location/zoom buttons.
+
+`MapPage` owns the selected `layerId`, restored from `localStorage` on mount
+(see "Layer persistence" above). `ApartmentMap` takes `layerId` and calls
+`map.setType()` for the base map. In the Yandex 2.1 API traffic is an
+**overlay**, not a base type, so the `traffic` layer additionally attaches
+`ymaps.traffic.provider.Actual` with `setMap(map)` (and `setMap(null)` when
+switching away). The provider is used directly rather than
+`ymaps.control.TrafficControl`, which would also inject its own on-map widget.
+Traffic was verified against the live API: tiles return real congestion data
+from `core-jams-rdr-cache.maps.yandex.net`.
+
+The base map and the traffic overlay both render below all geo objects, so
+markers, the district boundary/dim mask and the user location dot are
+unaffected by a layer change. Switching needs no page reload and does not touch
+filtering state.
 
 ## My Location / geolocation flow
 
