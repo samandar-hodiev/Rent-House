@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { Building2, LogOut, MessageSquare, PlusCircle, User } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useAuth } from '../../context/AuthContext'
+import { useChat } from '../../context/ChatContext'
 import { ROUTES } from '../../routes/paths'
 import DashboardNavItem from './DashboardNavItem'
 import DashboardSettingsMenu from './DashboardSettingsMenu'
@@ -13,8 +14,10 @@ const ICON_SIZE = 18
 export function DashboardNavList({ onNavigate }) {
   const { t } = useLocale()
   const navigate = useNavigate()
-  const { user, signOut } = useAuth()
-  const unread = user.stats?.unreadMessages ?? 0
+  const { signOut } = useAuth()
+  // Same source as the public header's chat icon, so opening a conversation
+  // clears the badge in both places at once.
+  const { unreadTotal } = useChat()
 
   const handleLogout = () => {
     onNavigate?.()
@@ -48,7 +51,7 @@ export function DashboardNavList({ onNavigate }) {
         to={ROUTES.dashboardChats}
         icon={<MessageSquare aria-hidden="true" size={ICON_SIZE} />}
         label={t('dashboard.chats')}
-        badge={unread > 0 ? unread : null}
+        badge={unreadTotal > 0 ? unreadTotal : null}
         onNavigate={onNavigate}
       />
       {/* `mt-auto` keeps Settings and Log out pinned to the very bottom of the

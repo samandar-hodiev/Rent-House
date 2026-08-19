@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { MessageSquare } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useChat } from '../context/ChatContext'
 import { useLocale } from '../context/LocaleContext'
 import { ROUTES } from '../routes/paths'
 import UserAvatar from './dashboard/UserAvatar'
@@ -10,7 +11,8 @@ import UserAvatar from './dashboard/UserAvatar'
 function AuthedHeaderActions({ variant = 'desktop', onNavigate }) {
   const { t } = useLocale()
   const { user } = useAuth()
-  const unread = user.stats?.unreadMessages ?? 0
+  // Shared with the dashboard sidebar badge — see ChatContext.
+  const { unreadTotal: unread } = useChat()
 
   if (variant === 'mobile') {
     return (

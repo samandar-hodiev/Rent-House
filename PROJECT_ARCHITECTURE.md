@@ -167,7 +167,13 @@ margin beside the navigation on wide screens.
 | `dashboard/DashboardNavItem.jsx` | One entry. Every item shares the same size/padding/structure; `accent` only tints the icon (used by "post a listing", which is important but must not be a differently-shaped CTA) and `badge` renders the unread counter. Active state comes from `NavLink`'s `isActive`. Also exports `NAV_ITEM_BASE`/`NAV_ITEM_ACTIVE`/`NAV_ITEM_IDLE` so the Settings `<button>` can look identical to the `NavLink` entries without duplicating classes. |
 | `dashboard/DashboardSettingsMenu.jsx` | Settings entry + its popover (language, theme, "edit profile"). Opens below its trigger and flips above when the viewport has no room, measured in a `useLayoutEffect`; dismissed via the shared `useDismiss`. |
 | `dashboard/ProfileOverview.jsx` | Read-only account overview + the three stat cards. |
-| `dashboard/UserAvatar.jsx` | Initials-based avatar, so the account UI needs no image asset or upload pipeline yet. |
+| `dashboard/UserAvatar.jsx` | Initials-based avatar, so the account UI needs no image asset or upload pipeline yet. Reused by the chat list, thread header and public header. |
+| `chat/ChatConversationList.jsx` | Left panel: title, search field, scrollable list. Filters on participant name **and** last-message preview; orders by newest activity (deliberately not unread-first — that reorders the list under the pointer that just cleared a badge). |
+| `chat/ChatConversationItem.jsx` | One row: avatar, name, preview, compact time, unread badge. Unread rows are distinguished by weight + badge, not by position. |
+| `chat/ChatThread.jsx` | Right panel: participant header with online state, the scrolling message area (listing context pinned on top), composer underneath. Owns the scroll-to-latest effect. |
+| `chat/ChatMessage.jsx` | One bubble. Outgoing = right + primary fill, incoming = left + secondary surface, so the two differ by side *and* fill. |
+| `chat/ChatApartmentPreview.jsx` | The listing a conversation is about: image, price, title, district and a link to its details page. |
+| `chat/ChatComposer.jsx` | Text input, attachment control and send button. Attachment is disabled while no upload pipeline exists rather than silently doing nothing. |
 | `data/currentUser.js` | **Mock** signed-in user (first/last name, name, email, phone, stats). Read only by `AuthContext`, which is the single place to replace when auth arrives. |
 
 Navigation order is: Profile → Post a listing (green icon accent) → My listings
@@ -189,6 +195,26 @@ save) using the shared `FormField`. The picked file is previewed locally via
 `URL.createObjectURL` and never uploaded; save only updates `AuthContext` in
 memory. `/dashboard/profile` stays a read-only overview. My listings, Chats and
 `/create-listing` remain professional empty states.
+
+**Chat (`/dashboard/chats`).** A two-panel messaging page: conversation list on
+the left, thread on the right, from `md:` up. Below `md:` only one panel is
+rendered at a time — the list, or the selected thread with a back button — so the
+two never compete for a 390px viewport.
+
+The selected conversation lives in the URL (`?c=<id>`), not in component state,
+so the browser back button, a reloaded tab and a shared link all behave the way
+the user expects, and the header's chat icon can deep-link into a conversation
+later. The page fills the dashboard main area exactly (`100vh` minus the 4rem
+header and the main padding) and only the two panels scroll, which is what keeps
+the composer reachable without pinning it with `position: fixed`.
+
+`context/ChatContext.jsx` holds the conversations. It exists so the page, the
+sidebar badge and the public header's chat icon read **one** unread count —
+opening a conversation clears the badge in all three at once. `data/conversations.js`
+is the mock dataset; message text goes through i18n keys
+(`chatMessage.<conversationId>.<messageId>`) exactly like apartment titles, so the
+demo content translates with the rest of the app, while locally sent messages
+carry their text directly.
 
 **Authenticated public header.** When `AuthContext` reports a session, the public
 `Header` swaps its "log in" link and "register" button for
@@ -219,7 +245,9 @@ the gallery arrows and the wishlist buttons. Using tokens there would make them
 light-on-light and unreadable. Modal scrims likewise use a fixed
 `bg-slate-900/40` rather than a token, so the overlay stays dark in both themes.
 
-**Currently UI only:** the user is mocked, the "session" is a single
+**Currently UI only:** conversations and messages are mock data — sending appends
+to `ChatContext` in memory and is gone on reload, there is no WebSocket, no
+delivery/read receipts and no attachment upload. The user is mocked, the "session" is a single
 `localStorage` flag set by any valid login-form submit (no credential check, no
 token), no route is protected, the stats and the unread badge are placeholders,
 and saving the profile / listings / chats / create-listing have no data behind
@@ -418,7 +446,7 @@ All routes render inside `RootLayout` (Header + `<Outlet/>` + Footer).
 | `/dashboard` | — | Redirects to `/dashboard/profile` | Implemented |
 | `/dashboard/profile` | `DashboardPage` → `ProfileOverview` | Account overview: avatar, name, email, phone, stat cards, "Edit profile" link | UI only (mock user) |
 | `/dashboard/listings` | `DashboardListingsPage` | My listings — empty state + "post a listing" action | UI only |
-| `/dashboard/chats` | `DashboardChatsPage` | Chats — empty state | UI only |
+| `/dashboard/chats` | `DashboardChatsPage` | Two-panel chat: conversation list + search, thread with listing context, composer. `?c=<id>` selects a conversation | UI only (mock data, in-memory sends) |
 | `/dashboard/edit-profile` | `DashboardEditProfilePage` | Profile edit form in the dashboard body: avatar preview + change action, first/last name, email, phone, save | UI only (in-memory save, no upload) |
 | `/create-listing` | `CreateListingPage` | Listing form shell, rendered inside the account layout | UI only |
 | `/owner` | `OwnerDashboardPage` | Placeholder | Not implemented |
@@ -489,6 +517,7 @@ in `App.jsx` around the router (`LocaleProvider` → `SearchProvider` →
 | **Wishlist** | `WishlistContext` | `useState` (`Map<id, savedAtISOString>`) + `localStorage` (`renthouse_wishlist`) | `toggleWishlist(id)`, `isSaved(id)`, `getSavedAt(id)`, `savedCount`. The only client state that survives a reload. `ApartmentCard` reads this directly (not via props) so wishlist toggles stay in sync across every page that renders a card. |
 | **Theme** | `ThemeContext` | `useState` + `localStorage` (`renthouse_theme`) | `theme` (`'light' \| 'dark' \| 'system'`), `setTheme`, `resolvedTheme`. Toggles a `dark` class on `<html>`; dark values are token overrides in `index.css`, so components need no per-element dark classes. **Defaults to `light`**; `system` is opt-in and then tracks `prefers-color-scheme`. Switched from `ThemeToggle` in both headers, or the Light/Dark row in the Settings popover. |
 | **Session (UI only)** | `AuthContext` | `useState` + `localStorage` (`renthouse_session`) | `isAuthenticated`, `user`, `signIn()`, `signOut()`, `updateUser()`. Defaults to signed out. There is no credential check, request or token behind it — it only decides whether the public header shows its signed-in variant and gives log out / profile edit something real to change. Replace wholesale when the auth API lands. |
+| **Chat (UI only)** | `ChatContext` | `useState` (in-memory, not persisted) | `conversations`, `unreadTotal`, `markRead(id)`, `sendMessage(id, text)`. Seeded from `data/conversations.js`. The single unread source for the chat page, the sidebar badge and the public header's chat icon. Sent messages live until reload — this is the seam a messaging API replaces. |
 | **UI-local state** | plain `useState` in each component | in-memory only | Dropdown open/closed (district, language, sort, filter panel — all via `useDismiss`), gallery active image index, chat modal messages, mobile menu open/closed, share-copied toast, per-page `loading` flags. |
 
 Filters/apartments are **not** in Context globally — each page (Home,
