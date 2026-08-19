@@ -154,13 +154,17 @@ function MapPage() {
         mapRef={mapControllerRef}
       />
 
-      {/* Top glass bar: filter + chips + result count. On mobile the map
-          controls join this same container; on desktop they move to the
-          map's bottom-right corner instead. */}
+      {/* Top glass bar: filter controls, active chips and the result count.
+          The map controls live in their own group at the bottom-right. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-start gap-2 p-3 sm:p-4">
         <div className="pointer-events-auto flex w-full flex-col gap-2 rounded-xl border border-white/25 bg-white/8 px-2.5 py-2 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg sm:flex-row sm:items-center sm:justify-between">
-          {/* Filter button stays pinned; the active chips scroll sideways
-              next to it rather than wrapping. */}
+          {/* Desktop: filter button, chips and count on one row. Mobile:
+              FilterBar splits into a compact controls row (button, clear,
+              count) plus a chips row that only appears while filters are
+              active — both still inside this glass parent. */}
+          {/* Content-sized wrapper: without it FilterBar stretches across the
+              whole bar on desktop and its chip scroller pushes the result
+              count out to the far right. */}
           <div className="flex min-w-0 items-center gap-2">
             <FilterBar
               filters={filters}
@@ -170,20 +174,12 @@ function MapPage() {
               glass
               sheetOnMobile
               singleRow
+              trailing={
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-white/55 px-3 py-1.5 text-xs font-medium text-text-secondary">
+                  {countText}
+                </span>
+              }
             />
-            {/* Desktop only — on mobile the count moves to the row below so
-                it does not eat the width the chips need. */}
-            <span className="hidden shrink-0 whitespace-nowrap rounded-full bg-white/55 px-3 py-1.5 text-xs font-medium text-text-secondary sm:inline-block">
-              {countText}
-            </span>
-          </div>
-
-          {/* Mobile: the result count sits on its own line so it never eats
-              the width the active chips need. */}
-          <div className="flex items-center sm:hidden">
-            <span className="shrink-0 whitespace-nowrap rounded-full bg-white/55 px-3 py-1.5 text-xs font-medium text-text-secondary">
-              {countText}
-            </span>
           </div>
         </div>
 

@@ -63,6 +63,9 @@ function FilterBar({
   // Keep the button + chips on one horizontal row (they scroll instead of
   // wrapping) — used by the Map page's compact glass bar.
   singleRow = false,
+  // Rendered at the end of the controls row (the Map page's result count), so
+  // it shares the row with the filter button instead of needing its own.
+  trailing = null,
 }) {
   const { t } = useLocale()
   const [isOpen, setIsOpen] = useState(false)
@@ -75,6 +78,11 @@ function FilterBar({
   // On the map's mobile bar the clear action is pinned next to the filter
   // button (short label) so active chips can never scroll it out of reach.
   const pinClear = singleRow && isMobile
+
+  // On mobile the map bar splits into two rows: controls on top, active chips
+  // underneath. The chips row only exists while filters are active, so the
+  // glass parent stays compact by default.
+  const splitRows = singleRow && isMobile
 
   const close = () => setIsOpen(false)
   // The sheet is portalled outside `containerRef`, so it has to be treated as
@@ -182,13 +190,8 @@ function FilterBar({
     </>
   )
 
-  return (
-    <div
-      className={`flex items-center gap-2 ${
-        singleRow ? 'min-w-0 flex-1' : 'flex-wrap'
-      }`}
-    >
-      <div ref={containerRef} className="relative shrink-0">
+  const trigger = (
+    <div ref={containerRef} className="relative shrink-0">
         <button
           type="button"
           onClick={() => setIsOpen((open) => !open)}
@@ -220,14 +223,16 @@ function FilterBar({
           </div>
         ) : null}
       </div>
+  )
 
-      {/* Mobile: a bottom sheet instead of the dropdown. Portalled to <body>
-          because an ancestor with `backdrop-filter` (the map's glass bar)
-          would otherwise become the containing block for `position: fixed`,
-          and so the sheet could not anchor to the viewport. It also keeps the
-          sheet clear of the map's stacking context. */}
-      {isOpen && useSheet
-        ? createPortal(
+  // Mobile: a bottom sheet instead of the dropdown. Portalled to <body>
+  // because an ancestor with `backdrop-filter` (the map's glass bar) would
+  // otherwise become the containing block for `position: fixed`, and so the
+  // sheet could not anchor to the viewport. It also keeps the sheet clear of
+  // the map's stacking context.
+  const sheet =
+    isOpen && useSheet
+      ? createPortal(
             <>
               <div
                 className="fixed inset-0 z-40 bg-text-primary/30"
@@ -256,33 +261,57 @@ function FilterBar({
                 />
               </div>
             </>,
-            document.body,
-          )
-        : null}
+          document.body,
+        )
+      : null
 
-      {pinClear && activeFilterCount > 0 ? (
-        <button
-          type="button"
-          onClick={clearFilters}
-          className={`shrink-0 whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium text-text-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-            glass ? `${GLASS_CLASS} hover:bg-white/75` : 'border-border bg-surface hover:bg-surface-secondary'
-          }`}
-        >
-          {t('filters.reset')}
-        </button>
-      ) : null}
+  const pinnedClear =
+    pinClear && activeFilterCount > 0 ? (
+      <button
+        type="button"
+        onClick={clearFilters}
+        className={`shrink-0 whitespace-nowrap rounded-md border px-3 py-2 text-sm font-medium text-text-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+          glass ? `${GLASS_CLASS} hover:bg-white/75` : 'border-border bg-surface hover:bg-surface-secondary'
+        }`}
+      >
+        {t('filters.reset')}
+      </button>
+    ) : null
 
-      {/* Only the chips scroll — the filter button stays pinned at the start
-          of the row. A single scroll container here (rather than one on an
-          ancestor too) is what makes every chip reachable when several
-          filters are active on a narrow screen. */}
-      {singleRow ? (
-        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {chipNodes}
+  // Exactly one scroll container: an overflow-x-auto ancestor as well would let
+  // this row shrink and clip its chips with nothing left to scroll.
+  const chipScroller = (grow) => (
+    <div
+      className={`renthouse-filter-chips flex min-w-0 items-center gap-2 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+        grow ? 'shrink' : 'w-full'
+      }`}
+    >
+      {chipNodes}
+    </div>
+  )
+
+  if (splitRows) {
+    return (
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        {/* Scrolls rather than overflowing the page on very narrow screens
+            (<360px), where the button, clear action and count cannot all fit. */}
+        <div className="flex min-w-0 items-center gap-2 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {trigger}
+          {pinnedClear}
+          {trailing}
         </div>
-      ) : (
-        chipNodes
-      )}
+        {sheet}
+        {chips.length > 0 ? chipScroller(false) : null}
+      </div>
+    )
+  }
+
+  return (
+    <div className={`flex items-center gap-2 ${singleRow ? 'min-w-0 flex-1' : 'flex-wrap'}`}>
+      {trigger}
+      {sheet}
+      {singleRow ? chipScroller(true) : chipNodes}
+      {trailing}
     </div>
   )
 }
