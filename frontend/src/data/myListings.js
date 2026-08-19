@@ -12,6 +12,15 @@ export const LISTING_STATUS = {
   closed: 'CLOSED',
 }
 
+// Semantic tints for a listing status, inside the existing token palette:
+// primary for live, warning for awaiting review, muted for closed. Shared by
+// the listing card badge and the summary badges so both stay in step.
+export const LISTING_STATUS_CLASS = {
+  [LISTING_STATUS.approved]: 'bg-primary-light text-primary-hover',
+  [LISTING_STATUS.pending]: 'bg-warning/15 text-warning',
+  [LISTING_STATUS.closed]: 'bg-surface-secondary text-text-muted',
+}
+
 // The signed-in user's own listings. Only the owner-side fields live here —
 // the apartment itself (image, title, price, district, rooms, area, floor) is
 // referenced by id so there is one source of truth for listing content and no

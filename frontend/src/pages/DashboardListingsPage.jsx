@@ -5,7 +5,7 @@ import EmptyState from '../components/EmptyState'
 import MyListingCard from '../components/dashboard/MyListingCard'
 import { useLocale } from '../context/LocaleContext'
 import { useListings } from '../context/ListingsContext'
-import { getMyListingsSummary } from '../data/myListings'
+import { LISTING_STATUS, LISTING_STATUS_CLASS, getMyListingsSummary } from '../data/myListings'
 import { ROUTES } from '../routes/paths'
 
 function SummaryItem({ label, value }) {
@@ -13,6 +13,19 @@ function SummaryItem({ label, value }) {
     <span className="flex items-baseline gap-1.5">
       <span className="text-text-muted">{label}:</span>
       <span className="font-medium text-text-primary">{value}</span>
+    </span>
+  )
+}
+
+// The three status counts carry the same semantic tint as the badge on each
+// listing card, so a colour means the same thing in both places.
+function SummaryBadge({ status, label, value }) {
+  return (
+    <span
+      className={`flex items-baseline gap-1.5 rounded-full px-2.5 py-1 font-medium ${LISTING_STATUS_CLASS[status]}`}
+    >
+      {label}
+      <span>{value}</span>
     </span>
   )
 }
@@ -57,9 +70,21 @@ function DashboardListingsPage() {
 
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
             <SummaryItem label={t('dashboard.summaryTotal')} value={summary.total} />
-            <SummaryItem label={t('listingStatus.APPROVED')} value={summary.approved} />
-            <SummaryItem label={t('listingStatus.PENDING')} value={summary.pending} />
-            <SummaryItem label={t('listingStatus.CLOSED')} value={summary.closed} />
+            <SummaryBadge
+              status={LISTING_STATUS.approved}
+              label={t('listingStatus.APPROVED')}
+              value={summary.approved}
+            />
+            <SummaryBadge
+              status={LISTING_STATUS.pending}
+              label={t('listingStatus.PENDING')}
+              value={summary.pending}
+            />
+            <SummaryBadge
+              status={LISTING_STATUS.closed}
+              label={t('listingStatus.CLOSED')}
+              value={summary.closed}
+            />
           </div>
         </div>
 
@@ -75,7 +100,7 @@ function DashboardListingsPage() {
       {justSaved ? (
         <p
           role="status"
-          className="flex shrink-0 max-w-3xl items-center gap-2 rounded-md border border-primary bg-primary-light px-3 py-2.5 text-sm text-primary-hover dark:text-primary"
+          className="flex shrink-0 items-center gap-2 rounded-md border border-primary bg-primary-light px-3 py-2.5 text-sm text-primary-hover dark:text-primary"
         >
           <Check aria-hidden="true" size={16} />
           {t('listing.changesSaved')}
@@ -84,7 +109,10 @@ function DashboardListingsPage() {
 
       {/* A single readable column rather than a grid: these rows carry more
           metadata than a public apartment card and need the width. */}
-      <ul className="flex max-w-3xl flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+      {/* Single column filling the content area. The scrollbar is styled to sit
+          quietly in the dashboard rather than as a bright browser default; the
+          tokens follow the active theme, so it inverts with dark mode. */}
+      <ul className="flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2 lg:[scrollbar-color:var(--color-border)_transparent] lg:[scrollbar-width:thin] lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-border lg:[&::-webkit-scrollbar-thumb:hover]:bg-text-muted lg:[&::-webkit-scrollbar-track]:bg-transparent lg:[&::-webkit-scrollbar]:w-2">
         {listings.map((listing) => (
           <li key={listing.id}>
             <MyListingCard listing={listing} />

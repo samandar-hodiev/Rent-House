@@ -2,18 +2,10 @@ import { Link } from 'react-router-dom'
 import { Eye, Heart, Pencil } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { districtNameKey, getDistrictById } from '../../data/districts'
-import { LISTING_STATUS } from '../../data/myListings'
+import { LISTING_STATUS_CLASS } from '../../data/myListings'
 import { apartmentDetailsPath, editListingPath } from '../../routes/paths'
 import { formatUzsAmount } from '../../utils/formatPrice'
 import { formatPostedAt } from '../../utils/formatRelativeTime'
-
-// Status tints stay inside the existing token palette: primary for live,
-// warning for awaiting review, muted for closed.
-const STATUS_CLASS = {
-  [LISTING_STATUS.approved]: 'bg-primary-light text-primary-hover',
-  [LISTING_STATUS.pending]: 'bg-warning/15 text-warning',
-  [LISTING_STATUS.closed]: 'bg-surface-secondary text-text-muted',
-}
 
 // One row in "Mening e'lonlarim": image left, details right on `sm:` and up,
 // stacked below that.
@@ -34,7 +26,7 @@ function MyListingCard({ listing }) {
           <div className="flex items-start justify-between gap-3">
             <h2 className="min-w-0 truncate text-sm font-semibold text-text-primary">{title}</h2>
             <span
-              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_CLASS[listing.status]}`}
+              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${LISTING_STATUS_CLASS[listing.status]}`}
             >
               {t(`listingStatus.${listing.status}`)}
             </span>
