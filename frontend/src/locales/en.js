@@ -337,6 +337,8 @@ export default {
   'listing.previewPlaceholderTitle': 'Listing title',
   'listing.publish': 'Publish listing',
   'listing.editTitle': 'Edit listing',
+  'listing.galleryOpen': 'View photos of {title}',
+  'listing.galleryClose': 'Close photos',
   'listing.saveChanges': 'Save changes',
   'listing.changesSaved': 'Listing updated.',
   'listing.notFound': 'Listing not found. It may have been removed.',

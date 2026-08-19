@@ -338,6 +338,8 @@ export default {
   'listing.previewPlaceholderTitle': "E'lon sarlavhasi",
   'listing.publish': "E'lonni joylash",
   'listing.editTitle': "E'lonni tahrirlash",
+  'listing.galleryOpen': "{title} rasmlarini ko'rish",
+  'listing.galleryClose': 'Rasmlarni yopish',
   'listing.saveChanges': 'Tahrirlarni saqlash',
   'listing.changesSaved': "E'lon yangilandi.",
   'listing.notFound': "E'lon topilmadi. U o'chirilgan bo'lishi mumkin.",

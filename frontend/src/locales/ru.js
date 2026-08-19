@@ -338,6 +338,8 @@ export default {
   'listing.previewPlaceholderTitle': 'Заголовок объявления',
   'listing.publish': 'Опубликовать объявление',
   'listing.editTitle': 'Редактировать объявление',
+  'listing.galleryOpen': 'Посмотреть фотографии: {title}',
+  'listing.galleryClose': 'Закрыть фотографии',
   'listing.saveChanges': 'Сохранить изменения',
   'listing.changesSaved': 'Объявление обновлено.',
   'listing.notFound': 'Объявление не найдено. Возможно, оно было удалено.',

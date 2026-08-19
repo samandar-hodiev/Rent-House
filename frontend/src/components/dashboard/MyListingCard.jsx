@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eye, Heart, Pencil } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
@@ -6,20 +7,36 @@ import { LISTING_STATUS_CLASS } from '../../data/myListings'
 import { apartmentDetailsPath, editListingPath } from '../../routes/paths'
 import { formatUzsAmount } from '../../utils/formatPrice'
 import { formatPostedAt } from '../../utils/formatRelativeTime'
+import ListingGalleryModal from './ListingGalleryModal'
 
 // One row in "Mening e'lonlarim": image left, details right on `sm:` and up,
 // stacked below that.
 function MyListingCard({ listing }) {
   const { t } = useLocale()
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false)
   // An owner-edited title wins; otherwise the catalog title stays translated.
   const title = listing.customTitle ?? t(`apartmentTitle.${listing.id}`)
   const district = getDistrictById(listing.districtId)
+  // This listing's own photos, falling back to the cover when it has just one.
+  const galleryImages = listing.images?.length ? listing.images : [listing.image].filter(Boolean)
 
   return (
     <article className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition-shadow hover:shadow-md sm:flex-row">
-      <div className="aspect-4/3 w-full shrink-0 overflow-hidden bg-surface-secondary sm:aspect-auto sm:h-auto sm:w-48">
+      {/* The image opens the photo viewer; "Ko'rish" still goes to the
+          apartment page. On hover the overlay signals it is openable; on touch
+          the tap does the same thing without needing hover. */}
+      <button
+        type="button"
+        onClick={() => setIsGalleryOpen(true)}
+        aria-label={t('listing.galleryOpen', { title })}
+        className="group relative block aspect-4/3 w-full shrink-0 overflow-hidden bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:aspect-auto sm:h-auto sm:w-48"
+      >
         <img src={listing.image} alt={title} className="size-full object-cover" />
-      </div>
+
+        <span className="absolute inset-0 flex items-center justify-center bg-slate-900/45 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+          <Eye aria-hidden="true" size={22} className="text-white" />
+        </span>
+      </button>
 
       <div className="flex min-w-0 flex-1 flex-col gap-3 p-4">
         <div className="flex min-w-0 flex-col gap-1">
@@ -78,6 +95,14 @@ function MyListingCard({ listing }) {
           </Link>
         </div>
       </div>
+
+      {isGalleryOpen ? (
+        <ListingGalleryModal
+          images={galleryImages}
+          title={title}
+          onClose={() => setIsGalleryOpen(false)}
+        />
+      ) : null}
     </article>
   )
 }
