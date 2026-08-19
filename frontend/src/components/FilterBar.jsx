@@ -160,12 +160,28 @@ function FilterBar({
     })
   }
 
+  const chipNodes = (
+    <>
+      {chips.map((chip) => (
+        <Chip key={chip.key} label={chip.label} onRemove={chip.onRemove} glass={glass} />
+      ))}
+
+      {activeFilterCount > 0 ? (
+        <button
+          type="button"
+          onClick={clearFilters}
+          className="shrink-0 whitespace-nowrap text-sm font-medium text-text-secondary hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          {t('filters.clearAll')}
+        </button>
+      ) : null}
+    </>
+  )
+
   return (
     <div
       className={`flex items-center gap-2 ${
-        singleRow
-          ? 'min-w-0 flex-nowrap overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-          : 'flex-wrap'
+        singleRow ? 'min-w-0 flex-1' : 'flex-wrap'
       }`}
     >
       <div ref={containerRef} className="relative shrink-0">
@@ -240,19 +256,17 @@ function FilterBar({
           )
         : null}
 
-      {chips.map((chip) => (
-        <Chip key={chip.key} label={chip.label} onRemove={chip.onRemove} glass={glass} />
-      ))}
-
-      {activeFilterCount > 0 ? (
-        <button
-          type="button"
-          onClick={clearFilters}
-          className="shrink-0 whitespace-nowrap text-sm font-medium text-text-secondary hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          {t('filters.clearAll')}
-        </button>
-      ) : null}
+      {/* Only the chips scroll — the filter button stays pinned at the start
+          of the row. A single scroll container here (rather than one on an
+          ancestor too) is what makes every chip reachable when several
+          filters are active on a narrow screen. */}
+      {singleRow ? (
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {chipNodes}
+        </div>
+      ) : (
+        chipNodes
+      )}
     </div>
   )
 }
