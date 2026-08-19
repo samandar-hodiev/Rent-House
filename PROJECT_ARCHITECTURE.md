@@ -145,6 +145,39 @@ Reusable, mostly presentational pieces. Notable ones:
   `apartmentDetailsPath()` for its "Batafsil ko'rish" button so it navigates
   to the same `ApartmentDetailsPage` as everywhere else, not a duplicate view.
 
+### User account system (`/dashboard`, `/create-listing`)
+
+The account area is a **second layout**, not part of `RootLayout`: it needs its
+own header without the public search bar and without login/register buttons.
+`App.jsx` therefore mounts these routes under `components/dashboard/DashboardLayout`
+instead. `/create-listing` sits outside the `/dashboard` path but renders inside
+the same shell, so posting a listing never drops the user out of their account.
+
+| File | Responsibility |
+|---|---|
+| `dashboard/DashboardLayout.jsx` | Account shell: header + persistent sidebar (`lg:` and up) + `<Outlet/>`, and owns the mobile drawer's open state. |
+| `dashboard/DashboardHeader.jsx` | Logo (links Home), hamburger below `lg:`, avatar + user name on the right. Deliberately has no `SearchBar` and no auth buttons. |
+| `dashboard/DashboardSidebar.jsx` | Desktop `<aside>`. Also exports `DashboardNavList`, the actual entry list, so the drawer reuses the exact same items instead of duplicating them. |
+| `dashboard/DashboardMobileMenu.jsx` | Slide-in drawer below `lg:`, portalled to `<body>` so no ancestor stacking context can clip or offset it. Closes on link tap, backdrop click and Escape. |
+| `dashboard/DashboardNavItem.jsx` | One entry. `variant="primary"` renders the emphasised "post a listing" action; `badge` renders the unread counter. Active state comes from `NavLink`'s `isActive`. |
+| `dashboard/ProfileOverview.jsx` | Read-only account overview + the three stat cards. |
+| `dashboard/UserAvatar.jsx` | Initials-based avatar, so the account UI needs no image asset or upload pipeline yet. |
+| `data/currentUser.js` | **Mock** signed-in user (name, email, phone, stats). The single place to replace when auth arrives. |
+
+Navigation order is: post a listing (emphasised) → Profile → My listings →
+Chats (unread badge) → Settings, with **Log out separated** below a divider.
+Log out is UI only — there is no session to clear, so it just returns Home.
+
+**Currently UI only:** the user is mocked, no route is protected, the stats and
+the unread badge are placeholders, and Edit profile / listings / chats /
+settings / create-listing have no forms or data behind them.
+
+**Planned backend integration:** replace `data/currentUser.js` with the session
+user from `GET /api/v1/auth/me`; guard the `/dashboard` and `/create-listing`
+routes once auth exists; back My listings with apartment CRUD
+(`POST/PATCH/DELETE /api/v1/apartments`), Chats with a real messaging endpoint,
+and the stat cards + unread badge with server-side counts.
+
 ### Map page architecture (`/map`)
 
 `MapPage.jsx` composes the existing search/filter architecture with
@@ -327,7 +360,13 @@ All routes render inside `RootLayout` (Header + `<Outlet/>` + Footer).
 | `/wishlist` | `WishlistPage` | Saved apartments, own filter/sort, empty states | Implemented |
 | `/login` | `LoginPage` | Sign-in form: identifier + password, password visibility toggle, forgot-password and register links | UI only (no backend, no session) |
 | `/register` | `RegisterPage` | Sign-up form: name, email, phone, password + confirmation, password visibility toggles, login link | UI only (no backend, no account created) |
-| `/profile` | `ProfilePage` | Placeholder | Not implemented |
+| `/profile` | `ProfilePage` | Placeholder (superseded by `/dashboard/profile`) | Not implemented |
+| `/dashboard` | — | Redirects to `/dashboard/profile` | Implemented |
+| `/dashboard/profile` | `DashboardPage` → `ProfileOverview` | Account overview: avatar, name, email, phone, stat cards, "Edit profile" | UI only (mock user) |
+| `/dashboard/listings` | `DashboardListingsPage` | My listings — empty state + "post a listing" action | UI only |
+| `/dashboard/chats` | `DashboardChatsPage` | Chats — empty state | UI only |
+| `/dashboard/settings` | `DashboardSettingsPage` | Settings — empty state | UI only |
+| `/create-listing` | `CreateListingPage` | Listing form shell, rendered inside the account layout | UI only |
 | `/owner` | `OwnerDashboardPage` | Placeholder | Not implemented |
 | `/admin` | `AdminPage` | Placeholder | Not implemented |
 | `*` | `NotFoundPage` | 404 | Implemented |
@@ -547,6 +586,11 @@ backend database URL) — no secrets exist in the repository today.
       routes, no role checks — the forms do not talk to anything yet)
 - [ ] Go backend / REST API (no backend code exists)
 - [ ] PostgreSQL / any database
+- [x] User account **UI** (`/dashboard` shell, sidebar/drawer navigation,
+      profile overview, routed sections for listings/chats/settings and
+      `/create-listing`)
+- [ ] User account **behaviour** (mock user, unprotected routes, placeholder
+      stats, no editing)
 - [ ] Apartment CRUD (owner dashboard is a placeholder)
 - [ ] Admin moderation (admin page is a placeholder)
 - [ ] Real image upload/storage (images are hardcoded Unsplash URLs)
