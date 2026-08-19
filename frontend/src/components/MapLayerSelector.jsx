@@ -69,12 +69,15 @@ function MapLayerSelector({ layerId, onLayerChange }) {
   const activeLayer = getMapLayerById(layerId)
 
   return (
-    <div ref={containerRef} className="relative">
+    // Intentionally not `relative`: the panel is positioned against the shared
+    // control container (MapPage), so it aligns with the whole group's right
+    // edge rather than this button's, and fits on narrow screens.
+    <div ref={containerRef}>
       {isOpen ? (
         <div
           role="dialog"
           aria-label={t('map.layers')}
-          className="absolute bottom-full right-0 mb-2 max-w-[calc(100vw-1.5rem)] overflow-x-auto rounded-xl border border-white/40 bg-white/80 p-2 shadow-[0_4px_16px_rgba(15,23,42,0.12)] backdrop-blur-lg [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="absolute bottom-full right-0 mb-3 max-w-[calc(100vw-1.5rem)] overflow-x-auto rounded-xl border border-border bg-surface p-2 shadow-[0_4px_16px_rgba(15,23,42,0.12)] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           <ul className="flex items-stretch gap-2">
             {MAP_LAYERS.map((layer) => {
@@ -88,7 +91,7 @@ function MapLayerSelector({ layerId, onLayerChange }) {
                       close()
                     }}
                     aria-pressed={isActive}
-                    className="group flex w-[72px] shrink-0 flex-col gap-1 focus:outline-none"
+                    className="group flex w-20 shrink-0 flex-col gap-1 focus:outline-none"
                   >
                     <span
                       className={`relative block h-12 w-full overflow-hidden rounded-lg border transition-colors ${
@@ -124,15 +127,16 @@ function MapLayerSelector({ layerId, onLayerChange }) {
         onClick={() => setIsOpen((open) => !open)}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
-        aria-label={t('map.layers')}
         title={t('map.layers')}
-        className={`relative block size-14 overflow-hidden rounded-xl border shadow-[0_2px_6px_rgba(15,23,42,0.12)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-          isOpen ? 'border-primary' : 'border-white/60 hover:border-primary/60'
+        className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+          isOpen ? 'bg-white/70 text-primary' : 'text-text-secondary hover:bg-white/70 hover:text-primary'
         }`}
       >
-        <LayerThumb layerId={activeLayer.id} />
-        <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-white/85 py-0.5 text-[10px] font-medium text-text-primary backdrop-blur-sm">
-          <Layers aria-hidden="true" size={10} />
+        <span className="block size-6 shrink-0 overflow-hidden rounded-full border border-white/70">
+          <LayerThumb layerId={activeLayer.id} />
+        </span>
+        <Layers aria-hidden="true" size={12} className="shrink-0" />
+        <span className="whitespace-nowrap text-xs font-medium leading-none">
           {t('map.layersShort')}
         </span>
       </button>
