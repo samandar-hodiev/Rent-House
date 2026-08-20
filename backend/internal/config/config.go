@@ -50,6 +50,10 @@ type Notify struct {
 	ResendFrom    string
 	ResendSubject string
 	ResendBody    string
+	// ResendBaseURL overrides the API endpoint. Empty means the real Resend
+	// API; it exists so the provider path can be exercised against a local
+	// stand-in without credentials. Never set it in production.
+	ResendBaseURL string
 
 	EskizEmail    string
 	EskizPassword string
@@ -152,12 +156,13 @@ func Load() (*Config, error) {
 		EmailProvider: strings.ToLower(envOr("EMAIL_PROVIDER", "dev")),
 		SMSProvider:   strings.ToLower(envOr("SMS_PROVIDER", "dev")),
 
-		ResendAPIKey:  os.Getenv("RESEND_API_KEY"),
-		ResendFrom:    os.Getenv("RESEND_FROM"),
-		ResendSubject: envOr("RESEND_SUBJECT", "RentHouse tasdiqlash kodi"),
-		// {code} is substituted at send time.
-		ResendBody: envOr("RESEND_BODY",
-			"RentHouse tasdiqlash kodingiz: {code}\n\nKod 5 daqiqa amal qiladi."),
+		ResendAPIKey: os.Getenv("RESEND_API_KEY"),
+		ResendFrom:   os.Getenv("RESEND_FROM"),
+		// Empty means the built-in template in internal/notify; both are
+		// overridable for wording changes without a code change.
+		ResendSubject: os.Getenv("RESEND_SUBJECT"),
+		ResendBody:    os.Getenv("RESEND_BODY"),
+		ResendBaseURL: os.Getenv("RESEND_BASE_URL"),
 
 		EskizEmail:    os.Getenv("ESKIZ_EMAIL"),
 		EskizPassword: os.Getenv("ESKIZ_PASSWORD"),

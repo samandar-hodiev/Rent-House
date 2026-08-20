@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // These exercise the providers against a local stand-in for the real API. They
@@ -385,5 +386,191 @@ func TestIsDevelopment(t *testing.T) {
 		if IsDevelopment(name) {
 			t.Errorf("IsDevelopment(%q) = true, want false", name)
 		}
+	}
+}
+
+// ---------- Resend: template and failure modes ----------
+
+func TestResendEmailContainsTheCodeAndNothingSensitive(t *testing.T) {
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	sender, _ := NewResendSender(ResendConfig{
+		APIKey: "k", From: "RentHouse <no-reply@example.test>", BaseURL: server.URL,
+	})
+	if err := sender.Send(context.Background(), "user@example.test", "483921"); err != nil {
+		t.Fatalf("send: %v", err)
+	}
+
+	subject, _ := body["subject"].(string)
+	if subject != defaultEmailSubject {
+		t.Errorf("got subject %q, want %q", subject, defaultEmailSubject)
+	}
+
+	text, _ := body["text"].(string)
+	htmlBody, _ := body["html"].(string)
+
+	for _, part := range []string{text, htmlBody} {
+		if !strings.Contains(part, "483921") {
+			t.Errorf("the message does not contain the code: %q", part)
+		}
+		if !strings.Contains(part, "RentHouse") {
+			t.Errorf("the message does not identify RentHouse: %q", part)
+		}
+		if !strings.Contains(part, "5 daqiqa") {
+			t.Errorf("the message does not state the validity window: %q", part)
+		}
+	}
+
+	// Nothing beyond the code may travel in the email.
+	for _, forbidden := range []string{"password", "Parol", "jwt", "token", "registration_token", "api_key"} {
+		if strings.Contains(strings.ToLower(text+htmlBody), strings.ToLower(forbidden)) {
+			t.Errorf("the email contains %q, which must never be sent", forbidden)
+		}
+	}
+}
+
+func TestResendSendsBothTextAndHTML(t *testing.T) {
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	sender, _ := NewResendSender(ResendConfig{APIKey: "k", From: "a@b.test", BaseURL: server.URL})
+	_ = sender.Send(context.Background(), "user@example.test", "111111")
+
+	if text, _ := body["text"].(string); strings.TrimSpace(text) == "" {
+		t.Error("no plain-text part; clients without HTML would see an empty message")
+	}
+	if htmlBody, _ := body["html"].(string); !strings.Contains(htmlBody, "<html") {
+		t.Error("no HTML part")
+	}
+}
+
+func TestResendCustomSubjectAndBodyWin(t *testing.T) {
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	sender, _ := NewResendSender(ResendConfig{
+		APIKey: "k", From: "a@b.test", BaseURL: server.URL,
+		Subject: "Custom subject", BodyFormat: "Code is {code}",
+	})
+	_ = sender.Send(context.Background(), "user@example.test", "222222")
+
+	if body["subject"] != "Custom subject" {
+		t.Errorf("got subject %v, want the configured one", body["subject"])
+	}
+	if text, _ := body["text"].(string); text != "Code is 222222" {
+		t.Errorf("got text %q, want the configured body", text)
+	}
+}
+
+func TestResendReportsANetworkFailure(t *testing.T) {
+	// A server that is closed before the request: the DNS/connection failure
+	// path, which must be an error and not a silent success.
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	url := server.URL
+	server.Close()
+
+	sender, _ := NewResendSender(ResendConfig{APIKey: "k", From: "a@b.test", BaseURL: url})
+
+	err := sender.Send(context.Background(), "user@example.test", "483921")
+	if err == nil {
+		t.Fatal("an unreachable provider must return an error")
+	}
+	if strings.Contains(err.Error(), "483921") {
+		t.Fatalf("the error leaked the code: %v", err)
+	}
+}
+
+func TestResendRespectsAContextDeadline(t *testing.T) {
+	// A provider that never answers must not hang the registration request.
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		<-release
+	}))
+	defer func() { close(release); server.Close() }()
+
+	sender, _ := NewResendSender(ResendConfig{APIKey: "k", From: "a@b.test", BaseURL: server.URL})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	err := sender.Send(ctx, "user@example.test", "483921")
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("a timed-out send must return an error")
+	}
+	if elapsed > 3*time.Second {
+		t.Fatalf("send took %v; the context deadline was not honoured", elapsed)
+	}
+}
+
+func TestResendHasADefaultTimeout(t *testing.T) {
+	// Even without a caller deadline the client must not wait forever.
+	sender, err := NewResendSender(ResendConfig{APIKey: "k", From: "a@b.test"})
+	if err != nil {
+		t.Fatalf("build sender: %v", err)
+	}
+	if sender.client.Timeout <= 0 {
+		t.Fatal("the HTTP client has no timeout; a hung provider would hang the request")
+	}
+}
+
+func TestResendAcceptsAMalformedSuccessBody(t *testing.T) {
+	// Resend accepted the message; the body being unreadable is not a delivery
+	// failure and must not be reported as one.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{not json at all`))
+	}))
+	defer server.Close()
+
+	sender, _ := NewResendSender(ResendConfig{APIKey: "k", From: "a@b.test", BaseURL: server.URL})
+
+	if err := sender.Send(context.Background(), "user@example.test", "483921"); err != nil {
+		t.Fatalf("a 2xx with an odd body is still an accepted send: %v", err)
+	}
+}
+
+func TestResendRejectsAMalformedErrorBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte(`<html>gateway error</html>`))
+	}))
+	defer server.Close()
+
+	sender, _ := NewResendSender(ResendConfig{APIKey: "k", From: "a@b.test", BaseURL: server.URL})
+
+	err := sender.Send(context.Background(), "user@example.test", "483921")
+	if err == nil {
+		t.Fatal("a 502 must be an error even when the body is not JSON")
+	}
+}
+
+func TestDescribeStatusPointsAtTheLikelyCause(t *testing.T) {
+	if got := describeStatus(401, "unauthorized"); !strings.Contains(got, "RESEND_API_KEY") {
+		t.Errorf("a 401 should mention the API key: %q", got)
+	}
+	if got := describeStatus(403, "domain not verified"); !strings.Contains(got, "RESEND_FROM") {
+		t.Errorf("a 403 should mention the sender domain: %q", got)
+	}
+	if got := describeStatus(500, "boom"); !strings.Contains(got, "Resend is failing") {
+		t.Errorf("a 5xx should point at the provider: %q", got)
 	}
 }

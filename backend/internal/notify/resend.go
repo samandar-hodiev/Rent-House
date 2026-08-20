@@ -70,15 +70,26 @@ type resendRequest struct {
 	To      []string `json:"to"`
 	Subject string   `json:"subject"`
 	Text    string   `json:"text"`
+	HTML    string   `json:"html"`
 }
 
 // Send delivers the code, returning an error if Resend does not accept it.
 func (s *ResendSender) Send(ctx context.Context, destination, code string) error {
+	// Both parts are sent: the HTML for clients that render it, the text for
+	// those that do not and for spam filters that prefer a multipart message.
+	text, htmlBody := renderEmail(s.cfg.BodyFormat, code)
+
+	subject := s.cfg.Subject
+	if strings.TrimSpace(subject) == "" {
+		subject = defaultEmailSubject
+	}
+
 	payload := resendRequest{
 		From:    s.cfg.From,
 		To:      []string{destination},
-		Subject: s.cfg.Subject,
-		Text:    strings.ReplaceAll(s.cfg.BodyFormat, "{code}", code),
+		Subject: subject,
+		Text:    text,
+		HTML:    htmlBody,
 	}
 
 	body, err := json.Marshal(payload)
@@ -100,11 +111,12 @@ func (s *ResendSender) Send(ctx context.Context, destination, code string) error
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		// The provider's message is useful for diagnosing a bad key or an
-		// unverified domain, and contains nothing secret — the code is not
-		// echoed back in an error body.
+		// The provider's reason helps an operator diagnose a bad key or an
+		// unverified domain. It goes into the returned error, which the service
+		// logs and then replaces with a generic message — it never reaches the
+		// browser, and it never contains the code.
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return fmt.Errorf("resend: status %d: %s", resp.StatusCode, strings.TrimSpace(string(detail)))
+		return fmt.Errorf("resend: %s", describeStatus(resp.StatusCode, strings.TrimSpace(string(detail))))
 	}
 
 	// The response carries a message id. It is intentionally not logged

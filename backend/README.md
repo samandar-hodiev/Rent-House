@@ -267,18 +267,34 @@ logging them leaves every registration stuck with no visible cause.
 
 #### Email — Resend
 
-1. Create an account at <https://resend.com>.
-2. **Verify a sending domain** under Domains. Until you do, Resend only accepts
-   `onboarding@resend.dev` as the sender and only delivers to the address that
-   owns the account — enough to test, not enough to register real users.
-3. Create an API key under API Keys.
-4. Set:
+1. Create an account at <https://resend.com> and an API key under **API Keys**.
+2. Set:
 
 ```bash
 EMAIL_PROVIDER=resend
 RESEND_API_KEY=re_...
 RESEND_FROM="RentHouse <no-reply@yourdomain.uz>"
 ```
+
+**Resend's testing mode is the thing that catches people.** A brand-new account
+has no verified domain, and in that state Resend will:
+
+- only accept `onboarding@resend.dev` as `RESEND_FROM`, and
+- only deliver to **the email address that owns the Resend account**.
+
+Sending to any other recipient is rejected with a 403, which this backend
+surfaces as `502 otp_delivery_failed` — the registration correctly refuses
+rather than claiming a code was sent. So while testing, register with your own
+Resend account address.
+
+To send to real users, **verify a domain** under **Domains** and point
+`RESEND_FROM` at an address on it. The sender is configurable precisely so no
+domain is hardcoded here.
+
+The verification email carries the six-digit code, the five-minute validity and
+nothing else — no password, no token, no identifiers. Both a plain-text and an
+HTML part are sent. Override the wording with `RESEND_SUBJECT` / `RESEND_BODY`
+(use `{code}` as the placeholder) if you want different copy.
 
 #### SMS — Eskiz.uz
 

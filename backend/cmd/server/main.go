@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -124,6 +125,7 @@ func buildSenders(cfg *config.Config) (senders, error) {
 			From:       cfg.Notify.ResendFrom,
 			Subject:    cfg.Notify.ResendSubject,
 			BodyFormat: cfg.Notify.ResendBody,
+			BaseURL:    cfg.Notify.ResendBaseURL,
 		},
 		Eskiz: notify.EskizConfig{
 			Email:         cfg.Notify.EskizEmail,
@@ -150,6 +152,10 @@ func buildSenders(cfg *config.Config) (senders, error) {
 			return
 		}
 		logger.Infof("%s delivery via %s", channel, provider)
+	}
+	if strings.TrimSpace(cfg.Notify.ResendBaseURL) != "" {
+		logger.Infof("WARNING: RESEND_BASE_URL is set to %q — email is NOT going to Resend. "+
+			"Unset it for real delivery.", cfg.Notify.ResendBaseURL)
 	}
 	describe("EMAIL", cfg.Notify.EmailProvider)
 	describe("SMS", cfg.Notify.SMSProvider)
