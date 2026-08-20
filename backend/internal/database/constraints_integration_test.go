@@ -70,11 +70,13 @@ func isUniqueViolation(err error) bool {
 func unique(prefix string) string { return prefix + uuid.NewString()[:8] }
 
 func newUser() *models.User {
+	email := unique("user-") + "@example.test"
+	phone := unique("+99890")
 	return &models.User{
 		FirstName:    "Test",
 		LastName:     "User",
-		Email:        unique("user-") + "@example.test",
-		Phone:        unique("+99890"),
+		Email:        &email,
+		Phone:        &phone,
 		PasswordHash: "not-a-real-hash",
 		Language:     models.LanguageUz,
 		Theme:        models.ThemeLight,

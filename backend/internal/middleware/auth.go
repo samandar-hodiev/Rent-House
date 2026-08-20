@@ -29,20 +29,20 @@ func Auth(tokens *token.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" {
-			response.AbortWithError(c, http.StatusUnauthorized, "Authorization header is required")
+			response.AbortWithError(c, http.StatusUnauthorized, "missing_token", "Authorization header is required")
 			return
 		}
 
 		// The scheme is compared case-insensitively, as RFC 7235 requires, but
 		// the token itself is taken verbatim.
 		if len(header) < len(bearerPrefix) || !strings.EqualFold(header[:len(bearerPrefix)], bearerPrefix) {
-			response.AbortWithError(c, http.StatusUnauthorized, "Authorization header must be 'Bearer <token>'")
+			response.AbortWithError(c, http.StatusUnauthorized, "malformed_token", "Authorization header must be 'Bearer <token>'")
 			return
 		}
 
 		raw := strings.TrimSpace(header[len(bearerPrefix):])
 		if raw == "" {
-			response.AbortWithError(c, http.StatusUnauthorized, "Authorization header must be 'Bearer <token>'")
+			response.AbortWithError(c, http.StatusUnauthorized, "malformed_token", "Authorization header must be 'Bearer <token>'")
 			return
 		}
 
@@ -51,10 +51,10 @@ func Auth(tokens *token.Service) gin.HandlerFunc {
 			// Expiry is worth distinguishing: a client can act on it by signing
 			// in again. Every other failure stays a single opaque message.
 			if err == token.ErrExpiredToken {
-				response.AbortWithError(c, http.StatusUnauthorized, "Token has expired")
+				response.AbortWithError(c, http.StatusUnauthorized, "token_expired", "Token has expired")
 				return
 			}
-			response.AbortWithError(c, http.StatusUnauthorized, "Invalid token")
+			response.AbortWithError(c, http.StatusUnauthorized, "invalid_token", "Invalid token")
 			return
 		}
 

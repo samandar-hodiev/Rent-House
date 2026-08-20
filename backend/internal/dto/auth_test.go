@@ -6,30 +6,37 @@ import (
 	"github.com/samandar-hodiev/Rent-House/backend/internal/models"
 )
 
-func TestRegisterNormalizeLowercasesAndTrims(t *testing.T) {
-	req := RegisterRequest{
-		FirstName: "  Samandar ",
-		LastName:  " Hodiev  ",
-		Email:     "  Samandar@Example.COM ",
-		Phone:     " +998901234567 ",
+func TestRegisterRequestOTPNormalizes(t *testing.T) {
+	req := RegisterRequestOTP{Method: " EMAIL ", Email: "  Samandar@Example.COM "}
+	req.Normalize()
+
+	if req.Method != "email" {
+		t.Errorf("got method %q, want it lowercased and trimmed", req.Method)
 	}
+	if req.Email != "samandar@example.com" {
+		t.Errorf("got email %q, want it lowercased and trimmed", req.Email)
+	}
+	if req.Contact() != "samandar@example.com" {
+		t.Errorf("Contact() = %q", req.Contact())
+	}
+
+	phone := RegisterRequestOTP{Method: "phone", Phone: "+998 90 123 45 67"}
+	phone.Normalize()
+	if phone.Phone != "+998901234567" {
+		t.Errorf("got phone %q, want it canonicalised", phone.Phone)
+	}
+	if phone.Contact() != "+998901234567" {
+		t.Errorf("Contact() = %q", phone.Contact())
+	}
+}
+
+func TestCompleteRegistrationNormalizeDefaultsLanguage(t *testing.T) {
+	req := CompleteRegistrationRequest{FirstName: "  Samandar ", LastName: " Hodiev  "}
 	req.Normalize()
 
 	if req.FirstName != "Samandar" || req.LastName != "Hodiev" {
 		t.Errorf("names were not trimmed: %q %q", req.FirstName, req.LastName)
 	}
-	if req.Email != "samandar@example.com" {
-		t.Errorf("got email %q, want it lowercased and trimmed", req.Email)
-	}
-	if req.Phone != "+998901234567" {
-		t.Errorf("got phone %q, want it trimmed", req.Phone)
-	}
-}
-
-func TestRegisterNormalizeDefaultsLanguage(t *testing.T) {
-	req := RegisterRequest{}
-	req.Normalize()
-
 	if req.Language != models.LanguageUz {
 		t.Fatalf("got language %q, want the %q default", req.Language, models.LanguageUz)
 	}
@@ -79,15 +86,16 @@ func TestUserResponseCarriesNoPasswordField(t *testing.T) {
 	// A compile-time guarantee would be better, but reflecting over the struct
 	// catches a future field named anything password-like.
 	hash := "should-never-appear"
+	email, phone := "a@b.test", "+998901234567"
 	user := &models.User{
 		FirstName: "A", LastName: "B",
-		Email: "a@b.test", Phone: "+998901234567",
+		Email: &email, Phone: &phone,
 		PasswordHash: hash,
 		Language:     models.LanguageUz, Theme: models.ThemeLight,
 	}
 
 	got := NewUserResponse(user)
-	if got.Email != "a@b.test" || got.Phone != "+998901234567" {
+	if got.Email == nil || *got.Email != "a@b.test" || got.Phone == nil || *got.Phone != "+998901234567" {
 		t.Fatalf("public fields were not copied: %+v", got)
 	}
 
@@ -98,9 +106,11 @@ func TestUserResponseCarriesNoPasswordField(t *testing.T) {
 }
 
 func contains(v UserResponse, needle string) bool {
-	fields := []string{v.ID, v.FirstName, v.LastName, v.Email, v.Phone, v.Language, v.Theme}
-	if v.AvatarURL != nil {
-		fields = append(fields, *v.AvatarURL)
+	fields := []string{v.ID, v.FirstName, v.LastName, v.Language, v.Theme}
+	for _, p := range []*string{v.Email, v.Phone, v.AvatarURL} {
+		if p != nil {
+			fields = append(fields, *p)
+		}
 	}
 	for _, f := range fields {
 		if f == needle {
@@ -108,4 +118,38 @@ func contains(v UserResponse, needle string) bool {
 		}
 	}
 	return false
+}
+
+func TestNormalizeUzPhoneAcceptsTheShapesUsersType(t *testing.T) {
+	cases := map[string]string{
+		"+998901234567":     "+998901234567",
+		"+998 90 123 45 67": "+998901234567",
+		"+998-90-123-45-67": "+998901234567",
+		"998901234567":      "+998901234567",
+		"901234567":         "+998901234567",
+		"  901234567  ":     "+998901234567",
+		"(90) 123 45 67":    "+998901234567",
+	}
+
+	for input, want := range cases {
+		if got := NormalizeUzPhone(input); got != want {
+			t.Errorf("NormalizeUzPhone(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestNormalizeUzPhoneRejectsWhatItCannotRead(t *testing.T) {
+	for _, input := range []string{"", "12345", "+12025550100", "+99890123456", "+9989012345678", "abcdefghi"} {
+		if got := NormalizeUzPhone(input); got != "" {
+			t.Errorf("NormalizeUzPhone(%q) = %q, want an empty string", input, got)
+		}
+	}
+}
+
+func TestLoginNormalizeCanonicalisesAPhoneIdentifier(t *testing.T) {
+	req := LoginRequest{Identifier: "+998 90 123 45 67"}
+	req.Normalize()
+	if req.Identifier != "+998901234567" {
+		t.Fatalf("got %q, want the canonical phone form", req.Identifier)
+	}
 }

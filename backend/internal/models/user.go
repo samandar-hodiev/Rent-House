@@ -27,8 +27,11 @@ type User struct {
 	Base
 	FirstName string `gorm:"column:first_name;type:varchar(100);not null" json:"first_name"`
 	LastName  string `gorm:"column:last_name;type:varchar(100);not null" json:"last_name"`
-	Email     string `gorm:"column:email;type:varchar(255);not null;uniqueIndex:uq_users_email" json:"email"`
-	Phone     string `gorm:"column:phone;type:varchar(32);not null;uniqueIndex:uq_users_phone" json:"phone"`
+	// Exactly one of these may be nil: registration proves ownership of a phone
+	// or an email, not both. A database CHECK requires at least one, and the
+	// UNIQUE constraints still hold because PostgreSQL treats NULLs as distinct.
+	Email *string `gorm:"column:email;type:varchar(255);uniqueIndex:uq_users_email" json:"email"`
+	Phone *string `gorm:"column:phone;type:varchar(32);uniqueIndex:uq_users_phone" json:"phone"`
 
 	// PasswordHash is tagged json:"-" so it can never leave through a handler
 	// that marshals a User directly. Hashing arrives with the auth phase.

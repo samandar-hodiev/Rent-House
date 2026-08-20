@@ -24,26 +24,95 @@ func NewAuthHandler(auth *service.AuthService) *AuthHandler {
 	return &AuthHandler{auth: auth}
 }
 
-// Register handles POST /api/v1/auth/register.
-func (h *AuthHandler) Register(c *gin.Context) {
-	var req dto.RegisterRequest
+// RequestRegistrationCode handles POST /api/v1/auth/register/request.
+func (h *AuthHandler) RequestRegistrationCode(c *gin.Context) {
+	var req dto.RegisterRequestOTP
 	if err := c.ShouldBindJSON(&req); err != nil {
-		// The validator's message names the offending field without echoing the
-		// password value back, so it is safe to return.
-		response.Error(c, http.StatusBadRequest, validationMessage(err))
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
 		return
 	}
 	req.Normalize()
 
-	result, err := h.auth.Register(req)
+	result, err := h.auth.RequestRegistrationCode(c.Request.Context(), req)
 	if err != nil {
 		switch {
-		case errors.Is(err, service.ErrUserExists):
-			response.Error(c, http.StatusConflict, "User already exists")
+		case errors.Is(err, service.ErrContactMismatch):
+			response.Error(c, http.StatusBadRequest, "contact_mismatch",
+				"Provide exactly the contact that matches the chosen method")
+		case errors.Is(err, service.ErrContactTaken):
+			response.Error(c, http.StatusConflict, "contact_taken",
+				"This phone or email is already registered")
+		case errors.Is(err, service.ErrResendTooSoon):
+			response.Error(c, http.StatusTooManyRequests, "resend_too_soon",
+				"Please wait before requesting another code")
 		default:
-			// The detail goes to the log; the client gets nothing internal.
-			logger.Errorf("register: %v", err)
-			response.Error(c, http.StatusInternalServerError, "Could not complete registration")
+			logger.Errorf("request registration code: %v", err)
+			response.Error(c, http.StatusInternalServerError, "internal_error",
+				"Could not send the verification code")
+		}
+		return
+	}
+
+	response.OK(c, "Verification code sent", result)
+}
+
+// VerifyRegistrationCode handles POST /api/v1/auth/register/verify.
+func (h *AuthHandler) VerifyRegistrationCode(c *gin.Context) {
+	var req dto.VerifyOTPRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+	req.Normalize()
+
+	result, err := h.auth.VerifyRegistrationCode(c.Request.Context(), req)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrVerificationNotFound):
+			response.Error(c, http.StatusNotFound, "verification_not_found",
+				"This verification is no longer available")
+		case errors.Is(err, service.ErrVerificationExpired):
+			response.Error(c, http.StatusUnprocessableEntity, "code_expired",
+				"The verification code has expired")
+		case errors.Is(err, service.ErrTooManyAttempts):
+			response.Error(c, http.StatusTooManyRequests, "too_many_attempts",
+				"Too many incorrect attempts. Request a new code")
+		case errors.Is(err, service.ErrInvalidCode):
+			response.Error(c, http.StatusUnprocessableEntity, "invalid_code",
+				"The verification code is incorrect")
+		default:
+			logger.Errorf("verify registration code: %v", err)
+			response.Error(c, http.StatusInternalServerError, "internal_error",
+				"Could not verify the code")
+		}
+		return
+	}
+
+	response.OK(c, "Verification successful", result)
+}
+
+// CompleteRegistration handles POST /api/v1/auth/register/complete.
+func (h *AuthHandler) CompleteRegistration(c *gin.Context) {
+	var req dto.CompleteRegistrationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+	req.Normalize()
+
+	result, err := h.auth.CompleteRegistration(c.Request.Context(), req)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidRegistrationToken):
+			response.Error(c, http.StatusUnauthorized, "invalid_registration_token",
+				"This registration session is no longer valid. Start again")
+		case errors.Is(err, service.ErrContactTaken):
+			response.Error(c, http.StatusConflict, "contact_taken",
+				"This phone or email is already registered")
+		default:
+			logger.Errorf("complete registration: %v", err)
+			response.Error(c, http.StatusInternalServerError, "internal_error",
+				"Could not complete registration")
 		}
 		return
 	}
@@ -55,20 +124,20 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req dto.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, validationMessage(err))
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
 		return
 	}
 	req.Normalize()
 
-	result, err := h.auth.Login(req)
+	result, err := h.auth.Login(c.Request.Context(), req)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidCredentials):
 			// One message for a wrong password and for an unknown account.
-			response.Error(c, http.StatusUnauthorized, "Invalid credentials")
+			response.Error(c, http.StatusUnauthorized, "invalid_credentials", "Invalid credentials")
 		default:
 			logger.Errorf("login: %v", err)
-			response.Error(c, http.StatusInternalServerError, "Could not complete login")
+			response.Error(c, http.StatusInternalServerError, "internal_error", "Could not complete login")
 		}
 		return
 	}
@@ -78,22 +147,24 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 // Me handles GET /api/v1/auth/me and runs behind the auth middleware.
 func (h *AuthHandler) Me(c *gin.Context) {
+	// The identity comes from the verified token, never from the request body
+	// or a query parameter.
 	userID, ok := middleware.UserIDFrom(c)
 	if !ok {
-		// Only reachable if the route were mounted without the middleware.
-		response.Error(c, http.StatusUnauthorized, "Authentication required")
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
 		return
 	}
 
-	user, err := h.auth.CurrentUser(userID)
+	user, err := h.auth.CurrentUser(c.Request.Context(), userID)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrUserNotFound):
 			// A valid token for an account that no longer exists.
-			response.Error(c, http.StatusUnauthorized, "Invalid token")
+			response.Error(c, http.StatusUnauthorized, "invalid_token", "Invalid token")
 		default:
 			logger.Errorf("current user: %v", err)
-			response.Error(c, http.StatusInternalServerError, "Could not load the current user")
+			response.Error(c, http.StatusInternalServerError, "internal_error",
+				"Could not load the current user")
 		}
 		return
 	}

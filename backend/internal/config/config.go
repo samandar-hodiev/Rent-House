@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,7 +19,17 @@ import (
 // defaultJWTExpiry is used when JWT_EXPIRES_IN is unset. The secret has no
 // default on purpose; an expiry does, because a wrong-but-safe lifetime is
 // better than refusing to start.
-const defaultJWTExpiry = 24 * time.Hour
+const (
+	defaultJWTExpiry = 24 * time.Hour
+
+	defaultOTPExpiry         = 5 * time.Minute
+	defaultOTPResendCooldown = 60 * time.Second
+	defaultOTPMaxAttempts    = 5
+	// A verified code buys a short window to finish the profile form. Long
+	// enough to type a name and a password, short enough that a stolen token is
+	// nearly worthless.
+	defaultRegistrationTokenExpiry = 15 * time.Minute
+)
 
 // Config holds every setting the server needs to start.
 type Config struct {
@@ -26,6 +37,15 @@ type Config struct {
 	AllowedOrigins []string
 	Database       Database
 	JWT            JWT
+	OTP            OTP
+}
+
+// OTP holds the one-time-code policy.
+type OTP struct {
+	Expiry                  time.Duration
+	ResendCooldown          time.Duration
+	MaxAttempts             int
+	RegistrationTokenExpiry time.Duration
 }
 
 // JWT holds the access-token settings.
@@ -79,11 +99,37 @@ func Load() (*Config, error) {
 		JWT: JWT{Secret: os.Getenv("JWT_SECRET")},
 	}
 
-	expiry, err := parseDuration(os.Getenv("JWT_EXPIRES_IN"), defaultJWTExpiry)
+	// JWT_EXPIRES_IN is the documented name; JWT_EXPIRATION is accepted as an
+	// alias so either spelling works.
+	jwtExpiry, err := parseDuration(firstSet("JWT_EXPIRES_IN", "JWT_EXPIRATION"), defaultJWTExpiry, "JWT_EXPIRES_IN")
 	if err != nil {
 		return nil, err
 	}
-	cfg.JWT.ExpiresIn = expiry
+	cfg.JWT.ExpiresIn = jwtExpiry
+
+	otpExpiry, err := parseDuration(os.Getenv("OTP_EXPIRATION"), defaultOTPExpiry, "OTP_EXPIRATION")
+	if err != nil {
+		return nil, err
+	}
+	cooldown, err := parseDuration(os.Getenv("OTP_RESEND_COOLDOWN"), defaultOTPResendCooldown, "OTP_RESEND_COOLDOWN")
+	if err != nil {
+		return nil, err
+	}
+	maxAttempts, err := parseInt(os.Getenv("OTP_MAX_ATTEMPTS"), defaultOTPMaxAttempts, "OTP_MAX_ATTEMPTS")
+	if err != nil {
+		return nil, err
+	}
+	tokenExpiry, err := parseDuration(
+		os.Getenv("REGISTRATION_TOKEN_EXPIRATION"), defaultRegistrationTokenExpiry, "REGISTRATION_TOKEN_EXPIRATION")
+	if err != nil {
+		return nil, err
+	}
+	cfg.OTP = OTP{
+		Expiry:                  otpExpiry,
+		ResendCooldown:          cooldown,
+		MaxAttempts:             maxAttempts,
+		RegistrationTokenExpiry: tokenExpiry,
+	}
 
 	if err := cfg.validate(); err != nil {
 		return nil, err
@@ -113,18 +159,53 @@ func (c *Config) validate() error {
 	if c.JWT.ExpiresIn <= 0 {
 		return errors.New("JWT_EXPIRES_IN must be a positive duration, for example 24h")
 	}
+	if c.OTP.Expiry <= 0 {
+		return errors.New("OTP_EXPIRATION must be a positive duration, for example 5m")
+	}
+	if c.OTP.ResendCooldown < 0 {
+		return errors.New("OTP_RESEND_COOLDOWN must not be negative")
+	}
+	if c.OTP.MaxAttempts <= 0 {
+		return errors.New("OTP_MAX_ATTEMPTS must be at least 1")
+	}
+	if c.OTP.RegistrationTokenExpiry <= 0 {
+		return errors.New("REGISTRATION_TOKEN_EXPIRATION must be a positive duration, for example 15m")
+	}
 	return nil
 }
 
-// parseDuration reads a Go duration string such as "24h" or "30m".
-func parseDuration(value string, fallback time.Duration) (time.Duration, error) {
+// firstSet returns the value of the first environment variable that is set,
+// so a setting can be renamed without breaking existing deployments.
+func firstSet(names ...string) string {
+	for _, name := range names {
+		if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func parseInt(value string, fallback int, name string) (int, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("%s %q is not a valid whole number: %w", name, value, err)
+	}
+	return parsed, nil
+}
+
+// parseDuration reads a Go duration string such as "24h" or "5m".
+func parseDuration(value string, fallback time.Duration, name string) (time.Duration, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return fallback, nil
 	}
 	parsed, err := time.ParseDuration(value)
 	if err != nil {
-		return 0, fmt.Errorf("JWT_EXPIRES_IN %q is not a valid duration (try 24h): %w", value, err)
+		return 0, fmt.Errorf("%s %q is not a valid duration (try 24h or 5m): %w", name, value, err)
 	}
 	return parsed, nil
 }

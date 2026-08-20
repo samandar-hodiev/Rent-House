@@ -3,6 +3,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -39,8 +40,8 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 // It relies on the database's unique constraints rather than checking first:
 // a check-then-insert has a race window in which two requests both pass the
 // check. The constraint has no such window.
-func (r *UserRepository) Create(user *models.User) error {
-	if err := r.db.Create(user).Error; err != nil {
+func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
+	if err := r.db.WithContext(ctx).Create(user).Error; err != nil {
 		if isUniqueViolation(err) {
 			return ErrDuplicateUser
 		}
@@ -50,35 +51,52 @@ func (r *UserRepository) Create(user *models.User) error {
 }
 
 // FindByID loads a user by primary key.
-func (r *UserRepository) FindByID(id uuid.UUID) (*models.User, error) {
-	return r.findBy("id = ?", id)
+func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
+	return r.findBy(ctx, "id = ?", id)
 }
 
 // FindByEmail loads a user by email. The caller supplies an already-normalized
 // address; matching is exact.
-func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
-	return r.findBy("email = ?", email)
+func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*models.User, error) {
+	return r.findBy(ctx, "email = ?", email)
 }
 
 // FindByPhone loads a user by phone number.
-func (r *UserRepository) FindByPhone(phone string) (*models.User, error) {
-	return r.findBy("phone = ?", phone)
+func (r *UserRepository) FindByPhone(ctx context.Context, phone string) (*models.User, error) {
+	return r.findBy(ctx, "phone = ?", phone)
+}
+
+// ExistsByContact reports whether an account already holds this email or phone.
+// Used before sending a registration code, so the caller is told immediately
+// rather than after typing in a code.
+func (r *UserRepository) ExistsByContact(ctx context.Context, method, contact string) (bool, error) {
+	column := "phone"
+	if method == models.VerificationMethodEmail {
+		column = "email"
+	}
+
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&models.User{}).
+		Where(column+" = ?", contact).Count(&count).Error; err != nil {
+		return false, fmt.Errorf("check contact: %w", err)
+	}
+	return count > 0, nil
 }
 
 // FindByIdentifier loads a user by email or phone.
 //
 // Which column to search is decided by the shape of the value, so a login form
 // can accept either without asking the user which one they typed.
-func (r *UserRepository) FindByIdentifier(identifier string) (*models.User, error) {
+func (r *UserRepository) FindByIdentifier(ctx context.Context, identifier string) (*models.User, error) {
 	if strings.Contains(identifier, "@") {
-		return r.FindByEmail(identifier)
+		return r.FindByEmail(ctx, identifier)
 	}
-	return r.FindByPhone(identifier)
+	return r.FindByPhone(ctx, identifier)
 }
 
-func (r *UserRepository) findBy(query string, arg any) (*models.User, error) {
+func (r *UserRepository) findBy(ctx context.Context, query string, arg any) (*models.User, error) {
 	var user models.User
-	if err := r.db.Where(query, arg).First(&user).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where(query, arg).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrUserNotFound
 		}

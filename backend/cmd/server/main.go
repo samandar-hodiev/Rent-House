@@ -18,6 +18,7 @@ import (
 	"github.com/samandar-hodiev/Rent-House/backend/internal/dto"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/handler"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/middleware"
+	"github.com/samandar-hodiev/Rent-House/backend/internal/notify"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/repository"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/service"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/token"
@@ -120,13 +121,26 @@ func newRouter(cfg *config.Config, db *gorm.DB, tokens *token.Service) (*gin.Eng
 
 	// handler -> service -> repository -> database.
 	users := repository.NewUserRepository(db)
-	authService := service.NewAuthService(users, tokens)
+	verifications := repository.NewVerificationRepository(db)
+
+	// The development senders write the code to the log instead of delivering
+	// it. Production providers implement the same interface, so swapping them
+	// in is a change here and nowhere else.
+	authService := service.NewAuthService(
+		users, verifications, tokens,
+		notify.DevelopmentSMSSender{}, notify.DevelopmentEmailSender{},
+		cfg.OTP,
+	)
 	authHandler := handler.NewAuthHandler(authService)
 
 	auth := v1.Group("/auth")
 	{
 		// Public: a caller with no account cannot be asked for a token.
-		auth.POST("/register", authHandler.Register)
+		// Registration is three steps, so ownership of the contact is proven
+		// before an account exists.
+		auth.POST("/register/request", authHandler.RequestRegistrationCode)
+		auth.POST("/register/verify", authHandler.VerifyRegistrationCode)
+		auth.POST("/register/complete", authHandler.CompleteRegistration)
 		auth.POST("/login", authHandler.Login)
 
 		// Protected.

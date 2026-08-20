@@ -6,7 +6,8 @@ Phases complete so far:
 
 1. **Foundation** — configuration, database connection, logging, CORS, health check.
 2. **Database architecture** — models, migrations, reference seed data.
-3. **Authentication** — registration, login, JWT access tokens, protected routes.
+3. **Authentication** — OTP-verified registration, login, JWT access tokens,
+   protected routes.
 
 Apartment CRUD, favourites, chat and image upload arrive in later phases.
 
@@ -101,7 +102,11 @@ cp .env.example .env
 | `DB_NAME` | **yes** | — | Database name |
 | `DB_SSLMODE` | no | `disable` | `disable` locally, `require` in production |
 | `JWT_SECRET` | **yes** | — | Signing key for access tokens. Generate with `openssl rand -base64 32` |
-| `JWT_EXPIRES_IN` | no | `24h` | Access-token lifetime, as a Go duration |
+| `JWT_EXPIRES_IN` | no | `24h` | Access-token lifetime, as a Go duration (`JWT_EXPIRATION` is accepted as an alias) |
+| `OTP_EXPIRATION` | no | `5m` | How long a verification code stays valid |
+| `OTP_RESEND_COOLDOWN` | no | `60s` | Minimum gap between codes for one contact |
+| `OTP_MAX_ATTEMPTS` | no | `5` | Wrong guesses before a code is locked |
+| `REGISTRATION_TOKEN_EXPIRATION` | no | `15m` | How long a verified session may take to finish |
 
 The required variables have no defaults on purpose: startup fails with a list of
 what is missing rather than falling back to a guessable value.
@@ -155,7 +160,11 @@ internal/middleware/ CORS (Gin supplies logging and recovery)
 internal/handler/    HTTP layer      — empty, added per feature
 internal/service/    business logic  — empty, added per feature
 internal/repository/ database access — empty, added per feature
-internal/models/     the ten GORM entities
+internal/models/     the GORM entities
+internal/dto/        request and response shapes
+internal/otp/        one-time code generation, hashing and comparison
+internal/notify/     verification-code sender interface + development senders
+internal/token/      JWT minting and verification
 internal/seed/       reference data (districts, amenities)
 migrations/          numbered SQL schema files, embedded into the binary
 cmd/migrate/         applies and rolls back migrations
@@ -169,41 +178,143 @@ concerns stay in handlers, business rules in services, queries in repositories.
 
 ## Authentication
 
+Registration proves the user controls the contact they sign up with. A simple
+"post a name, email and password" endpoint would let anyone register any phone
+number or address, so there isn't one: an account can only be created by
+completing a code sent to that phone or email.
+
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| POST | `/api/v1/auth/register` | public | Create an account, returns a token |
+| POST | `/api/v1/auth/register/request` | public | Send a 6-digit code to a phone **or** email |
+| POST | `/api/v1/auth/register/verify` | public | Check the code, return a registration token |
+| POST | `/api/v1/auth/register/complete` | public | Exchange the token for an account + JWT |
 | POST | `/api/v1/auth/login` | public | Sign in with email **or** phone |
 | GET | `/api/v1/auth/me` | Bearer token | The authenticated user |
 
-```bash
-curl -X POST http://localhost:8080/api/v1/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{"first_name":"Samandar","last_name":"Hodiev","email":"samandar@example.com","phone":"+998901234567","password":"StrongPassword123","language":"uz"}'
+### Registration flow
 
+```
+choose phone or email
+        ↓  POST /register/request      -> verification_id  (code goes by SMS/email)
+enter the 6-digit code
+        ↓  POST /register/verify       -> registration_token (valid 15m)
+enter name + password
+        ↓  POST /register/complete     -> user + access_token   (201)
+already signed in — no separate login step
+```
+
+```bash
+# 1. request a code (phone)
+curl -X POST http://localhost:8080/api/v1/auth/register/request \
+  -H 'Content-Type: application/json' \
+  -d '{"method":"phone","phone":"+998901234567"}'
+# -> {"success":true,"message":"Verification code sent",
+#     "data":{"verification_id":"…","method":"phone","expires_in":300,
+#             "resend_after":60,"attempts_remaining":5}}
+
+# or by email
+curl -X POST http://localhost:8080/api/v1/auth/register/request \
+  -H 'Content-Type: application/json' \
+  -d '{"method":"email","email":"samandar@example.com"}'
+
+# 2. verify
+curl -X POST http://localhost:8080/api/v1/auth/register/verify \
+  -H 'Content-Type: application/json' \
+  -d '{"verification_id":"…","code":"483921"}'
+# -> {"data":{"registration_token":"…","expires_in":900}}
+
+# 3. complete
+curl -X POST http://localhost:8080/api/v1/auth/register/complete \
+  -H 'Content-Type: application/json' \
+  -d '{"registration_token":"…","first_name":"Samandar","last_name":"Hodiev",
+       "password":"StrongPassword123","password_confirmation":"StrongPassword123"}'
+# -> 201 {"data":{"user":{…},"access_token":"…","token_type":"Bearer","expires_in":86400}}
+```
+
+A user registers with **one** contact. Registering by phone leaves `email` null
+and vice versa; the database requires at least one of the two.
+
+### Development: where the code goes
+
+There is no SMS or email account wired up. `internal/notify` defines the
+`Sender` interface, and `main.go` currently injects `DevelopmentSMSSender` and
+`DevelopmentEmailSender`, which write the code to the server log:
+
+```
+INFO  [dev sms] verification code for ***4567: 483921
+INFO  [dev email] verification code for s***@example.com: 021525
+```
+
+The destination is masked even here. A production provider implements the same
+one-method interface, so swapping it in is a change in `main.go` and nowhere
+else. **These senders must never run in production** — the code would land in
+log aggregation.
+
+### Login flow
+
+```bash
 curl -X POST http://localhost:8080/api/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"identifier":"samandar@example.com","password":"StrongPassword123"}'
 
+# the identifier may equally be a phone number, in any shape a user would type
+  -d '{"identifier":"+998 90 123 45 67","password":"StrongPassword123"}'
+```
+
+### Using the token
+
+```bash
 curl http://localhost:8080/api/v1/auth/me -H "Authorization: Bearer $TOKEN"
 ```
 
-Notes on the design:
+### Security notes
 
-- Passwords are hashed with **bcrypt at cost 12**. The hash is `json:"-"` on the
-  model *and* absent from the response DTO, so it cannot leak through either.
-- A failed login always answers `401 Invalid credentials`, whether the account
-  is unknown or the password is wrong. An unknown identifier still runs a bcrypt
-  hash, so response timing does not reveal which case it was.
-- Duplicate email or phone answers `409 User already exists` without saying
-  which field collided.
-- Tokens are HS256 and carry only `sub`, `iat`, `exp`. The signing algorithm is
-  pinned when parsing, so an `alg: none` or HS512 token is rejected.
-- The middleware verifies the token and does not hit the database;
+- **OTP**: six digits from `crypto/rand`, stored as a bcrypt hash, valid 5
+  minutes, five attempts, 60-second resend cooldown. Requesting a new code
+  invalidates the previous one, and a code that has been verified once cannot
+  be verified again.
+- **Registration token**: 256 bits from `crypto/rand`, stored as SHA-256,
+  single-use, 15-minute life. It carries the verified contact, so a caller
+  cannot verify one number and register another.
+- **Passwords**: bcrypt at cost 12. The hash is `json:"-"` on the model *and*
+  absent from the response DTO, so it cannot leak through either.
+- **Login**: always `401 Invalid credentials`, whether the account is unknown or
+  the password is wrong. An unknown identifier still runs a bcrypt hash, so
+  response timing does not reveal which case it was.
+- **Registration conflicts** answer `409 contact_taken`. This is deliberate
+  where login is deliberately vague: the user needs to know to sign in instead,
+  and the same fact is already discoverable from the login form.
+- **Tokens** are HS256 carrying only `sub`, `iat`, `exp`. The algorithm is
+  pinned when parsing, so `alg: none` and HS512 are rejected.
+- **The middleware** verifies the token without a database round trip;
   `/auth/me` loads the account itself, so a token for a deleted user fails.
-- Phone numbers must be `+998` followed by nine digits. One canonical shape is
-  what makes the unique constraint meaningful.
-- SQL logging uses `ParameterizedQueries`, so bound values — password hashes
-  included — never reach the log.
+- **Logs** never contain passwords, hashes or JWTs. SQL logging uses
+  `ParameterizedQueries`, so bound values stay out too.
+
+### Error codes
+
+Failures carry a stable `error` code alongside the human `message`, so a client
+branches on the code rather than on wording:
+
+| Status | `error` | When |
+|---|---|---|
+| 400 | `validation_failed` | Malformed body or a failed binding rule |
+| 400 | `contact_mismatch` | The contact does not match the chosen method |
+| 401 | `invalid_credentials` | Wrong password, or no such account |
+| 401 | `invalid_registration_token` | Unknown, expired, unverified or spent token |
+| 401 | `missing_token` / `malformed_token` / `invalid_token` / `token_expired` | Authorization header problems |
+| 404 | `verification_not_found` | Unknown, superseded or already-verified code |
+| 409 | `contact_taken` | The phone or email is already registered |
+| 422 | `invalid_code` / `code_expired` | Wrong or expired OTP |
+| 429 | `resend_too_soon` / `too_many_attempts` | Rate limits |
+| 500 | `internal_error` | Anything unexpected; detail goes to the log |
+
+### Password reset
+
+Not implemented. The verification table carries a `purpose` column with a
+`password_reset` value already allowed, and `user_id` is nullable, so the same
+OTP infrastructure — expiry, attempts, cooldown, sender abstraction — is
+reusable when that phase arrives.
 
 ## Data model
 
