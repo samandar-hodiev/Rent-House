@@ -192,7 +192,9 @@ export default {
   'auth.errorSessionExpired': 'Сессия регистрации истекла. Начните заново.',
   'auth.errorCredentials': 'Неверный email/телефон или пароль.',
   'auth.errorValidation': 'Введённые данные некорректны.',
-  'auth.errorNetwork': 'Не удалось связаться с сервером. Проверьте интернет.',
+  'auth.errorNetwork': 'Не удалось связаться с сервером. Проверьте, запущен ли сервер, и интернет.',
+  'auth.errorDeliveryFailed': 'Не удалось отправить код подтверждения. Попробуйте чуть позже.',
+  'auth.checkingSession': 'Проверяем...',
   'auth.errorUnexpected': 'Непредвиденная ошибка. Попробуйте позже.',
 
   // District display names, keyed by the district id from data/districts.js

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { ApiError, NETWORK_ERROR } from '../services/apiClient'
+import { ApiError } from '../services/apiClient'
 import { fetchCurrentUser } from '../services/authApi'
 import { CURRENT_USER } from '../data/currentUser'
 
@@ -106,16 +106,18 @@ export function AuthProvider({ children }) {
       .catch((error) => {
         if (cancelled || error?.name === 'AbortError') return
 
-        // A server that cannot be reached is not proof of a bad token, so the
-        // stored one is kept and the user is simply treated as signed out for
-        // now. A rejected token is cleared, because it will never work again.
-        if (error instanceof ApiError && error.code === NETWORK_ERROR) {
-          setStatus(AUTH_STATUS.unauthenticated)
-          return
+        // Only an explicit rejection proves the token is bad. A 401 means the
+        // server looked at it and refused it, so it is discarded. Anything else
+        // — the API being down, a 500, a proxy hiccup — says nothing about the
+        // token, and throwing away a valid session over a transient fault would
+        // sign the user out for no reason. In those cases the token is kept and
+        // the next page load tries again.
+        const rejected = error instanceof ApiError && error.status === 401
+        if (rejected) {
+          persistToken(null)
+          setToken(null)
+          setUser(null)
         }
-        persistToken(null)
-        setToken(null)
-        setUser(null)
         setStatus(AUTH_STATUS.unauthenticated)
       })
 

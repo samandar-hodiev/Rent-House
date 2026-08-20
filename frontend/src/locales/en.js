@@ -192,7 +192,9 @@ export default {
   'auth.errorSessionExpired': 'Your registration session expired. Please start again.',
   'auth.errorCredentials': 'Wrong email/phone or password.',
   'auth.errorValidation': 'The information you entered is not valid.',
-  'auth.errorNetwork': 'Could not reach the server. Check your connection.',
+  'auth.errorNetwork': 'Could not reach the server. Check that it is running and that you are online.',
+  'auth.errorDeliveryFailed': 'Could not send the verification code. Please try again shortly.',
+  'auth.checkingSession': 'Checking your session...',
   'auth.errorUnexpected': 'Something went wrong. Please try again later.',
 
   // District display names, keyed by the district id from data/districts.js

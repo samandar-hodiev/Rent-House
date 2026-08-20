@@ -86,6 +86,10 @@ function RegisterPage() {
       switch (error.code) {
         case 'network_error':
           return t('auth.errorNetwork')
+        case 'otp_delivery_failed':
+          // The server was reached and understood the request; the SMS or email
+          // provider is what failed. Not a connectivity problem.
+          return t('auth.errorDeliveryFailed')
         case 'contact_taken':
           return t('auth.errorContactTaken')
         case 'resend_too_soon':

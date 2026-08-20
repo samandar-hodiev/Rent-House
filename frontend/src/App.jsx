@@ -8,6 +8,7 @@ import { SearchProvider } from './context/SearchContext'
 import { WishlistProvider } from './context/WishlistContext'
 import RootLayout from './layouts/RootLayout'
 import DashboardLayout from './components/dashboard/DashboardLayout'
+import RequireAuth from './components/RequireAuth'
 import HomePage from './pages/HomePage'
 import SearchPage from './pages/SearchPage'
 import ApartmentDetailsPage from './pages/ApartmentDetailsPage'
@@ -52,18 +53,23 @@ function App() {
                       </Route>
 
                       {/* Account area: its own shell (no public search bar, no
-                          login/register buttons) instead of RootLayout. */}
-                      <Route element={<DashboardLayout />}>
-                        <Route path={ROUTES.dashboard}>
-                          <Route index element={<Navigate to={ROUTES.dashboardProfile} replace />} />
-                          <Route path="profile" element={<DashboardPage />} />
-                          <Route path="listings" element={<DashboardListingsPage />} />
-                          <Route path="chats" element={<DashboardChatsPage />} />
-                          <Route path="edit-profile" element={<DashboardEditProfilePage />} />
+                          login/register buttons) instead of RootLayout, and
+                          behind RequireAuth — these routes show a real
+                          account, so an unauthenticated visitor is sent to
+                          the login page. */}
+                      <Route element={<RequireAuth />}>
+                        <Route element={<DashboardLayout />}>
+                          <Route path={ROUTES.dashboard}>
+                            <Route index element={<Navigate to={ROUTES.dashboardProfile} replace />} />
+                            <Route path="profile" element={<DashboardPage />} />
+                            <Route path="listings" element={<DashboardListingsPage />} />
+                            <Route path="chats" element={<DashboardChatsPage />} />
+                            <Route path="edit-profile" element={<DashboardEditProfilePage />} />
+                          </Route>
+                          <Route path={ROUTES.createListing} element={<CreateListingPage />} />
+                          {/* Same form component in edit mode — see CreateListingPage. */}
+                          <Route path={ROUTES.editListing} element={<CreateListingPage />} />
                         </Route>
-                        <Route path={ROUTES.createListing} element={<CreateListingPage />} />
-                        {/* Same form component in edit mode — see CreateListingPage. */}
-                        <Route path={ROUTES.editListing} element={<CreateListingPage />} />
                       </Route>
                     </Routes>
                   </BrowserRouter>

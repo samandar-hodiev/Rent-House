@@ -22,6 +22,7 @@ import (
 	"github.com/samandar-hodiev/Rent-House/backend/internal/otp"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/repository"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/token"
+	"github.com/samandar-hodiev/Rent-House/backend/pkg/logger"
 )
 
 // Errors the handler maps onto status codes.
@@ -55,6 +56,12 @@ var (
 
 	// ErrContactMismatch means the body's contact does not match its method.
 	ErrContactMismatch = errors.New("contact does not match the chosen method")
+
+	// ErrDeliveryFailed means the code was generated but the SMS or email
+	// provider refused to deliver it. Distinct from a generic internal fault so
+	// the client can tell the user to retry rather than showing "something went
+	// wrong" — and so it is never mistaken for the browser being offline.
+	ErrDeliveryFailed = errors.New("verification code could not be delivered")
 )
 
 // bcryptCost is above bcrypt.DefaultCost (10). Each increment doubles the work
@@ -179,7 +186,10 @@ func (s *AuthService) RequestRegistrationCode(
 	// Sent after the row exists, so a delivery failure cannot leave a code in
 	// the wild with nothing to verify it against.
 	if err := s.sender(req.Method).Send(ctx, contact, code); err != nil {
-		return nil, fmt.Errorf("send verification code: %w", err)
+		// The provider's reason is wrapped for the log; the caller sees only
+		// that delivery failed.
+		logger.Errorf("verification delivery failed via %s: %v", req.Method, err)
+		return nil, ErrDeliveryFailed
 	}
 
 	return &dto.RegisterRequestOTPResponse{

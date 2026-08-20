@@ -45,6 +45,11 @@ func (h *AuthHandler) RequestRegistrationCode(c *gin.Context) {
 		case errors.Is(err, service.ErrResendTooSoon):
 			response.Error(c, http.StatusTooManyRequests, "resend_too_soon",
 				"Please wait before requesting another code")
+		case errors.Is(err, service.ErrDeliveryFailed):
+			// A distinct code: the request reached the server and was
+			// understood; the provider is what failed. Retrying may work.
+			response.Error(c, http.StatusBadGateway, "otp_delivery_failed",
+				"Could not deliver the verification code. Please try again shortly")
 		default:
 			logger.Errorf("request registration code: %v", err)
 			response.Error(c, http.StatusInternalServerError, "internal_error",

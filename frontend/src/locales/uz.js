@@ -192,7 +192,9 @@ export default {
   'auth.errorSessionExpired': "Ro'yxatdan o'tish sessiyasi tugadi. Qaytadan boshlang.",
   'auth.errorCredentials': "Email/telefon yoki parol noto'g'ri.",
   'auth.errorValidation': "Kiritilgan ma'lumotlar to'g'ri emas.",
-  'auth.errorNetwork': "Serverga ulanib bo'lmadi. Internetni tekshiring.",
+  'auth.errorNetwork': "Serverga ulanib bo'lmadi. Server ishga tushganini va internetni tekshiring.",
+  'auth.errorDeliveryFailed': "Tasdiqlash kodini yuborib bo'lmadi. Birozdan keyin qayta urinib ko'ring.",
+  'auth.checkingSession': 'Tekshirilmoqda...',
   'auth.errorUnexpected': 'Kutilmagan xatolik. Keyinroq urinib ko\'ring.',
 
   // District display names, keyed by the district id from data/districts.js
