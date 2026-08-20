@@ -185,16 +185,25 @@ func (s *AuthService) RequestRegistrationCode(
 
 	// Sent after the row exists, so a delivery failure cannot leave a code in
 	// the wild with nothing to verify it against.
-	if err := s.sender(req.Method).Send(ctx, contact, code); err != nil {
+	sender := s.sender(req.Method)
+	if err := sender.Send(ctx, contact, code); err != nil {
 		// The provider's reason is wrapped for the log; the caller sees only
 		// that delivery failed.
 		logger.Errorf("verification delivery failed via %s: %v", req.Method, err)
 		return nil, ErrDeliveryFailed
 	}
 
+	// Reported honestly: a development sender wrote the code to the log, it did
+	// not deliver anything, and the UI must say so rather than claim otherwise.
+	delivery := dto.DeliverySent
+	if notify.IsSimulated(sender) {
+		delivery = dto.DeliveryLogged
+	}
+
 	return &dto.RegisterRequestOTPResponse{
 		VerificationID:    verification.ID.String(),
 		Method:            req.Method,
+		Delivery:          delivery,
 		ExpiresIn:         int64(s.policy.Expiry.Seconds()),
 		ResendAfter:       int64(s.policy.ResendCooldown.Seconds()),
 		AttemptsRemaining: s.policy.MaxAttempts,

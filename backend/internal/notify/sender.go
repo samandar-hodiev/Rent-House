@@ -18,6 +18,19 @@ type Sender interface {
 	Send(ctx context.Context, destination, code string) error
 }
 
+// Simulated is implemented by senders that do not actually deliver anything.
+// The API reports this to the client so no screen can claim "code sent" when
+// the code only went to a log file.
+type Simulated interface {
+	Simulated() bool
+}
+
+// IsSimulated reports whether a sender only pretends to deliver.
+func IsSimulated(s Sender) bool {
+	simulated, ok := s.(Simulated)
+	return ok && simulated.Simulated()
+}
+
 // SenderFunc adapts a function to the Sender interface, which is convenient in
 // tests.
 type SenderFunc func(ctx context.Context, destination, code string) error
@@ -35,6 +48,9 @@ func (f SenderFunc) Send(ctx context.Context, destination, code string) error {
 // place.
 type DevelopmentSMSSender struct{}
 
+// Simulated marks this sender as non-delivering.
+func (DevelopmentSMSSender) Simulated() bool { return true }
+
 func (DevelopmentSMSSender) Send(_ context.Context, destination, code string) error {
 	logger.Infof("[dev sms] verification code for %s: %s", maskPhone(destination), code)
 	return nil
@@ -42,6 +58,9 @@ func (DevelopmentSMSSender) Send(_ context.Context, destination, code string) er
 
 // DevelopmentEmailSender is the email equivalent of DevelopmentSMSSender.
 type DevelopmentEmailSender struct{}
+
+// Simulated marks this sender as non-delivering.
+func (DevelopmentEmailSender) Simulated() bool { return true }
 
 func (DevelopmentEmailSender) Send(_ context.Context, destination, code string) error {
 	logger.Infof("[dev email] verification code for %s: %s", maskEmail(destination), code)

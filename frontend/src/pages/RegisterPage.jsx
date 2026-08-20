@@ -52,6 +52,9 @@ function RegisterPage() {
   const [method, setMethod] = useState('phone')
   const [contact, setContact] = useState('')
   const [verificationId, setVerificationId] = useState(null)
+  // "sent" when a provider accepted the message, "logged" when the server only
+  // wrote the code to its log. Never claim delivery on the strength of a 200.
+  const [delivery, setDelivery] = useState(null)
   const [registrationToken, setRegistrationToken] = useState(null)
 
   const [code, setCode] = useState('')
@@ -141,6 +144,7 @@ function RegisterPage() {
       const data = await requestRegistrationCode({ method, contact: payload })
       setContact(payload)
       setVerificationId(data.verification_id)
+      setDelivery(data.delivery ?? null)
       setResendIn(data.resend_after ?? 60)
       if (!isResend) {
         setCode('')
@@ -258,13 +262,24 @@ function RegisterPage() {
       <AuthCard
         title={method === 'phone' ? t('auth.verifyPhoneTitle') : t('auth.verifyEmailTitle')}
         subtitle={
-          method === 'phone'
-            ? t('auth.codeSentPhone', { contact: contactForDisplay })
-            : t('auth.codeSentEmail', { contact: contactForDisplay })
+          delivery === 'logged'
+            ? t('auth.codeLoggedNotSent', { contact: contactForDisplay })
+            : method === 'phone'
+              ? t('auth.codeSentPhone', { contact: contactForDisplay })
+              : t('auth.codeSentEmail', { contact: contactForDisplay })
         }
       >
         <form onSubmit={submitCode} noValidate className="mt-6 flex flex-col gap-4">
           {alert}
+
+          {delivery === 'logged' ? (
+            <p
+              role="status"
+              className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning"
+            >
+              {t('auth.devDeliveryNotice')}
+            </p>
+          ) : null}
 
           <OtpInput value={code} onChange={setCode} error={errors.code} disabled={isSubmitting} />
 

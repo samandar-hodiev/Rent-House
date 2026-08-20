@@ -12,6 +12,15 @@ import (
 	"github.com/samandar-hodiev/Rent-House/backend/internal/models"
 )
 
+// Delivery modes reported by the register-request endpoint.
+const (
+	// DeliverySent means a real provider accepted the message.
+	DeliverySent = "sent"
+	// DeliveryLogged means the server is in development mode: the code was
+	// written to the server log and nothing was delivered.
+	DeliveryLogged = "logged"
+)
+
 // RegisterRequestOTP is the body of POST /api/v1/auth/register/request — step
 // one, which asks for a code to be sent.
 //
@@ -46,6 +55,11 @@ func (r *RegisterRequestOTP) Contact() string {
 type RegisterRequestOTPResponse struct {
 	VerificationID string `json:"verification_id"`
 	Method         string `json:"method"`
+	// Delivery is "sent" when a real provider accepted the message, or
+	// "logged" when the server is in development mode and only wrote the code
+	// to its log. The client must not claim a code was sent unless this is
+	// "sent".
+	Delivery string `json:"delivery"`
 	// ExpiresIn is in seconds, so the client can run its countdown.
 	ExpiresIn         int64 `json:"expires_in"`
 	ResendAfter       int64 `json:"resend_after"`

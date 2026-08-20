@@ -58,7 +58,14 @@ func (h *AuthHandler) RequestRegistrationCode(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, "Verification code sent", result)
+	// The message matches what actually happened. In development nothing was
+	// delivered, and saying otherwise here would be the same lie the UI is
+	// forbidden from telling.
+	message := "Verification code sent"
+	if result.Delivery == dto.DeliveryLogged {
+		message = "Development mode: the code was written to the server log, not sent"
+	}
+	response.OK(c, message, result)
 }
 
 // VerifyRegistrationCode handles POST /api/v1/auth/register/verify.

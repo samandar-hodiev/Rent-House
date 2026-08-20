@@ -168,6 +168,8 @@ export default {
   'auth.verifyEmailTitle': 'Подтвердите email',
   'auth.codeSentPhone': 'На номер {contact} отправлен 6-значный код.',
   'auth.codeSentEmail': 'На адрес {contact} отправлен 6-значный код.',
+  'auth.codeLoggedNotSent': 'Письмо на {contact} НЕ отправлено — сервер работает в dev-режиме.',
+  'auth.devDeliveryNotice': 'Dev-режим: настоящее письмо не отправлено. Код в логе бэкенда. Для реальной отправки нужны EMAIL_PROVIDER=resend и ключ Resend.',
   'auth.otpLabel': 'Код подтверждения',
   'auth.otpDigit': 'Цифра {index}',
   'auth.verifyAction': 'Подтвердить',

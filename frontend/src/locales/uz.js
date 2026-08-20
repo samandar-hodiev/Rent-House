@@ -168,6 +168,8 @@ export default {
   'auth.verifyEmailTitle': 'Emailingizni tasdiqlang',
   'auth.codeSentPhone': '{contact} raqamiga 6 xonali kod yuborildi.',
   'auth.codeSentEmail': '{contact} manziliga 6 xonali kod yuborildi.',
+  'auth.codeLoggedNotSent': "{contact} manziliga xat YUBORILMADI — server dev rejimda ishlayapti.",
+  'auth.devDeliveryNotice': "Dev rejim: haqiqiy xat yuborilmadi. Kod backend logida. Haqiqiy yuborish uchun EMAIL_PROVIDER=resend va Resend kaliti kerak.",
   'auth.otpLabel': 'Tasdiqlash kodi',
   'auth.otpDigit': '{index}-raqam',
   'auth.verifyAction': 'Tasdiqlash',

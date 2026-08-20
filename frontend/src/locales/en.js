@@ -168,6 +168,8 @@ export default {
   'auth.verifyEmailTitle': 'Verify your email',
   'auth.codeSentPhone': 'A 6-digit code was sent to {contact}.',
   'auth.codeSentEmail': 'A 6-digit code was sent to {contact}.',
+  'auth.codeLoggedNotSent': 'No email was sent to {contact} — the server is running in dev mode.',
+  'auth.devDeliveryNotice': 'Dev mode: no real email was sent. The code is in the backend log. Real delivery needs EMAIL_PROVIDER=resend and a Resend key.',
   'auth.otpLabel': 'Verification code',
   'auth.otpDigit': 'Digit {index}',
   'auth.verifyAction': 'Verify',
