@@ -276,20 +276,26 @@ RESEND_API_KEY=re_...
 RESEND_FROM="RentHouse <no-reply@yourdomain.uz>"
 ```
 
-**Resend's testing mode is the thing that catches people.** A brand-new account
-has no verified domain, and in that state Resend will:
+**Without a verified domain, treat delivery to anyone but yourself as
+unreliable.** A brand-new account has no verified domain and must send from
+`onboarding@resend.dev`.
 
-- only accept `onboarding@resend.dev` as `RESEND_FROM`, and
-- only deliver to **the email address that owns the Resend account**.
+Measured against a real account on 2026-08-20: the API returns **200 with a
+message id for any recipient**, including addresses that do not own the Resend
+account. So a 200 proves only that *Resend accepted the request* — it is not
+proof the message reached an inbox, and this backend's `delivery: "sent"` means
+exactly that and no more. Whether a non-owner address is actually delivered to
+is decided downstream, and the outcome shows in Resend's dashboard logs rather
+than in the send response.
 
-Sending to any other recipient is rejected with a 403, which this backend
-surfaces as `502 otp_delivery_failed` — the registration correctly refuses
-rather than claiming a code was sent. So while testing, register with your own
-Resend account address.
+Practical consequence: **do the first end-to-end test with the address that owns
+the Resend account**, where delivery is reliable. To send to real users,
+**verify a domain** under **Domains** and point `RESEND_FROM` at an address on
+it. The sender is configurable precisely so no domain is hardcoded here.
 
-To send to real users, **verify a domain** under **Domains** and point
-`RESEND_FROM` at an address on it. The sender is configurable precisely so no
-domain is hardcoded here.
+If a send is genuinely rejected (bad key, unverified sender domain), the API
+returns 4xx and this backend surfaces `502 otp_delivery_failed` — registration
+refuses rather than claiming a code was sent.
 
 The verification email carries the six-digit code, the five-minute validity and
 nothing else — no password, no token, no identifiers. Both a plain-text and an
