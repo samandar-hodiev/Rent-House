@@ -86,14 +86,18 @@ function OtpInput({ value, onChange, error, disabled }) {
             onKeyDown={handleKeyDown(index)}
             aria-label={t('auth.otpDigit', { index: index + 1 })}
             aria-invalid={error ? true : undefined}
-            className={`h-[3.25rem] w-full min-w-0 rounded-xl border bg-surface text-center text-xl font-semibold tabular-nums text-text-primary transition-[border-color,box-shadow] duration-150 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-60 ${
-              error ? 'border-error' : digit.trim() ? 'border-primary/50' : 'border-border'
+            className={`h-[3.25rem] w-full min-w-0 rounded-xl border text-center text-xl font-semibold tabular-nums text-text-primary transition-[border-color,box-shadow,background-color] duration-200 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-70 ${
+              error
+                ? 'border-error bg-error/[0.04] ring-4 ring-error/10'
+                : digit.trim()
+                  ? 'border-primary/60 bg-primary/[0.06]'
+                  : 'border-border bg-surface hover:border-text-muted/40'
             }`}
           />
         ))}
       </div>
 
-      {error ? <p className="text-xs text-error">{error}</p> : null}
+      {error && error.trim() ? <p className="text-xs text-error">{error}</p> : null}
     </div>
   )
 }

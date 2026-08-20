@@ -12,7 +12,7 @@ function AuthButton({ children, loading, loadingLabel, type = 'submit', onClick,
       onClick={onClick}
       disabled={loading || disabled}
       aria-busy={loading || undefined}
-      className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:bg-border disabled:text-text-muted"
+      className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-white shadow-sm transition-[background-color,transform,box-shadow] duration-150 hover:bg-primary-hover hover:shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:translate-y-px active:shadow-none disabled:cursor-not-allowed disabled:bg-border disabled:text-text-muted disabled:shadow-none motion-reduce:transition-none motion-reduce:active:translate-y-0"
     >
       {loading ? <Loader2 aria-hidden="true" size={16} className="animate-spin" /> : null}
       {loading && loadingLabel ? loadingLabel : children}

@@ -179,6 +179,10 @@ function RegisterPage() {
       setStep(STEP.profile)
     } catch (error) {
       setFormError(messageFor(error))
+      // Mark the boxes themselves, not just the alert above them.
+      if (error instanceof ApiError && ['invalid_otp', 'otp_expired'].includes(error.code)) {
+        setErrors({ code: ' ' })
+      }
       // A lost or exhausted verification cannot be retried on this screen, so
       // send the user back to request a fresh code rather than leaving them on
       // a dead form.
@@ -256,6 +260,7 @@ function RegisterPage() {
   if (step === STEP.code) {
     return (
       <AuthLayout
+        step={STEP.code}
         width="narrow"
         progress={<AuthProgress current={2} />}
         title={method === 'phone' ? t('auth.verifyPhoneTitle') : t('auth.verifyEmailTitle')}
@@ -274,7 +279,15 @@ function RegisterPage() {
             <AuthAlert variant="info">{t('auth.devDeliveryNotice')}</AuthAlert>
           ) : null}
 
-          <OtpInput value={code} onChange={setCode} error={errors.code} disabled={isSubmitting} />
+          <OtpInput
+            value={code}
+            onChange={(next) => {
+              setCode(next)
+              if (errors.code) setErrors({})
+            }}
+            error={errors.code}
+            disabled={isSubmitting}
+          />
 
           <AuthButton loading={isSubmitting} loadingLabel={t('auth.verifying')}>
             {t('auth.verifyAction')}
@@ -319,6 +332,7 @@ function RegisterPage() {
   if (step === STEP.profile) {
     return (
       <AuthLayout
+        step={STEP.profile}
         width="wide"
         progress={<AuthProgress current={3} />}
         title={t('auth.createAccountTitle')}
@@ -380,6 +394,7 @@ function RegisterPage() {
 
   return (
     <AuthLayout
+      step={STEP.contact}
       progress={<AuthProgress current={1} />}
       title={t('auth.registerTitle')}
       subtitle={t('auth.registerVerifySubtitle')}
