@@ -6,9 +6,9 @@ Phases complete so far:
 
 1. **Foundation** — configuration, database connection, logging, CORS, health check.
 2. **Database architecture** — models, migrations, reference seed data.
+3. **Authentication** — registration, login, JWT access tokens, protected routes.
 
-There are no feature endpoints yet: no auth, no apartment CRUD, no chat. Those
-arrive in later phases.
+Apartment CRUD, favourites, chat and image upload arrive in later phases.
 
 ## Tech stack
 
@@ -100,7 +100,8 @@ cp .env.example .env
 | `DB_PASSWORD` | no | — | PostgreSQL password |
 | `DB_NAME` | **yes** | — | Database name |
 | `DB_SSLMODE` | no | `disable` | `disable` locally, `require` in production |
-| `JWT_SECRET` | **yes** | — | Signing key for JWTs (not used until the auth phase, but required so a deployment cannot start without one) |
+| `JWT_SECRET` | **yes** | — | Signing key for access tokens. Generate with `openssl rand -base64 32` |
+| `JWT_EXPIRES_IN` | no | `24h` | Access-token lifetime, as a Go duration |
 
 The required variables have no defaults on purpose: startup fails with a list of
 what is missing rather than falling back to a guessable value.
@@ -165,6 +166,44 @@ pkg/response/        shared JSON response envelope
 
 Dependencies point one way: handler → service → repository → database. HTTP
 concerns stay in handlers, business rules in services, queries in repositories.
+
+## Authentication
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| POST | `/api/v1/auth/register` | public | Create an account, returns a token |
+| POST | `/api/v1/auth/login` | public | Sign in with email **or** phone |
+| GET | `/api/v1/auth/me` | Bearer token | The authenticated user |
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"first_name":"Samandar","last_name":"Hodiev","email":"samandar@example.com","phone":"+998901234567","password":"StrongPassword123","language":"uz"}'
+
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"identifier":"samandar@example.com","password":"StrongPassword123"}'
+
+curl http://localhost:8080/api/v1/auth/me -H "Authorization: Bearer $TOKEN"
+```
+
+Notes on the design:
+
+- Passwords are hashed with **bcrypt at cost 12**. The hash is `json:"-"` on the
+  model *and* absent from the response DTO, so it cannot leak through either.
+- A failed login always answers `401 Invalid credentials`, whether the account
+  is unknown or the password is wrong. An unknown identifier still runs a bcrypt
+  hash, so response timing does not reveal which case it was.
+- Duplicate email or phone answers `409 User already exists` without saying
+  which field collided.
+- Tokens are HS256 and carry only `sub`, `iat`, `exp`. The signing algorithm is
+  pinned when parsing, so an `alg: none` or HS512 token is rejected.
+- The middleware verifies the token and does not hit the database;
+  `/auth/me` loads the account itself, so a token for a deleted user fails.
+- Phone numbers must be `+998` followed by nine digits. One canonical shape is
+  what makes the unique constraint meaningful.
+- SQL logging uses `ParameterizedQueries`, so bound values — password hashes
+  included — never reach the log.
 
 ## Data model
 

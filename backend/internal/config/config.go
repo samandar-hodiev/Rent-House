@@ -10,16 +10,28 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
+
+// defaultJWTExpiry is used when JWT_EXPIRES_IN is unset. The secret has no
+// default on purpose; an expiry does, because a wrong-but-safe lifetime is
+// better than refusing to start.
+const defaultJWTExpiry = 24 * time.Hour
 
 // Config holds every setting the server needs to start.
 type Config struct {
 	Port           string
 	AllowedOrigins []string
 	Database       Database
-	JWTSecret      string
+	JWT            JWT
+}
+
+// JWT holds the access-token settings.
+type JWT struct {
+	Secret    string
+	ExpiresIn time.Duration
 }
 
 // Database holds the PostgreSQL connection settings.
@@ -64,8 +76,14 @@ func Load() (*Config, error) {
 			Name:     os.Getenv("DB_NAME"),
 			SSLMode:  envOr("DB_SSLMODE", "disable"),
 		},
-		JWTSecret: os.Getenv("JWT_SECRET"),
+		JWT: JWT{Secret: os.Getenv("JWT_SECRET")},
 	}
+
+	expiry, err := parseDuration(os.Getenv("JWT_EXPIRES_IN"), defaultJWTExpiry)
+	if err != nil {
+		return nil, err
+	}
+	cfg.JWT.ExpiresIn = expiry
 
 	if err := cfg.validate(); err != nil {
 		return nil, err
@@ -80,7 +98,7 @@ func (c *Config) validate() error {
 	for name, value := range map[string]string{
 		"DB_USER":    c.Database.User,
 		"DB_NAME":    c.Database.Name,
-		"JWT_SECRET": c.JWTSecret,
+		"JWT_SECRET": c.JWT.Secret,
 	} {
 		if strings.TrimSpace(value) == "" {
 			missing = append(missing, name)
@@ -92,7 +110,23 @@ func (c *Config) validate() error {
 	if len(c.AllowedOrigins) == 0 {
 		return errors.New("ALLOWED_ORIGINS must list at least one origin")
 	}
+	if c.JWT.ExpiresIn <= 0 {
+		return errors.New("JWT_EXPIRES_IN must be a positive duration, for example 24h")
+	}
 	return nil
+}
+
+// parseDuration reads a Go duration string such as "24h" or "30m".
+func parseDuration(value string, fallback time.Duration) (time.Duration, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, fmt.Errorf("JWT_EXPIRES_IN %q is not a valid duration (try 24h): %w", value, err)
+	}
+	return parsed, nil
 }
 
 func envOr(key, fallback string) string {

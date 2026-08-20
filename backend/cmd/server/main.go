@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os/signal"
 	"syscall"
@@ -14,7 +15,12 @@ import (
 
 	"github.com/samandar-hodiev/Rent-House/backend/internal/config"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/database"
+	"github.com/samandar-hodiev/Rent-House/backend/internal/dto"
+	"github.com/samandar-hodiev/Rent-House/backend/internal/handler"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/middleware"
+	"github.com/samandar-hodiev/Rent-House/backend/internal/repository"
+	"github.com/samandar-hodiev/Rent-House/backend/internal/service"
+	"github.com/samandar-hodiev/Rent-House/backend/internal/token"
 	"github.com/samandar-hodiev/Rent-House/backend/pkg/logger"
 	"github.com/samandar-hodiev/Rent-House/backend/pkg/response"
 )
@@ -48,9 +54,24 @@ func run() error {
 		}
 	}()
 
+	// Custom binding rules must be registered before the first request binds.
+	if err := dto.RegisterValidators(); err != nil {
+		return fmt.Errorf("register validators: %w", err)
+	}
+
+	tokens, err := token.New(cfg.JWT.Secret, cfg.JWT.ExpiresIn)
+	if err != nil {
+		return err
+	}
+
+	router, err := newRouter(cfg, db, tokens)
+	if err != nil {
+		return err
+	}
+
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           newRouter(cfg, db),
+		Handler:           router,
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
 
@@ -79,9 +100,10 @@ func run() error {
 	}
 }
 
-// newRouter wires the middleware and the routes. `db` is threaded through for
-// the handlers that arrive in the feature phases; nothing reads it yet.
-func newRouter(cfg *config.Config, _ *gorm.DB) *gin.Engine {
+// newRouter wires dependencies, middleware and routes. Construction happens
+// once at startup — handlers hold the collaborators they need rather than
+// reaching for globals.
+func newRouter(cfg *config.Config, db *gorm.DB, tokens *token.Service) (*gin.Engine, error) {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery(), middleware.CORS(cfg.AllowedOrigins))
 
@@ -91,11 +113,25 @@ func newRouter(cfg *config.Config, _ *gorm.DB) *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	// Every feature endpoint will hang off this group. It is empty by design.
 	v1 := router.Group("/api/v1")
 	v1.GET("", func(c *gin.Context) {
 		response.OK(c, "RentHouse API v1", nil)
 	})
 
-	return router
+	// handler -> service -> repository -> database.
+	users := repository.NewUserRepository(db)
+	authService := service.NewAuthService(users, tokens)
+	authHandler := handler.NewAuthHandler(authService)
+
+	auth := v1.Group("/auth")
+	{
+		// Public: a caller with no account cannot be asked for a token.
+		auth.POST("/register", authHandler.Register)
+		auth.POST("/login", authHandler.Login)
+
+		// Protected.
+		auth.GET("/me", middleware.Auth(tokens), authHandler.Me)
+	}
+
+	return router, nil
 }

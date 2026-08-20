@@ -3,6 +3,8 @@ package database
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -17,7 +19,28 @@ const (
 	maxOpenConns    = 25
 	maxIdleConns    = 5
 	connMaxLifetime = time.Hour
+
+	slowQueryThreshold = 300 * time.Millisecond
 )
+
+// newGormLogger configures GORM's logging.
+//
+// ParameterizedQueries is the important setting: without it GORM writes bound
+// values into the log whenever a statement is slow or fails, which would put
+// password hashes — and later, personal data — into plain text log files. With
+// it, the statement is logged as `$1, $2` and the values stay out.
+func newGormLogger() gormlogger.Interface {
+	return gormlogger.New(
+		log.New(os.Stdout, "SQL   ", log.LstdFlags|log.Lmsgprefix),
+		gormlogger.Config{
+			SlowThreshold:             slowQueryThreshold,
+			LogLevel:                  gormlogger.Warn,
+			IgnoreRecordNotFoundError: true,
+			ParameterizedQueries:      true,
+			Colorful:                  false,
+		},
+	)
+}
 
 // Connect opens a PostgreSQL connection and verifies it with a ping.
 //
@@ -29,7 +52,7 @@ const (
 // management arrives with the first entity.
 func Connect(cfg config.Database) (*gorm.DB, error) {
 	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{
-		Logger: gormlogger.Default.LogMode(gormlogger.Warn),
+		Logger: newGormLogger(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("open postgres connection: %w", err)
