@@ -29,6 +29,7 @@ import ContactChatModal from '../components/ContactChatModal'
 import ApartmentCard from '../components/ApartmentCard'
 import { useLocale } from '../context/LocaleContext'
 import { useWishlist } from '../context/WishlistContext'
+import { useRequireAuth } from '../hooks/useRequireAuth'
 import { APARTMENTS } from '../data/apartments'
 import { getDistrictById, districtNameKey } from '../data/districts'
 import { ROUTES } from '../routes/paths'
@@ -74,8 +75,14 @@ function ApartmentDetailsPage() {
   const { t } = useLocale()
   const navigate = useNavigate()
   const { isSaved, toggleWishlist } = useWishlist()
+  const requireAuth = useRequireAuth()
   const [loading, setLoading] = useState(true)
   const [isChatOpen, setIsChatOpen] = useState(false)
+
+  // Both actions belong to an account. The page itself stays public — only
+  // saving and messaging require signing in, and both return here afterwards.
+  const handleSaveClick = requireAuth(() => toggleWishlist(apartment?.id))
+  const handleChatClick = requireAuth(() => setIsChatOpen(true))
   const [shareCopied, setShareCopied] = useState(false)
 
   useEffect(() => {
@@ -171,7 +178,7 @@ function ApartmentDetailsPage() {
             <div className="flex shrink-0 items-center gap-2">
               <button
                 type="button"
-                onClick={() => toggleWishlist(apartment.id)}
+                onClick={handleSaveClick}
                 aria-pressed={saved}
                 aria-label={
                   saved ? t('apartmentCard.wishlistRemove') : t('apartmentCard.wishlistAdd')
@@ -268,7 +275,7 @@ function ApartmentDetailsPage() {
               </a>
               <button
                 type="button"
-                onClick={() => setIsChatOpen(true)}
+                onClick={handleChatClick}
                 className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <MessageCircle aria-hidden="true" size={16} />
@@ -311,7 +318,7 @@ function ApartmentDetailsPage() {
         </a>
         <button
           type="button"
-          onClick={() => setIsChatOpen(true)}
+          onClick={handleChatClick}
           className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <MessageCircle aria-hidden="true" size={16} />

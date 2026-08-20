@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { MapPin, Map } from 'lucide-react'
 import { useLocale } from '../context/LocaleContext'
 import { useWishlist } from '../context/WishlistContext'
+import { useRequireAuth } from '../hooks/useRequireAuth'
 import { getDistrictById, districtNameKey } from '../data/districts'
 import { apartmentDetailsPath } from '../routes/paths'
 import { formatUzsAmount } from '../utils/formatPrice'
@@ -36,15 +37,27 @@ function ApartmentCard({ apartment, title: titleOverride, interactive = true }) 
   const { t } = useLocale()
   const navigate = useNavigate()
   const { isSaved, toggleWishlist } = useWishlist()
+  const requireAuth = useRequireAuth()
   const isWishlisted = isSaved(apartment.id)
 
   const district = getDistrictById(apartment.districtId)
   const title = titleOverride ?? t(`apartmentTitle.${apartment.id}`)
 
-  const handleWishlistClick = (event) => {
+  // Saving a listing belongs to an account, so a signed-out visitor is sent to
+  // sign in first and returned here afterwards. The button stays visible either
+  // way — hiding it would leave no way to discover the feature.
+  const handleWishlistClick = requireAuth((event) => {
     event.stopPropagation()
     event.preventDefault()
     toggleWishlist(apartment.id)
+  })
+
+  // The guard runs after the default is prevented, so a signed-out click never
+  // also follows the card's link.
+  const onWishlistClick = (event) => {
+    event.stopPropagation()
+    event.preventDefault()
+    handleWishlistClick(event)
   }
 
   const handleMapClick = (event) => {
@@ -75,7 +88,7 @@ function ApartmentCard({ apartment, title: titleOverride, interactive = true }) 
         {interactive ? (
         <button
           type="button"
-          onClick={handleWishlistClick}
+          onClick={onWishlistClick}
           aria-pressed={isWishlisted}
           aria-label={
             isWishlisted ? t('apartmentCard.wishlistRemove') : t('apartmentCard.wishlistAdd')

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft, AtSign, Lock, Phone, User } from 'lucide-react'
 import AuthLayout from '../components/auth/AuthLayout'
 import AuthAlert from '../components/auth/AuthAlert'
@@ -17,6 +17,7 @@ import {
   requestRegistrationCode,
   verifyRegistrationCode,
 } from '../services/authApi'
+import { readRedirect, withRedirect } from '../utils/redirectTarget'
 import { ROUTES } from '../routes/paths'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -51,6 +52,10 @@ function RegisterPage() {
   const { t, locale } = useLocale()
   const navigate = useNavigate()
   const { signIn } = useAuth()
+  // A protected action can send someone here via the login page, so the
+  // destination has to survive the whole registration flow too.
+  const search = useLocation().search
+  const destination = readRedirect(search) ?? ROUTES.dashboard
 
   const [step, setStep] = useState(STEP.contact)
   const [method, setMethod] = useState('phone')
@@ -235,7 +240,7 @@ function RegisterPage() {
       // The backend signs the user in as part of registration, so there is no
       // second trip through the login form.
       signIn(data.access_token, data.user)
-      navigate(ROUTES.dashboard, { replace: true })
+      navigate(destination, { replace: true })
     } catch (error) {
       setFormError(messageFor(error))
       if (error instanceof ApiError && error.code === 'invalid_registration_token') {
@@ -406,7 +411,7 @@ function RegisterPage() {
       footer={
         <AuthFooterLink
           prompt={t('auth.hasAccount')}
-          to={ROUTES.login}
+          to={withRedirect(ROUTES.login, destination)}
           label={t('auth.loginTitle')}
         />
       }

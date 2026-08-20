@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AtSign, Lock } from 'lucide-react'
 import AuthLayout from '../components/auth/AuthLayout'
 import AuthAlert from '../components/auth/AuthAlert'
@@ -10,12 +10,16 @@ import { useLocale } from '../context/LocaleContext'
 import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../services/apiClient'
 import { login } from '../services/authApi'
+import { readRedirect, withRedirect } from '../utils/redirectTarget'
 import { ROUTES } from '../routes/paths'
 
 function LoginPage() {
   const { t } = useLocale()
   const { signIn } = useAuth()
   const navigate = useNavigate()
+  // Where the user was headed before being asked to sign in. Falls back to the
+  // dashboard for a plain visit to /login.
+  const destination = readRedirect(useLocation().search) ?? ROUTES.dashboard
   const [values, setValues] = useState({ identifier: '', password: '' })
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState(null)
@@ -44,7 +48,7 @@ function LoginPage() {
         password: values.password,
       })
       signIn(data.access_token, data.user)
-      navigate(ROUTES.dashboard, { replace: true })
+      navigate(destination, { replace: true })
     } catch (error) {
       // The backend answers the same way for an unknown account and a wrong
       // password, and so does this form.
@@ -67,7 +71,7 @@ function LoginPage() {
       footer={
         <AuthFooterLink
           prompt={t('auth.noAccount')}
-          to={ROUTES.register}
+          to={withRedirect(ROUTES.register, destination)}
           label={t('auth.registerTitle')}
         />
       }

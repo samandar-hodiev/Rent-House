@@ -43,10 +43,21 @@ function App() {
                         <Route path={ROUTES.search} element={<SearchPage />} />
                         <Route path={ROUTES.apartmentDetails} element={<ApartmentDetailsPage />} />
                         <Route path={ROUTES.map} element={<MapPage />} />
-                        <Route path={ROUTES.wishlist} element={<WishlistPage />} />
-                        <Route path={ROUTES.profile} element={<ProfilePage />} />
-                        <Route path={ROUTES.owner} element={<OwnerDashboardPage />} />
-                        <Route path={ROUTES.admin} element={<AdminPage />} />
+                        {/* These pages inside the public shell are personal:
+                            saved apartments, the profile, and the owner and
+                            admin surfaces. They keep the header and footer,
+                            unlike the dedicated account area below.
+
+                            The guard here is authentication only. Role
+                            enforcement for the owner and admin areas belongs
+                            server-side and lands with those endpoints; this
+                            check is UX, not a security boundary. */}
+                        <Route element={<RequireAuth />}>
+                          <Route path={ROUTES.wishlist} element={<WishlistPage />} />
+                          <Route path={ROUTES.profile} element={<ProfilePage />} />
+                          <Route path={ROUTES.owner} element={<OwnerDashboardPage />} />
+                          <Route path={ROUTES.admin} element={<AdminPage />} />
+                        </Route>
                         <Route path="*" element={<NotFoundPage />} />
                       </Route>
 
