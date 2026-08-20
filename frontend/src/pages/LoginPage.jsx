@@ -40,7 +40,7 @@ function LoginPage() {
         password: values.password,
       })
       signIn(data.access_token, data.user)
-      navigate(ROUTES.home, { replace: true })
+      navigate(ROUTES.dashboard, { replace: true })
     } catch (error) {
       // The backend answers the same way for an unknown account and a wrong
       // password, and so does this form.

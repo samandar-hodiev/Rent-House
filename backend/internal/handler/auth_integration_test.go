@@ -362,7 +362,7 @@ func TestRequestCodeEnforcesTheResendCooldown(t *testing.T) {
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("got status %d, want 429: %s", rec.Code, rec.Body.String())
 	}
-	if body := decode(t, rec); body.Error != "resend_too_soon" {
+	if body := decode(t, rec); body.Error != "otp_cooldown" {
 		t.Fatalf("got error code %q, want resend_too_soon", body.Error)
 	}
 }
@@ -457,7 +457,7 @@ func TestVerifyRejectsTheWrongCode(t *testing.T) {
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("got status %d, want 422: %s", rec.Code, rec.Body.String())
 	}
-	if body := decode(t, rec); body.Error != "invalid_code" {
+	if body := decode(t, rec); body.Error != "invalid_otp" {
 		t.Fatalf("got error code %q, want invalid_code", body.Error)
 	}
 }
@@ -525,7 +525,7 @@ func TestVerifyRejectsAnExpiredCode(t *testing.T) {
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("got status %d, want 422: %s", rec.Code, rec.Body.String())
 	}
-	if body := decode(t, rec); body.Error != "code_expired" {
+	if body := decode(t, rec); body.Error != "otp_expired" {
 		t.Fatalf("got error code %q, want code_expired", body.Error)
 	}
 }

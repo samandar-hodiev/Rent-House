@@ -92,13 +92,13 @@ function RegisterPage() {
           return t('auth.errorDeliveryFailed')
         case 'contact_taken':
           return t('auth.errorContactTaken')
-        case 'resend_too_soon':
+        case 'otp_cooldown':
           return t('auth.errorResendTooSoon')
-        case 'invalid_code':
+        case 'invalid_otp':
           return t('auth.errorInvalidCode')
-        case 'code_expired':
+        case 'otp_expired':
           return t('auth.errorCodeExpired')
-        case 'too_many_attempts':
+        case 'otp_attempts_exceeded':
           return t('auth.errorTooManyAttempts')
         case 'verification_not_found':
           return t('auth.errorVerificationLost')
@@ -177,7 +177,7 @@ function RegisterPage() {
       // a dead form.
       if (
         error instanceof ApiError &&
-        ['verification_not_found', 'too_many_attempts', 'code_expired'].includes(error.code)
+        ['verification_not_found', 'otp_attempts_exceeded', 'otp_expired'].includes(error.code)
       ) {
         setStep(STEP.contact)
         setVerificationId(null)
@@ -223,7 +223,7 @@ function RegisterPage() {
       // The backend signs the user in as part of registration, so there is no
       // second trip through the login form.
       signIn(data.access_token, data.user)
-      navigate(ROUTES.home, { replace: true })
+      navigate(ROUTES.dashboard, { replace: true })
     } catch (error) {
       setFormError(messageFor(error))
       if (error instanceof ApiError && error.code === 'invalid_registration_token') {

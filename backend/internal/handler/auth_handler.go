@@ -43,7 +43,7 @@ func (h *AuthHandler) RequestRegistrationCode(c *gin.Context) {
 			response.Error(c, http.StatusConflict, "contact_taken",
 				"This phone or email is already registered")
 		case errors.Is(err, service.ErrResendTooSoon):
-			response.Error(c, http.StatusTooManyRequests, "resend_too_soon",
+			response.Error(c, http.StatusTooManyRequests, "otp_cooldown",
 				"Please wait before requesting another code")
 		case errors.Is(err, service.ErrDeliveryFailed):
 			// A distinct code: the request reached the server and was
@@ -77,13 +77,13 @@ func (h *AuthHandler) VerifyRegistrationCode(c *gin.Context) {
 			response.Error(c, http.StatusNotFound, "verification_not_found",
 				"This verification is no longer available")
 		case errors.Is(err, service.ErrVerificationExpired):
-			response.Error(c, http.StatusUnprocessableEntity, "code_expired",
+			response.Error(c, http.StatusUnprocessableEntity, "otp_expired",
 				"The verification code has expired")
 		case errors.Is(err, service.ErrTooManyAttempts):
-			response.Error(c, http.StatusTooManyRequests, "too_many_attempts",
+			response.Error(c, http.StatusTooManyRequests, "otp_attempts_exceeded",
 				"Too many incorrect attempts. Request a new code")
 		case errors.Is(err, service.ErrInvalidCode):
-			response.Error(c, http.StatusUnprocessableEntity, "invalid_code",
+			response.Error(c, http.StatusUnprocessableEntity, "invalid_otp",
 				"The verification code is incorrect")
 		default:
 			logger.Errorf("verify registration code: %v", err)
