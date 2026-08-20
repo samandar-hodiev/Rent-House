@@ -31,8 +31,12 @@ function ProfileOverview() {
             <UserAvatar name={name} size="lg" />
             <div className="min-w-0">
               <h1 className="truncate text-xl font-semibold text-text-primary">{name}</h1>
-              <p className="mt-1 truncate text-sm text-text-secondary">{email}</p>
-              <p className="truncate text-sm text-text-secondary">{phone}</p>
+              {/* A user registers with a phone or an email, so one of these
+                  is normally absent. */}
+              {email ? (
+                <p className="mt-1 truncate text-sm text-text-secondary">{email}</p>
+              ) : null}
+              {phone ? <p className="truncate text-sm text-text-secondary">{phone}</p> : null}
             </div>
           </div>
 

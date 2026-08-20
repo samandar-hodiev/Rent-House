@@ -1,49 +1,135 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { ApiError, NETWORK_ERROR } from '../services/apiClient'
+import { fetchCurrentUser } from '../services/authApi'
 import { CURRENT_USER } from '../data/currentUser'
 
-// UI-only session flag. There is still no authentication, no API and no token —
-// this exists purely so the public header can render its signed-in variant and
-// so the dashboard's "Chiqish" has something to clear. Replace with the real
-// session once auth is built.
-const STORAGE_KEY = 'renthouse_session'
+// The access token is the whole session. It lives in localStorage so a reload
+// keeps the user signed in; nothing else about the account is persisted, and
+// the token is re-validated against the API on every page load.
+const TOKEN_KEY = 'renthouse_token'
+
+// Session states. `loading` matters: on first paint the app does not yet know
+// whether the stored token is still good, and rendering a signed-out header for
+// a moment would make every reload flicker.
+export const AUTH_STATUS = {
+  loading: 'loading',
+  authenticated: 'authenticated',
+  unauthenticated: 'unauthenticated',
+}
 
 const AuthContext = createContext(null)
 
-function readStoredSession() {
-  if (typeof window === 'undefined') return false
+function readStoredToken() {
+  if (typeof window === 'undefined') return null
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === 'active'
+    return window.localStorage.getItem(TOKEN_KEY)
   } catch {
-    return false
+    return null
+  }
+}
+
+function persistToken(token) {
+  try {
+    if (token) window.localStorage.setItem(TOKEN_KEY, token)
+    else window.localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    // Private-browsing mode can refuse writes; the session then lasts as long
+    // as the tab, which is a degraded experience rather than a broken one.
+  }
+}
+
+/**
+ * Maps the API's user onto the shape the UI already uses.
+ *
+ * The backend speaks snake_case and leaves whichever contact was not verified
+ * as null; the components expect camelCase and a display name. Doing the
+ * translation here means the API contract can change without touching them.
+ *
+ * `stats` has no endpoint yet, so the placeholder counts are kept — they are
+ * the same numbers the dashboard showed before the API existed, and they are
+ * clearly marked here as the one thing still mocked.
+ */
+export function toUiUser(apiUser) {
+  const firstName = apiUser.first_name ?? ''
+  const lastName = apiUser.last_name ?? ''
+
+  return {
+    id: apiUser.id,
+    firstName,
+    lastName,
+    name: [firstName, lastName].filter(Boolean).join(' '),
+    email: apiUser.email ?? '',
+    phone: apiUser.phone ?? '',
+    avatarUrl: apiUser.avatar_url ?? null,
+    language: apiUser.language ?? 'uz',
+    theme: apiUser.theme ?? 'light',
+    stats: CURRENT_USER.stats,
   }
 }
 
 export function AuthProvider({ children }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(readStoredSession)
-  const [user, setUser] = useState(CURRENT_USER)
+  const [token, setToken] = useState(readStoredToken)
+  const [user, setUser] = useState(null)
+  const [status, setStatus] = useState(() =>
+    readStoredToken() ? AUTH_STATUS.loading : AUTH_STATUS.unauthenticated,
+  )
 
-  const persist = (active) => {
-    try {
-      if (active) window.localStorage.setItem(STORAGE_KEY, 'active')
-      else window.localStorage.removeItem(STORAGE_KEY)
-    } catch {
-      // Persistence is a convenience only.
-    }
-  }
-
-  const signIn = useCallback(() => {
-    setIsAuthenticated(true)
-    persist(true)
+  const signIn = useCallback((accessToken, apiUser) => {
+    persistToken(accessToken)
+    setToken(accessToken)
+    setUser(toUiUser(apiUser))
+    setStatus(AUTH_STATUS.authenticated)
   }, [])
 
   const signOut = useCallback(() => {
-    setIsAuthenticated(false)
-    persist(false)
+    persistToken(null)
+    setToken(null)
+    setUser(null)
+    setStatus(AUTH_STATUS.unauthenticated)
   }, [])
 
-  // Local-only profile edits, so the edit form can show its own changes.
+  // Restore the session on load: a stored token proves nothing on its own — it
+  // may have expired or belong to a deleted account — so it is exchanged for
+  // the current user before the app treats it as a session.
+  useEffect(() => {
+    if (!token) return undefined
+
+    const controller = new AbortController()
+    let cancelled = false
+
+    fetchCurrentUser(token)
+      .then((apiUser) => {
+        if (cancelled) return
+        setUser(toUiUser(apiUser))
+        setStatus(AUTH_STATUS.authenticated)
+      })
+      .catch((error) => {
+        if (cancelled || error?.name === 'AbortError') return
+
+        // A server that cannot be reached is not proof of a bad token, so the
+        // stored one is kept and the user is simply treated as signed out for
+        // now. A rejected token is cleared, because it will never work again.
+        if (error instanceof ApiError && error.code === NETWORK_ERROR) {
+          setStatus(AUTH_STATUS.unauthenticated)
+          return
+        }
+        persistToken(null)
+        setToken(null)
+        setUser(null)
+        setStatus(AUTH_STATUS.unauthenticated)
+      })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [token])
+
+  // Local-only profile edits, so the edit form can show its own changes until a
+  // profile-update endpoint exists.
   const updateUser = useCallback((patch) => {
     setUser((current) => {
+      if (!current) return current
       const next = { ...current, ...patch }
       next.name = [next.firstName, next.lastName].filter(Boolean).join(' ') || next.name
       return next
@@ -51,11 +137,35 @@ export function AuthProvider({ children }) {
   }, [])
 
   const value = useMemo(
-    () => ({ isAuthenticated, user, signIn, signOut, updateUser }),
-    [isAuthenticated, user, signIn, signOut, updateUser],
+    () => ({
+      status,
+      isLoading: status === AUTH_STATUS.loading,
+      isAuthenticated: status === AUTH_STATUS.authenticated,
+      token,
+      // Components read `user.name` and friends unconditionally; an empty
+      // profile keeps them from having to null-check on every render.
+      user: user ?? EMPTY_USER,
+      signIn,
+      signOut,
+      updateUser,
+    }),
+    [status, token, user, signIn, signOut, updateUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+const EMPTY_USER = {
+  id: null,
+  firstName: '',
+  lastName: '',
+  name: '',
+  email: '',
+  phone: '',
+  avatarUrl: null,
+  language: 'uz',
+  theme: 'light',
+  stats: CURRENT_USER.stats,
 }
 
 export function useAuth() {
