@@ -38,6 +38,23 @@ type Config struct {
 	Database       Database
 	JWT            JWT
 	OTP            OTP
+	Notify         Notify
+}
+
+// Notify selects how verification codes are delivered.
+type Notify struct {
+	EmailProvider string
+	SMSProvider   string
+
+	ResendAPIKey  string
+	ResendFrom    string
+	ResendSubject string
+	ResendBody    string
+
+	EskizEmail    string
+	EskizPassword string
+	EskizFrom     string
+	EskizMessage  string
 }
 
 // OTP holds the one-time-code policy.
@@ -131,6 +148,24 @@ func Load() (*Config, error) {
 		RegistrationTokenExpiry: tokenExpiry,
 	}
 
+	cfg.Notify = Notify{
+		EmailProvider: strings.ToLower(envOr("EMAIL_PROVIDER", "dev")),
+		SMSProvider:   strings.ToLower(envOr("SMS_PROVIDER", "dev")),
+
+		ResendAPIKey:  os.Getenv("RESEND_API_KEY"),
+		ResendFrom:    os.Getenv("RESEND_FROM"),
+		ResendSubject: envOr("RESEND_SUBJECT", "RentHouse tasdiqlash kodi"),
+		// {code} is substituted at send time.
+		ResendBody: envOr("RESEND_BODY",
+			"RentHouse tasdiqlash kodingiz: {code}\n\nKod 5 daqiqa amal qiladi."),
+
+		EskizEmail:    os.Getenv("ESKIZ_EMAIL"),
+		EskizPassword: os.Getenv("ESKIZ_PASSWORD"),
+		EskizFrom:     envOr("ESKIZ_FROM", "4546"),
+		// Must match the template approved by Eskiz moderation.
+		EskizMessage: envOr("ESKIZ_MESSAGE", "RentHouse tasdiqlash kodi: {code}"),
+	}
+
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
@@ -170,6 +205,46 @@ func (c *Config) validate() error {
 	}
 	if c.OTP.RegistrationTokenExpiry <= 0 {
 		return errors.New("REGISTRATION_TOKEN_EXPIRATION must be a positive duration, for example 15m")
+	}
+	return c.validateNotify()
+}
+
+// validateNotify checks that a selected real provider has its credentials.
+//
+// Missing credentials are a startup failure rather than a fallback to the
+// development sender: a server that believes it is sending codes while only
+// writing them to its own log would leave every registration stuck.
+func (c *Config) validateNotify() error {
+	var missing []string
+
+	switch c.Notify.EmailProvider {
+	case "", "dev":
+	case "resend":
+		if strings.TrimSpace(c.Notify.ResendAPIKey) == "" {
+			missing = append(missing, "RESEND_API_KEY")
+		}
+		if strings.TrimSpace(c.Notify.ResendFrom) == "" {
+			missing = append(missing, "RESEND_FROM")
+		}
+	default:
+		return fmt.Errorf("EMAIL_PROVIDER %q is not supported (expected dev or resend)", c.Notify.EmailProvider)
+	}
+
+	switch c.Notify.SMSProvider {
+	case "", "dev":
+	case "eskiz":
+		if strings.TrimSpace(c.Notify.EskizEmail) == "" {
+			missing = append(missing, "ESKIZ_EMAIL")
+		}
+		if strings.TrimSpace(c.Notify.EskizPassword) == "" {
+			missing = append(missing, "ESKIZ_PASSWORD")
+		}
+	default:
+		return fmt.Errorf("SMS_PROVIDER %q is not supported (expected dev or eskiz)", c.Notify.SMSProvider)
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required environment variables: %s", strings.Join(sorted(missing), ", "))
 	}
 	return nil
 }

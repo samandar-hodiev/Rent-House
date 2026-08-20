@@ -234,21 +234,90 @@ curl -X POST http://localhost:8080/api/v1/auth/register/complete \
 A user registers with **one** contact. Registering by phone leaves `email` null
 and vice versa; the database requires at least one of the two.
 
-### Development: where the code goes
+### Delivering the code
 
-There is no SMS or email account wired up. `internal/notify` defines the
-`Sender` interface, and `main.go` currently injects `DevelopmentSMSSender` and
-`DevelopmentEmailSender`, which write the code to the server log:
+`internal/notify` defines a one-method `Sender` interface. Which implementation
+runs is decided by two environment variables, and the server says which on
+startup:
+
+```
+INFO  EMAIL delivery is DISABLED: codes are written to this log, not sent.
+INFO  SMS delivery via eskiz
+```
+
+| Variable | Values | Default |
+|---|---|---|
+| `EMAIL_PROVIDER` | `dev`, `resend` | `dev` |
+| `SMS_PROVIDER` | `dev`, `eskiz` | `dev` |
+
+**`dev` sends nothing.** It writes the code to the server log with the
+destination masked, which is what makes the flow usable without a provider
+account:
 
 ```
 INFO  [dev sms] verification code for ***4567: 483921
 INFO  [dev email] verification code for s***@example.com: 021525
 ```
 
-The destination is masked even here. A production provider implements the same
-one-method interface, so swapping it in is a change in `main.go` and nowhere
-else. **These senders must never run in production** — the code would land in
-log aggregation.
+Never run `dev` in production — the codes would land in log aggregation.
+
+Selecting a real provider **without its credentials is a startup failure**, not
+a fallback to `dev`. A server that believes it is sending codes while only
+logging them leaves every registration stuck with no visible cause.
+
+#### Email — Resend
+
+1. Create an account at <https://resend.com>.
+2. **Verify a sending domain** under Domains. Until you do, Resend only accepts
+   `onboarding@resend.dev` as the sender and only delivers to the address that
+   owns the account — enough to test, not enough to register real users.
+3. Create an API key under API Keys.
+4. Set:
+
+```bash
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=re_...
+RESEND_FROM="RentHouse <no-reply@yourdomain.uz>"
+```
+
+#### SMS — Eskiz.uz
+
+Uzbek operators route transactional SMS through local agreements, so an
+international gateway is not a shortcut: traffic to +998 without a registered
+sender ID is unreliable. Eskiz is the established local option.
+
+What you must arrange before this can work — none of it can be done from code:
+
+1. **An account and contract at <https://eskiz.uz>.** Transactional SMS in
+   Uzbekistan requires a contract with a legal entity (yuridik shaxs).
+2. **A registered sender ID.** `4546` is Eskiz's shared test sender, usable for
+   trying the integration. A production sender name must be registered with the
+   operators through Eskiz.
+3. **An approved message template.** Eskiz moderates message text. Submit the
+   exact wording, including the `{code}` placeholder position, and wait for
+   approval — **unapproved text is rejected at send time**, which surfaces here
+   as a failed registration, not a silent drop.
+4. Set:
+
+```bash
+SMS_PROVIDER=eskiz
+ESKIZ_EMAIL=...        # the account you sign in to my.eskiz.uz with
+ESKIZ_PASSWORD=...
+ESKIZ_FROM=4546
+ESKIZ_MESSAGE="RentHouse tasdiqlash kodi: {code}"   # must match the approved template
+```
+
+Eskiz issues a bearer token from an email/password login rather than a static
+API key. The sender fetches one on first use, caches it, and re-authenticates
+once if the API rejects it, so an expired token does not surface as a failed
+registration.
+
+#### If a provider fails
+
+A rejected send propagates: `POST /auth/register/request` answers `500
+internal_error`, the provider's reason goes to the server log, and **no
+verification row is left claiming a code was delivered**. The user is never told
+a code was sent when it was not.
 
 ### Login flow
 

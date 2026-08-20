@@ -65,7 +65,12 @@ func run() error {
 		return err
 	}
 
-	router, err := newRouter(cfg, db, tokens)
+	senders, err := buildSenders(cfg)
+	if err != nil {
+		return err
+	}
+
+	router, err := newRouter(cfg, db, tokens, senders)
 	if err != nil {
 		return err
 	}
@@ -101,10 +106,63 @@ func run() error {
 	}
 }
 
+// senders groups the two delivery channels.
+type senders struct {
+	sms   notify.Sender
+	email notify.Sender
+}
+
+// buildSenders resolves the configured providers and says plainly, once, which
+// channel is real and which only logs. A deployment that thinks it is sending
+// SMS while writing to a log file is the failure mode worth being loud about.
+func buildSenders(cfg *config.Config) (senders, error) {
+	settings := notify.Settings{
+		EmailProvider: cfg.Notify.EmailProvider,
+		SMSProvider:   cfg.Notify.SMSProvider,
+		Resend: notify.ResendConfig{
+			APIKey:     cfg.Notify.ResendAPIKey,
+			From:       cfg.Notify.ResendFrom,
+			Subject:    cfg.Notify.ResendSubject,
+			BodyFormat: cfg.Notify.ResendBody,
+		},
+		Eskiz: notify.EskizConfig{
+			Email:         cfg.Notify.EskizEmail,
+			Password:      cfg.Notify.EskizPassword,
+			From:          cfg.Notify.EskizFrom,
+			MessageFormat: cfg.Notify.EskizMessage,
+		},
+	}
+
+	emailSender, err := notify.BuildEmailSender(settings)
+	if err != nil {
+		return senders{}, fmt.Errorf("email provider: %w", err)
+	}
+	smsSender, err := notify.BuildSMSSender(settings)
+	if err != nil {
+		return senders{}, fmt.Errorf("sms provider: %w", err)
+	}
+
+	describe := func(channel, provider string) {
+		if notify.IsDevelopment(provider) {
+			logger.Infof(
+				"%s delivery is DISABLED: codes are written to this log, not sent. "+
+					"Set %s_PROVIDER to a real provider before production.", channel, channel)
+			return
+		}
+		logger.Infof("%s delivery via %s", channel, provider)
+	}
+	describe("EMAIL", cfg.Notify.EmailProvider)
+	describe("SMS", cfg.Notify.SMSProvider)
+
+	return senders{sms: smsSender, email: emailSender}, nil
+}
+
 // newRouter wires dependencies, middleware and routes. Construction happens
 // once at startup — handlers hold the collaborators they need rather than
 // reaching for globals.
-func newRouter(cfg *config.Config, db *gorm.DB, tokens *token.Service) (*gin.Engine, error) {
+func newRouter(
+	cfg *config.Config, db *gorm.DB, tokens *token.Service, delivery senders,
+) (*gin.Engine, error) {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery(), middleware.CORS(cfg.AllowedOrigins))
 
@@ -123,12 +181,11 @@ func newRouter(cfg *config.Config, db *gorm.DB, tokens *token.Service) (*gin.Eng
 	users := repository.NewUserRepository(db)
 	verifications := repository.NewVerificationRepository(db)
 
-	// The development senders write the code to the log instead of delivering
-	// it. Production providers implement the same interface, so swapping them
-	// in is a change here and nowhere else.
+	// Which providers these are is decided by configuration in buildSenders;
+	// the service only knows the interface.
 	authService := service.NewAuthService(
 		users, verifications, tokens,
-		notify.DevelopmentSMSSender{}, notify.DevelopmentEmailSender{},
+		delivery.sms, delivery.email,
 		cfg.OTP,
 	)
 	authHandler := handler.NewAuthHandler(authService)
