@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import AuthCard from '../components/AuthCard'
+import AuthLayout from '../components/auth/AuthLayout'
+import AuthAlert from '../components/auth/AuthAlert'
+import AuthButton from '../components/auth/AuthButton'
+import AuthProgress from '../components/auth/AuthProgress'
 import FormField from '../components/FormField'
 import MethodChoice from '../components/auth/MethodChoice'
 import OtpInput from '../components/auth/OtpInput'
@@ -246,20 +249,15 @@ function RegisterPage() {
     setErrors((current) => ({ ...current, [field]: undefined }))
   }
 
-  const primaryButtonClass =
-    'w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:bg-border disabled:text-text-muted'
-
-  const alert = formError ? (
-    <p role="alert" className="rounded-md border border-error/40 bg-error/10 px-3 py-2 text-sm text-error">
-      {formError}
-    </p>
-  ) : null
+  const alert = formError ? <AuthAlert variant="error">{formError}</AuthAlert> : null
 
   // ---- rendering ----
 
   if (step === STEP.code) {
     return (
-      <AuthCard
+      <AuthLayout
+        width="narrow"
+        progress={<AuthProgress current={2} />}
         title={method === 'phone' ? t('auth.verifyPhoneTitle') : t('auth.verifyEmailTitle')}
         subtitle={
           delivery === 'logged'
@@ -269,77 +267,92 @@ function RegisterPage() {
               : t('auth.codeSentEmail', { contact: contactForDisplay })
         }
       >
-        <form onSubmit={submitCode} noValidate className="mt-6 flex flex-col gap-4">
+        <form onSubmit={submitCode} noValidate className="flex flex-col gap-5">
           {alert}
 
           {delivery === 'logged' ? (
-            <p
-              role="status"
-              className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning"
-            >
-              {t('auth.devDeliveryNotice')}
-            </p>
+            <AuthAlert variant="info">{t('auth.devDeliveryNotice')}</AuthAlert>
           ) : null}
 
           <OtpInput value={code} onChange={setCode} error={errors.code} disabled={isSubmitting} />
 
-          <button type="submit" disabled={isSubmitting} className={primaryButtonClass}>
-            {isSubmitting ? t('auth.verifying') : t('auth.verifyAction')}
-          </button>
+          <AuthButton loading={isSubmitting} loadingLabel={t('auth.verifying')}>
+            {t('auth.verifyAction')}
+          </AuthButton>
 
-          <div className="text-center text-sm">
-            {resendIn > 0 ? (
-              <span className="text-text-muted">{t('auth.resendIn', { seconds: resendIn })}</span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => sendCode({ isResend: true })}
-                disabled={isSubmitting}
-                className="font-medium text-primary hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:text-text-muted"
-              >
-                {t('auth.resendCode')}
-              </button>
-            )}
+          <div className="flex flex-col items-center gap-3 border-t border-border pt-4">
+            <div className="text-[0.8125rem]">
+              {resendIn > 0 ? (
+                <span className="text-text-muted tabular-nums">
+                  {t('auth.resendIn', { seconds: resendIn })}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => sendCode({ isResend: true })}
+                  disabled={isSubmitting}
+                  className="font-medium text-primary transition-colors hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:text-text-muted"
+                >
+                  {t('auth.resendCode')}
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setStep(STEP.contact)
+                setCode('')
+                setFormError(null)
+              }}
+              className="flex items-center gap-1.5 text-[0.8125rem] text-text-muted transition-colors hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <ArrowLeft aria-hidden="true" size={13} />
+              {t('auth.changeContact')}
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setStep(STEP.contact)
-              setCode('')
-              setFormError(null)
-            }}
-            className="flex items-center justify-center gap-1.5 text-sm text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            <ArrowLeft aria-hidden="true" size={14} />
-            {t('auth.changeContact')}
-          </button>
         </form>
-      </AuthCard>
+      </AuthLayout>
     )
   }
 
   if (step === STEP.profile) {
     return (
-      <AuthCard title={t('auth.createAccountTitle')} subtitle={t('auth.createAccountSubtitle')}>
-        <form onSubmit={submitProfile} noValidate className="mt-6 flex flex-col gap-4">
+      <AuthLayout
+        width="wide"
+        progress={<AuthProgress current={3} />}
+        title={t('auth.createAccountTitle')}
+        subtitle={t('auth.createAccountSubtitle')}
+      >
+        <form onSubmit={submitProfile} noValidate className="flex flex-col gap-4">
+          {/* The verified contact is confirmed here so the user can see the step
+              actually succeeded before being asked for more details. */}
+          <AuthAlert variant="success">
+            {method === 'phone'
+              ? t('auth.phoneVerified', { contact: contactForDisplay })
+              : t('auth.emailVerified', { contact: contactForDisplay })}
+          </AuthAlert>
+
           {alert}
 
-          <FormField
-            label={t('dashboard.firstName')}
-            value={profile.firstName}
-            onChange={setProfileField('firstName')}
-            error={errors.firstName}
-            placeholder={t('auth.namePlaceholder')}
-            autoComplete="given-name"
-          />
-          <FormField
-            label={t('dashboard.lastName')}
-            value={profile.lastName}
-            onChange={setProfileField('lastName')}
-            error={errors.lastName}
-            autoComplete="family-name"
-          />
+          {/* Two short fields side by side on anything wider than a phone. */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField
+              label={t('dashboard.firstName')}
+              value={profile.firstName}
+              onChange={setProfileField('firstName')}
+              error={errors.firstName}
+              placeholder={t('auth.namePlaceholder')}
+              autoComplete="given-name"
+            />
+            <FormField
+              label={t('dashboard.lastName')}
+              value={profile.lastName}
+              onChange={setProfileField('lastName')}
+              error={errors.lastName}
+              autoComplete="family-name"
+            />
+          </div>
           <FormField
             label={t('auth.password')}
             type="password"
@@ -357,16 +370,17 @@ function RegisterPage() {
             autoComplete="new-password"
           />
 
-          <button type="submit" disabled={isSubmitting} className={primaryButtonClass}>
-            {isSubmitting ? t('auth.creatingAccount') : t('auth.createAccountAction')}
-          </button>
+          <AuthButton loading={isSubmitting} loadingLabel={t('auth.creatingAccount')}>
+            {t('auth.createAccountAction')}
+          </AuthButton>
         </form>
-      </AuthCard>
+      </AuthLayout>
     )
   }
 
   return (
-    <AuthCard
+    <AuthLayout
+      progress={<AuthProgress current={1} />}
       title={t('auth.registerTitle')}
       subtitle={t('auth.registerVerifySubtitle')}
       footer={
@@ -374,7 +388,7 @@ function RegisterPage() {
           {t('auth.hasAccount')}{' '}
           <Link
             to={ROUTES.login}
-            className="font-medium text-primary hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="font-medium text-primary transition-colors hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             {t('auth.loginTitle')}
           </Link>
@@ -387,7 +401,7 @@ function RegisterPage() {
           sendCode()
         }}
         noValidate
-        className="mt-6 flex flex-col gap-4"
+        className="flex flex-col gap-4"
       >
         {alert}
 
@@ -415,15 +429,11 @@ function RegisterPage() {
           inputMode={method === 'phone' ? 'tel' : 'email'}
         />
 
-        <button type="submit" disabled={isSubmitting} className={primaryButtonClass}>
-          {isSubmitting
-            ? t('auth.sending')
-            : method === 'phone'
-              ? t('auth.sendSmsCode')
-              : t('auth.sendCode')}
-        </button>
+        <AuthButton loading={isSubmitting} loadingLabel={t('auth.sending')}>
+          {method === 'phone' ? t('auth.sendSmsCode') : t('auth.sendCode')}
+        </AuthButton>
       </form>
-    </AuthCard>
+    </AuthLayout>
   )
 }
 

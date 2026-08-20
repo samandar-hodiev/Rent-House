@@ -11,7 +11,13 @@ function MethodChoice({ value, onChange }) {
   ]
 
   return (
-    <div role="radiogroup" aria-label={t('auth.methodLabel')} className="grid grid-cols-2 gap-2">
+    // A segmented control rather than two loose buttons: the pair reads as one
+    // switch, which is what it is.
+    <div
+      role="radiogroup"
+      aria-label={t('auth.methodLabel')}
+      className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-surface-secondary/60 p-1"
+    >
       {options.map((option) => {
         const isActive = option.id === value
         return (
@@ -21,13 +27,13 @@ function MethodChoice({ value, onChange }) {
             role="radio"
             aria-checked={isActive}
             onClick={() => onChange(option.id)}
-            className={`flex items-center justify-center gap-2 rounded-md border px-3 py-2.5 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+            className={`flex h-10 items-center justify-center gap-2 rounded-lg text-sm transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
               isActive
-                ? 'border-primary bg-primary-light font-medium text-primary-hover dark:text-primary'
-                : 'border-border text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
+                ? 'bg-surface font-medium text-text-primary shadow-sm'
+                : 'text-text-muted hover:text-text-secondary'
             }`}
           >
-            {option.icon}
+            <span className={isActive ? 'text-primary' : ''}>{option.icon}</span>
             {option.label}
           </button>
         )

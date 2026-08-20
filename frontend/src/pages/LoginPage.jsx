@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import AuthCard from '../components/AuthCard'
+import AuthLayout from '../components/auth/AuthLayout'
+import AuthAlert from '../components/auth/AuthAlert'
+import AuthButton from '../components/auth/AuthButton'
 import FormField from '../components/FormField'
 import { useLocale } from '../context/LocaleContext'
 import { useAuth } from '../context/AuthContext'
@@ -57,7 +59,7 @@ function LoginPage() {
   }
 
   return (
-    <AuthCard
+    <AuthLayout
       title={t('auth.loginTitle')}
       subtitle={t('auth.loginSubtitle')}
       footer={
@@ -65,22 +67,15 @@ function LoginPage() {
           {t('auth.noAccount')}{' '}
           <Link
             to={ROUTES.register}
-            className="font-medium text-primary hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="font-medium text-primary transition-colors hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             {t('auth.registerTitle')}
           </Link>
         </>
       }
     >
-      <form onSubmit={handleSubmit} noValidate className="mt-6 flex flex-col gap-4">
-        {formError ? (
-          <p
-            role="alert"
-            className="rounded-md border border-error/40 bg-error/10 px-3 py-2 text-sm text-error"
-          >
-            {formError}
-          </p>
-        ) : null}
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+        {formError ? <AuthAlert variant="error">{formError}</AuthAlert> : null}
 
         <FormField
           label={t('auth.identifier')}
@@ -100,24 +95,20 @@ function LoginPage() {
           autoComplete="current-password"
         />
 
-        <div className="flex justify-end">
+        <div className="-mt-1 flex justify-end">
           <Link
             to={ROUTES.login}
-            className="text-sm font-medium text-text-secondary hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="text-[0.8125rem] font-medium text-text-muted transition-colors hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             {t('auth.forgotPassword')}
           </Link>
         </div>
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:bg-border disabled:text-text-muted"
-        >
-          {isSubmitting ? t('auth.signingIn') : t('auth.loginTitle')}
-        </button>
+        <AuthButton loading={isSubmitting} loadingLabel={t('auth.signingIn')}>
+          {t('auth.loginTitle')}
+        </AuthButton>
       </form>
-    </AuthCard>
+    </AuthLayout>
   )
 }
 

@@ -46,3 +46,27 @@ html.dark {
 body {
   @apply bg-background text-text-primary font-sans antialiased;
 }
+
+/* Auth card entrance: a short rise and fade. Fast enough not to delay anyone
+   reaching the form, present enough that a step change reads as a transition
+   rather than a flash of new content. Respects reduced-motion. */
+@keyframes auth-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-auth-in {
+  animation: auth-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-auth-in {
+    animation: none;
+  }
+}

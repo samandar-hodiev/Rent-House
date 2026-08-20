@@ -44,13 +44,18 @@ function App() {
                         <Route path={ROUTES.apartmentDetails} element={<ApartmentDetailsPage />} />
                         <Route path={ROUTES.map} element={<MapPage />} />
                         <Route path={ROUTES.wishlist} element={<WishlistPage />} />
-                        <Route path={ROUTES.login} element={<LoginPage />} />
-                        <Route path={ROUTES.register} element={<RegisterPage />} />
                         <Route path={ROUTES.profile} element={<ProfilePage />} />
                         <Route path={ROUTES.owner} element={<OwnerDashboardPage />} />
                         <Route path={ROUTES.admin} element={<AdminPage />} />
                         <Route path="*" element={<NotFoundPage />} />
                       </Route>
+
+                      {/* Authentication owns the full viewport: no header, no
+                          search bar, no footer. Someone signing in has one job,
+                          and every other control is a way to fail at it. These
+                          routes therefore sit outside RootLayout entirely. */}
+                      <Route path={ROUTES.login} element={<LoginPage />} />
+                      <Route path={ROUTES.register} element={<RegisterPage />} />
 
                       {/* Account area: its own shell (no public search bar, no
                           login/register buttons) instead of RootLayout, and

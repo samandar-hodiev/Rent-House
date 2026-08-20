@@ -64,12 +64,12 @@ function OtpInput({ value, onChange, error, disabled }) {
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <span className="text-sm font-medium text-text-primary">{t('auth.otpLabel')}</span>
 
-      {/* `gap-1.5` and a min-width rather than a fixed one: six boxes must fit
-          a 320px screen without the row scrolling sideways. */}
-      <div className="flex justify-between gap-1.5" role="group" aria-label={t('auth.otpLabel')}>
+      {/* Equal-width boxes with a small gap: six of them must fit a 320px
+          screen without the row ever scrolling sideways. */}
+      <div className="flex justify-between gap-2" role="group" aria-label={t('auth.otpLabel')}>
         {digits.map((digit, index) => (
           <input
             key={index}
@@ -86,8 +86,8 @@ function OtpInput({ value, onChange, error, disabled }) {
             onKeyDown={handleKeyDown(index)}
             aria-label={t('auth.otpDigit', { index: index + 1 })}
             aria-invalid={error ? true : undefined}
-            className={`h-12 w-full min-w-0 rounded-md border bg-surface text-center text-lg font-semibold text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60 ${
-              error ? 'border-error' : 'border-border'
+            className={`h-[3.25rem] w-full min-w-0 rounded-xl border bg-surface text-center text-xl font-semibold tabular-nums text-text-primary transition-[border-color,box-shadow] duration-150 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-60 ${
+              error ? 'border-error' : digit.trim() ? 'border-primary/50' : 'border-border'
             }`}
           />
         ))}
