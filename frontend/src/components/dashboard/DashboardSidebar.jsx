@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Building2, LogOut, MessageSquare, PlusCircle, User } from 'lucide-react'
+import { Building2, LayoutDashboard, LogOut, MessageSquare, PlusCircle } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useAuth } from '../../context/AuthContext'
 import { useChat } from '../../context/ChatContext'
@@ -28,17 +28,19 @@ export function DashboardNavList({ onNavigate }) {
 
   return (
     <nav aria-label={t('dashboard.navLabel')} className="flex h-full flex-col gap-1">
+      {/* `end` so the overview is only highlighted on /dashboard itself and not
+          on every nested section underneath it. */}
       <DashboardNavItem
-        to={ROUTES.dashboardProfile}
-        icon={<User aria-hidden="true" size={ICON_SIZE} />}
-        label={t('dashboard.profile')}
+        to={ROUTES.dashboard}
+        end
+        icon={<LayoutDashboard aria-hidden="true" size={ICON_SIZE} />}
+        label={t('dashboard.overview')}
         onNavigate={onNavigate}
       />
       <DashboardNavItem
         to={ROUTES.createListing}
         icon={<PlusCircle aria-hidden="true" size={ICON_SIZE} />}
         label={t('dashboard.postListing')}
-        accent
         onNavigate={onNavigate}
       />
       <DashboardNavItem

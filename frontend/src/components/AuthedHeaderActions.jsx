@@ -62,7 +62,7 @@ function AuthedHeaderActions({ variant = 'desktop', onNavigate }) {
         </Link>
 
         <Link
-          to={ROUTES.dashboardProfile}
+          to={ROUTES.dashboardEditProfile}
           onClick={onNavigate}
           className={mobileNavLinkClass({ isActive: false })}
         >
@@ -99,7 +99,7 @@ function AuthedHeaderActions({ variant = 'desktop', onNavigate }) {
       </Link>
 
       <Link
-        to={ROUTES.dashboardProfile}
+        to={ROUTES.dashboardEditProfile}
         aria-label={t('header.account')}
         className="flex min-w-0 shrink-0 items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >

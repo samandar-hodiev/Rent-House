@@ -36,7 +36,7 @@ function DashboardHeader({ onOpenMenu }) {
         <div className="flex min-w-0 items-center gap-1">
           <ThemeToggle />
           <Link
-            to={ROUTES.dashboardProfile}
+            to={ROUTES.dashboardEditProfile}
             className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <UserAvatar name={user.name} />

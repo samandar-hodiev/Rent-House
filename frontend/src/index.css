@@ -19,6 +19,14 @@
 
   --color-error: #e11d48;
   --color-warning: #f59e0b;
+
+  /* Analytics series. Three hues that stay distinguishable side by side and
+     carry the same weight — no one line should look more important than the
+     others. Green is the brand primary so the chart still reads as RentHouse;
+     amber reuses the warning hue, which appears nowhere else in the chart. */
+  --color-chart-daily: #2563eb;
+  --color-chart-weekly: #059669;
+  --color-chart-monthly: #d97706;
 }
 
 /* Class-based dark mode: ThemeContext toggles `.dark` on <html>. */
@@ -41,6 +49,12 @@ html.dark {
   --color-primary: #10b981;
   --color-primary-hover: #34d399;
   --color-primary-light: #0d3b2e;
+
+  /* Lifted, not inverted: the light-mode hues are too dark to read against a
+     navy ground, so each series moves up a step while keeping its identity. */
+  --color-chart-daily: #60a5fa;
+  --color-chart-weekly: #34d399;
+  --color-chart-monthly: #fbbf24;
 }
 
 body {
@@ -200,11 +214,31 @@ body {
   animation: auth-step-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Analytics lines draw themselves once when the dashboard opens. `pathLength`
+   is normalised to 1 in the SVG, so one dash covers the whole line whatever its
+   real length and all three series finish together. It runs once and stops —
+   nothing on the dashboard animates continuously. */
+@keyframes draw-line {
+  from {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-draw-line {
+  animation: draw-line 900ms cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
 /* Motion is decoration here, never information: with reduced-motion every
    ambient effect stops and the UI stays fully usable. */
 @media (prefers-reduced-motion: reduce) {
   .animate-auth-in,
   .animate-auth-step,
+  .animate-draw-line,
   .animate-glow-a,
   .animate-glow-b,
   .animate-glow-c,

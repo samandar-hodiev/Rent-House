@@ -76,8 +76,15 @@ function App() {
                       <Route element={<RequireAuth />}>
                         <Route element={<DashboardLayout />}>
                           <Route path={ROUTES.dashboard}>
-                            <Route index element={<Navigate to={ROUTES.dashboardProfile} replace />} />
-                            <Route path="profile" element={<DashboardPage />} />
+                            {/* The account landing page is the overview, so it
+                                sits at /dashboard itself. `profile` used to
+                                hold it and is kept as a redirect rather than a
+                                second copy, so older links still resolve. */}
+                            <Route index element={<DashboardPage />} />
+                            <Route
+                              path="profile"
+                              element={<Navigate to={ROUTES.dashboard} replace />}
+                            />
                             <Route path="listings" element={<DashboardListingsPage />} />
                             <Route path="chats" element={<DashboardChatsPage />} />
                             <Route path="edit-profile" element={<DashboardEditProfilePage />} />

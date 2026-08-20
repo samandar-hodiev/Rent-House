@@ -1,8 +1,10 @@
-import ProfileOverview from '../components/dashboard/ProfileOverview'
+import DashboardOverview from '../components/dashboard/DashboardOverview'
 
-// Default account section: the profile overview.
+// The account landing page: listings, views and unread messages at a glance.
+// Profile details and editing live in their own section, reached from the
+// header avatar and the Settings popover.
 function DashboardPage() {
-  return <ProfileOverview />
+  return <DashboardOverview />
 }
 
 export default DashboardPage
