@@ -16,7 +16,7 @@ function MethodChoice({ value, onChange }) {
     <div
       role="radiogroup"
       aria-label={t('auth.methodLabel')}
-      className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-surface-secondary/60 p-1"
+      className="grid grid-cols-1 gap-1 rounded-xl border border-border bg-surface-secondary/60 p-1 min-[321px]:grid-cols-2"
     >
       {options.map((option) => {
         const isActive = option.id === value
@@ -27,7 +27,7 @@ function MethodChoice({ value, onChange }) {
             role="radio"
             aria-checked={isActive}
             onClick={() => onChange(option.id)}
-            className={`flex h-10 items-center justify-center gap-2 rounded-lg text-sm transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+            className={`flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
               isActive
                 ? 'bg-surface font-medium text-text-primary shadow-sm'
                 : 'text-text-muted hover:text-text-secondary'
