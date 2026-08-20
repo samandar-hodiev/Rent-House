@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, AtSign, Lock, Phone, User } from 'lucide-react'
 import AuthLayout from '../components/auth/AuthLayout'
 import AuthAlert from '../components/auth/AuthAlert'
 import AuthButton from '../components/auth/AuthButton'
 import AuthProgress from '../components/auth/AuthProgress'
-import FormField from '../components/FormField'
+import AuthInput from '../components/auth/AuthInput'
+import AuthFooterLink from '../components/auth/AuthFooterLink'
 import MethodChoice from '../components/auth/MethodChoice'
 import OtpInput from '../components/auth/OtpInput'
 import { useAuth } from '../context/AuthContext'
@@ -351,7 +352,8 @@ function RegisterPage() {
 
           {/* Two short fields side by side on anything wider than a phone. */}
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormField
+            <AuthInput
+              icon={User}
               label={t('dashboard.firstName')}
               value={profile.firstName}
               onChange={setProfileField('firstName')}
@@ -359,7 +361,8 @@ function RegisterPage() {
               placeholder={t('auth.namePlaceholder')}
               autoComplete="given-name"
             />
-            <FormField
+            <AuthInput
+              icon={User}
               label={t('dashboard.lastName')}
               value={profile.lastName}
               onChange={setProfileField('lastName')}
@@ -367,7 +370,8 @@ function RegisterPage() {
               autoComplete="family-name"
             />
           </div>
-          <FormField
+          <AuthInput
+            icon={Lock}
             label={t('auth.password')}
             type="password"
             value={profile.password}
@@ -375,7 +379,8 @@ function RegisterPage() {
             error={errors.password}
             autoComplete="new-password"
           />
-          <FormField
+          <AuthInput
+            icon={Lock}
             label={t('auth.confirmPassword')}
             type="password"
             value={profile.passwordConfirmation}
@@ -399,15 +404,11 @@ function RegisterPage() {
       title={t('auth.registerTitle')}
       subtitle={t('auth.registerVerifySubtitle')}
       footer={
-        <>
-          {t('auth.hasAccount')}{' '}
-          <Link
-            to={ROUTES.login}
-            className="font-medium text-primary transition-colors hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            {t('auth.loginTitle')}
-          </Link>
-        </>
+        <AuthFooterLink
+          prompt={t('auth.hasAccount')}
+          to={ROUTES.login}
+          label={t('auth.loginTitle')}
+        />
       }
     >
       <form
@@ -430,9 +431,10 @@ function RegisterPage() {
           }}
         />
 
-        <FormField
+        <AuthInput
           label={method === 'phone' ? t('auth.phone') : t('auth.email')}
           type={method === 'phone' ? 'tel' : 'email'}
+          icon={method === 'phone' ? Phone : AtSign}
           value={contact}
           onChange={(value) => {
             setContact(value)

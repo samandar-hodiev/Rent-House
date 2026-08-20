@@ -110,6 +110,62 @@ body {
   will-change: transform, opacity;
 }
 
+@keyframes glow-drift-c {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate3d(-3%, 5%, 0) scale(1.15);
+    opacity: 1;
+  }
+}
+
+.animate-glow-c {
+  animation: glow-drift-c 38s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  will-change: transform, opacity;
+}
+
+/* Orbital rings. Full rotations, but over minutes — at this size a single
+   degree is several pixels of arc, so the movement is present without ever
+   being watchable. The translate is repeated inside the keyframe because a
+   transform declaration replaces the centring translate entirely. */
+@keyframes orbit {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.animate-orbit-slow {
+  animation: orbit 150s linear infinite;
+}
+
+.animate-orbit-slower {
+  animation: orbit 240s linear infinite reverse;
+}
+
+/* Points drift on a long loop and fade in and out, so they never look like a
+   static speckle pattern. */
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translate3d(6px, -10px, 0);
+    opacity: 0.7;
+  }
+}
+
+.animate-drift {
+  animation: drift 20s ease-in-out infinite;
+}
+
 /* The grid breathes over a very long cycle. Opacity only — shifting its
    position would make the lines visibly crawl. */
 @keyframes grid-breathe {
@@ -151,7 +207,11 @@ body {
   .animate-auth-step,
   .animate-glow-a,
   .animate-glow-b,
-  .animate-grid {
+  .animate-glow-c,
+  .animate-grid,
+  .animate-orbit-slow,
+  .animate-orbit-slower,
+  .animate-drift {
     animation: none !important;
   }
 }

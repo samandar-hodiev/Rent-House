@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { AtSign, Lock } from 'lucide-react'
 import AuthLayout from '../components/auth/AuthLayout'
 import AuthAlert from '../components/auth/AuthAlert'
 import AuthButton from '../components/auth/AuthButton'
-import FormField from '../components/FormField'
+import AuthInput from '../components/auth/AuthInput'
+import AuthFooterLink from '../components/auth/AuthFooterLink'
 import { useLocale } from '../context/LocaleContext'
 import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../services/apiClient'
@@ -63,36 +65,34 @@ function LoginPage() {
       title={t('auth.loginTitle')}
       subtitle={t('auth.loginSubtitle')}
       footer={
-        <>
-          {t('auth.noAccount')}{' '}
-          <Link
-            to={ROUTES.register}
-            className="font-medium text-primary transition-colors hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            {t('auth.registerTitle')}
-          </Link>
-        </>
+        <AuthFooterLink
+          prompt={t('auth.noAccount')}
+          to={ROUTES.register}
+          label={t('auth.registerTitle')}
+        />
       }
     >
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
         {formError ? <AuthAlert variant="error">{formError}</AuthAlert> : null}
 
-        <FormField
+        <AuthInput
           label={t('auth.identifier')}
           value={values.identifier}
           onChange={setField('identifier')}
           error={errors.identifier}
           placeholder={t('auth.identifierPlaceholder')}
           autoComplete="username"
+          icon={AtSign}
         />
 
-        <FormField
+        <AuthInput
           label={t('auth.password')}
           type="password"
           value={values.password}
           onChange={setField('password')}
           error={errors.password}
           autoComplete="current-password"
+          icon={Lock}
         />
 
         <div className="-mt-1 flex justify-end">
