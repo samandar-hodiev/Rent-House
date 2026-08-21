@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/samandar-hodiev/Rent-House/backend/pkg/logger"
 )
 
 // resendEndpoint is the transactional send endpoint. Overridable so tests can
@@ -116,11 +118,27 @@ func (s *ResendSender) Send(ctx context.Context, destination, code string) error
 		// logs and then replaces with a generic message — it never reaches the
 		// browser, and it never contains the code.
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		logger.Errorf("email OTP request: recipient=%s provider=resend status=rejected http=%d",
+			maskEmail(destination), resp.StatusCode)
 		return fmt.Errorf("resend: %s", describeStatus(resp.StatusCode, strings.TrimSpace(string(detail))))
 	}
 
-	// The response carries a message id. It is intentionally not logged
-	// alongside the destination, to keep recipient addresses out of the logs.
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1024))
+	// One line per accepted message, carrying the id Resend files the delivery
+	// event under. That id is what turns "the API accepted it" into a claim an
+	// operator can actually check on the dashboard — including who the real
+	// recipient was, which is the question this log exists to answer.
+	//
+	// The address is masked because these logs outlive the request and a full
+	// inbox address is personal data; the domain and first character are enough
+	// to tell two recipients apart at a glance, and the message id settles it
+	// exactly. The code, the API key and the token never appear here.
+	var accepted struct {
+		ID string `json:"id"`
+	}
+	payloadBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+	_ = json.Unmarshal(payloadBody, &accepted)
+
+	logger.Infof("email OTP request: recipient=%s provider=resend status=accepted message_id=%s",
+		maskEmail(destination), accepted.ID)
 	return nil
 }

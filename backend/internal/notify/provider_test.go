@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -9,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/samandar-hodiev/Rent-House/backend/pkg/logger"
 )
 
 // These exercise the providers against a local stand-in for the real API. They
@@ -572,5 +575,131 @@ func TestDescribeStatusPointsAtTheLikelyCause(t *testing.T) {
 	}
 	if got := describeStatus(500, "boom"); !strings.Contains(got, "Resend is failing") {
 		t.Errorf("a 5xx should point at the provider: %q", got)
+	}
+}
+
+// The bug this guards against: every registration arriving at one inbox
+// regardless of what the user typed. The sender must forward the address it was
+// handed, verbatim, every time — with no shared state between calls and no
+// fallback recipient of any kind.
+func TestResendSendsToEachRequestedRecipientAndNoOther(t *testing.T) {
+	var recipients [][]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &body)
+		to, _ := body["to"].([]any)
+		recipients = append(recipients, to)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"msg_x"}`))
+	}))
+	defer server.Close()
+
+	sender, err := NewResendSender(ResendConfig{
+		APIKey: "re_test_key", From: "RentHouse <no-reply@renthouse.uz>",
+		BaseURL: server.URL,
+	})
+	if err != nil {
+		t.Fatalf("build sender: %v", err)
+	}
+
+	// Two addresses that differ only in the local part, which is exactly the
+	// case a redirect-to-owner bug would collapse.
+	wanted := []string{"alice@example.test", "bob@example.test"}
+	for _, address := range wanted {
+		if err := sender.Send(context.Background(), address, "111111"); err != nil {
+			t.Fatalf("send to %s: %v", address, err)
+		}
+	}
+
+	if len(recipients) != len(wanted) {
+		t.Fatalf("got %d requests, want %d", len(recipients), len(wanted))
+	}
+	for i, address := range wanted {
+		if len(recipients[i]) != 1 {
+			t.Fatalf("request %d addressed %d recipients, want exactly 1", i, len(recipients[i]))
+		}
+		if recipients[i][0] != address {
+			t.Errorf("request %d went to %v, want %s", i, recipients[i][0], address)
+		}
+	}
+	// Stated separately so a failure says "they collapsed onto one inbox"
+	// rather than only "recipient 1 was wrong".
+	if recipients[0][0] == recipients[1][0] {
+		t.Errorf("both messages went to %v — recipients are being collapsed", recipients[0][0])
+	}
+}
+
+// A rejection must surface as an error. Returning nil here is what would let the
+// API answer "code sent" for a message the provider refused.
+func TestResendRejectionForAnUnverifiedDomainIsAnError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		// Resend's real wording when the account is still in test mode.
+		_, _ = w.Write([]byte(`{"statusCode":403,"name":"validation_error",` +
+			`"message":"You can only send testing emails to your own email address"}`))
+	}))
+	defer server.Close()
+
+	sender, err := NewResendSender(ResendConfig{
+		APIKey: "re_test_key", From: "RentHouse <onboarding@resend.dev>",
+		BaseURL: server.URL,
+	})
+	if err != nil {
+		t.Fatalf("build sender: %v", err)
+	}
+
+	err = sender.Send(context.Background(), "someone-else@example.test", "483921")
+	if err == nil {
+		t.Fatal("a rejected send reported success")
+	}
+	if strings.Contains(err.Error(), "483921") {
+		t.Error("the error carries the verification code")
+	}
+	if strings.Contains(err.Error(), "re_test_key") {
+		t.Error("the error carries the API key")
+	}
+}
+
+// The accepted-path log has to be traceable without being a leak: it carries the
+// provider's message id, and never the code or the key.
+func TestResendAcceptedSendIsLoggedWithItsMessageIDAndNoSecrets(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"819a5454-c69c-47fc-a3d3-c7678f13ace6"}`))
+	}))
+	defer server.Close()
+
+	sender, err := NewResendSender(ResendConfig{
+		APIKey: "re_super_secret", From: "RentHouse <no-reply@renthouse.uz>",
+		BaseURL: server.URL,
+	})
+	if err != nil {
+		t.Fatalf("build sender: %v", err)
+	}
+
+	var buf bytes.Buffer
+	restore := logger.SwapOutput(&buf)
+	defer restore()
+
+	if err := sender.Send(context.Background(), "alice@example.test", "483921"); err != nil {
+		t.Fatalf("send: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{"provider=resend", "status=accepted", "819a5454-c69c-47fc-a3d3-c7678f13ace6"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("log is missing %q; got %q", want, out)
+		}
+	}
+	for _, leak := range []string{"483921", "re_super_secret", "alice@example.test"} {
+		if strings.Contains(out, leak) {
+			t.Errorf("log leaked %q; got %q", leak, out)
+		}
+	}
+	// Masked, but still distinguishable from a different recipient.
+	if !strings.Contains(out, "a***@example.test") {
+		t.Errorf("log does not identify the recipient at all; got %q", out)
 	}
 }

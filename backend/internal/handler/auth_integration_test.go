@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -38,6 +39,7 @@ import (
 	"github.com/samandar-hodiev/Rent-House/backend/internal/dto"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/middleware"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/models"
+	"github.com/samandar-hodiev/Rent-House/backend/internal/notify"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/repository"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/service"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/token"
@@ -1019,5 +1021,89 @@ func TestMeRejectsATokenForADeletedAccount(t *testing.T) {
 	rec := h.do(t, http.MethodGet, "/api/v1/auth/me", nil, "Bearer "+auth.AccessToken)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("got status %d, want 401: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// The whole point of the flow: the code goes to the address the caller typed.
+//
+// This walks two registrations through the real handler, service and repository
+// and asserts that the delivery layer was handed each address exactly once with
+// its own code — and, critically, that one address never receives the other's.
+// A regression that redirected delivery to a single inbox would pass every
+// "does registration work" test and fail here.
+func TestRegistrationCodesGoToTheAddressThatAskedForThem(t *testing.T) {
+	h := newHarness(t)
+
+	alice := uniqueEmail()
+	bob := uniqueEmail()
+
+	_, aliceCode := h.requestCode(t, "email", alice)
+	_, bobCode := h.requestCode(t, "email", bob)
+
+	h.codes.mu.Lock()
+	defer h.codes.mu.Unlock()
+
+	// Both addresses were delivered to, under their own names.
+	for _, address := range []string{alice, bob} {
+		if _, ok := h.codes.last[address]; !ok {
+			t.Fatalf("nothing was delivered to %s", address)
+		}
+	}
+
+	// No third address appeared — no owner inbox, no development fallback.
+	if len(h.codes.last) != 2 {
+		t.Fatalf("delivery saw %d recipients, want exactly the 2 requested: %v",
+			len(h.codes.last), h.codes.last)
+	}
+
+	if aliceCode == bobCode {
+		t.Fatal("both registrations were issued the same code")
+	}
+	if h.codes.last[alice] != aliceCode {
+		t.Errorf("the code delivered to %s is not the one issued for it", alice)
+	}
+	if h.codes.last[bob] == aliceCode {
+		t.Errorf("%s received the code issued for %s", bob, alice)
+	}
+}
+
+// A provider refusal must stop the flow rather than being reported as success:
+// the API answers 502 with a delivery-specific code, so the UI can say the code
+// could not be sent instead of advancing to an OTP screen for a message that
+// was never accepted.
+func TestProviderRejectionIsReportedAsADeliveryFailure(t *testing.T) {
+	h := newHarness(t)
+
+	// Same wiring as the harness, with a sender that refuses the way Resend
+	// does for an unverified sending domain.
+	refusing := notify.SenderFunc(func(_ context.Context, _, _ string) error {
+		return errors.New("resend: 403 you can only send testing emails to your own address")
+	})
+	failing := service.NewAuthService(
+		repository.NewUserRepository(h.db),
+		repository.NewVerificationRepository(h.db),
+		h.tokens, refusing, refusing, h.policy,
+	)
+
+	router := gin.New()
+	router.POST("/api/v1/auth/register/request", NewAuthHandler(failing).RequestRegistrationCode)
+
+	email := uniqueEmail()
+	body, _ := json.Marshal(map[string]string{"method": "email", "email": email})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register/request", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("got status %d, want 502: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "otp_delivery_failed") {
+		t.Errorf("response does not carry the delivery-failure code: %s", rec.Body.String())
+	}
+	// The provider's own words stay in the server log; the client gets a fixed
+	// message, so an operator's account details never reach a browser.
+	if strings.Contains(rec.Body.String(), "resend") {
+		t.Errorf("the provider's error leaked to the client: %s", rec.Body.String())
 	}
 }
