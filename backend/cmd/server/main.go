@@ -20,6 +20,7 @@ import (
 	"github.com/samandar-hodiev/Rent-House/backend/internal/handler"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/middleware"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/notify"
+	"github.com/samandar-hodiev/Rent-House/backend/internal/realtime"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/repository"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/service"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/storage"
@@ -249,6 +250,39 @@ func newRouter(
 		me.GET("/apartments", apartmentHandler.ListMine)
 		me.GET("/apartments/stats", apartmentHandler.Stats)
 	}
+
+	// Chat. The hub is process-wide state — the set of live sockets — so it is
+	// built once here and shared by the service that publishes events and the
+	// handler that accepts connections.
+	hub := realtime.NewHub()
+	chatService := service.NewChatService(
+		repository.NewChatRepository(db), apartments, users, hub,
+	)
+	chatHandler := handler.NewChatHandler(chatService)
+
+	conversations := v1.Group("/conversations", middleware.Auth(tokens))
+	{
+		conversations.POST("", chatHandler.StartConversation)
+		conversations.GET("", chatHandler.ListConversations)
+		// Registered before "/:id" so the literal path is not swallowed by the
+		// parameter.
+		conversations.GET("/unread", chatHandler.UnreadTotal)
+		conversations.GET("/:id", chatHandler.GetConversation)
+		conversations.GET("/:id/messages", chatHandler.ListMessages)
+		conversations.POST("/:id/messages", chatHandler.SendMessage)
+		conversations.POST("/:id/read", chatHandler.MarkRead)
+	}
+
+	messages := v1.Group("/messages", middleware.Auth(tokens))
+	{
+		messages.PATCH("/:id", chatHandler.EditMessage)
+		messages.DELETE("/:id", chatHandler.DeleteMessage)
+	}
+
+	// The realtime channel. Authenticated inside the handler rather than by
+	// middleware: a browser cannot set an Authorization header on a WebSocket
+	// handshake, so the token arrives as a query parameter.
+	v1.GET("/ws", handler.NewWSHandler(hub, chatService, tokens, cfg.AllowedOrigins).Connect)
 
 	// Uploaded photographs: stored by the configured backend, served straight
 	// off disk for the local one.

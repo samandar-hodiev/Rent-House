@@ -216,7 +216,14 @@ func TestConversationParticipantIsUnique(t *testing.T) {
 	withRollback(t, func(tx *gorm.DB) {
 		owner, apartment := seedApartment(t, tx)
 
-		conversation := &models.Conversation{ApartmentID: apartment.ID}
+		// Since 0004 a conversation names the person who opened it, so one has
+		// to exist before the thread does.
+		buyer := newUser()
+		if err := tx.Create(buyer).Error; err != nil {
+			t.Fatalf("create buyer: %v", err)
+		}
+
+		conversation := &models.Conversation{ApartmentID: apartment.ID, BuyerID: buyer.ID}
 		if err := tx.Create(conversation).Error; err != nil {
 			t.Fatalf("create conversation: %v", err)
 		}
@@ -237,7 +244,14 @@ func TestConversationSupportsMoreThanTwoParticipants(t *testing.T) {
 	withRollback(t, func(tx *gorm.DB) {
 		owner, apartment := seedApartment(t, tx)
 
-		conversation := &models.Conversation{ApartmentID: apartment.ID}
+		// Since 0004 a conversation names the person who opened it, so one has
+		// to exist before the thread does.
+		buyer := newUser()
+		if err := tx.Create(buyer).Error; err != nil {
+			t.Fatalf("create buyer: %v", err)
+		}
+
+		conversation := &models.Conversation{ApartmentID: apartment.ID, BuyerID: buyer.ID}
 		if err := tx.Create(conversation).Error; err != nil {
 			t.Fatalf("create conversation: %v", err)
 		}
@@ -287,7 +301,14 @@ func TestDeletingAnApartmentLeavesNoOrphans(t *testing.T) {
 		}).Error; err != nil {
 			t.Fatalf("link amenity: %v", err)
 		}
-		conversation := &models.Conversation{ApartmentID: apartment.ID}
+		// Since 0004 a conversation names the person who opened it, so one has
+		// to exist before the thread does.
+		buyer := newUser()
+		if err := tx.Create(buyer).Error; err != nil {
+			t.Fatalf("create buyer: %v", err)
+		}
+
+		conversation := &models.Conversation{ApartmentID: apartment.ID, BuyerID: buyer.ID}
 		if err := tx.Create(conversation).Error; err != nil {
 			t.Fatalf("create conversation: %v", err)
 		}
