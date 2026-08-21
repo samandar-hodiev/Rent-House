@@ -27,6 +27,11 @@ var Districts = []models.District{
 	{Name: "Mirobod", Slug: "mirobod", Latitude: 41.2846, Longitude: 69.2705},
 	{Name: "Yakkasaroy", Slug: "yakkasaroy", Latitude: 41.2814, Longitude: 69.2447},
 	{Name: "Olmazor", Slug: "olmazor", Latitude: 41.3448, Longitude: 69.2211},
+	{Name: "Uchtepa", Slug: "uchtepa", Latitude: 41.2884, Longitude: 69.1783},
+	{Name: "Bektemir", Slug: "bektemir", Latitude: 41.2181, Longitude: 69.3339},
+	{Name: "Yashnobod", Slug: "yashnobod", Latitude: 41.2860, Longitude: 69.3210},
+	{Name: "Yangihayot", Slug: "yangihayot", Latitude: 41.2093, Longitude: 69.2246},
+	{Name: "Mirzo Ulug'bek", Slug: "mirzo-ulugbek", Latitude: 41.3253, Longitude: 69.3350},
 }
 
 // Amenities an apartment can offer. Names are the Uzbek labels shown in the UI;

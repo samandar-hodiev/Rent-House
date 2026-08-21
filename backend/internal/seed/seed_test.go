@@ -39,9 +39,12 @@ func TestAmenitySlugsAreUnique(t *testing.T) {
 }
 
 func TestEveryFrontendDistrictIsSeeded(t *testing.T) {
+	// All twelve districts of Tashkent, the same list the frontend offers. A
+	// district missing here is a district no one can publish a listing in.
 	required := []string{
 		"Sergeli", "Chilonzor", "Yunusobod", "Shayxontohur",
-		"Mirobod", "Yakkasaroy", "Olmazor",
+		"Mirobod", "Yakkasaroy", "Olmazor", "Uchtepa",
+		"Bektemir", "Yashnobod", "Yangihayot", "Mirzo Ulug'bek",
 	}
 
 	present := map[string]bool{}

@@ -35,10 +35,17 @@ const (
 type Config struct {
 	Port           string
 	AllowedOrigins []string
-	Database       Database
-	JWT            JWT
-	OTP            OTP
-	Notify         Notify
+
+	// UploadDir is where listing photographs are written; UploadPublicPath is
+	// the URL prefix that directory is served under. Both are configurable so a
+	// deployment can put the files on a mounted volume rather than beside the
+	// binary.
+	UploadDir        string
+	UploadPublicPath string
+	Database         Database
+	JWT              JWT
+	OTP              OTP
+	Notify           Notify
 }
 
 // Notify selects how verification codes are delivered.
@@ -169,6 +176,9 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	cfg.UploadDir = envOr("UPLOAD_DIR", "./uploads")
+	cfg.UploadPublicPath = envOr("UPLOAD_PUBLIC_PATH", "/uploads")
 
 	cfg.Notify = Notify{
 		EmailProvider: strings.ToLower(envOr("EMAIL_PROVIDER", "dev")),

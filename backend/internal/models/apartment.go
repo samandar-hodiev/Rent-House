@@ -2,6 +2,7 @@ package models
 
 import (
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
 )
 
@@ -26,11 +27,18 @@ const (
 	ApartmentStatusClosed  = "closed"
 )
 
+// Who pays for gas, water and electricity on top of the rent.
+const (
+	UtilitiesIncluded = "INCLUDED"
+	UtilitiesSeparate = "SEPARATE"
+)
+
 // Accepted values, mirrored by CHECK constraints in the migration so a bad
 // value cannot reach the table even through a direct SQL insert.
 var (
 	Currencies        = []string{CurrencyUZS, CurrencyUSD}
 	RentalPeriods     = []string{RentalPeriodMonthly, RentalPeriodDaily}
+	UtilitiesOptions  = []string{UtilitiesIncluded, UtilitiesSeparate}
 	ApartmentStatuses = []string{
 		ApartmentStatusDraft,
 		ApartmentStatusPending,
@@ -38,6 +46,9 @@ var (
 		ApartmentStatusClosed,
 	}
 )
+
+// MaxMinimumMonths bounds the shortest-term field, matching the CHECK in 0003.
+const MaxMinimumMonths = 60
 
 // Apartment is a rental listing.
 //
@@ -67,6 +78,18 @@ type Apartment struct {
 	Address   string  `gorm:"column:address;type:varchar(255);not null" json:"address"`
 	Latitude  float64 `gorm:"column:latitude;type:double precision;not null" json:"latitude"`
 	Longitude float64 `gorm:"column:longitude;type:double precision;not null" json:"longitude"`
+
+	// Finer-grained than a district and what people actually search by. Free
+	// text, because Tashkent neighbourhood names are informal and overlapping.
+	Neighborhood *string `gorm:"column:neighborhood;type:varchar(120)" json:"neighborhood,omitempty"`
+
+	// How the place is let. Nil deposit means none was asked for; nil
+	// MinimumMonths means no minimum term.
+	Deposit       *decimal.Decimal `gorm:"column:deposit;type:numeric(14,2)" json:"deposit,omitempty"`
+	Utilities     string           `gorm:"column:utilities;type:varchar(10);not null;default:INCLUDED" json:"utilities"`
+	MinimumMonths *int16           `gorm:"column:minimum_months" json:"minimum_months,omitempty"`
+	// House rules as stable slugs. pq.StringArray maps Postgres text[].
+	Rules pq.StringArray `gorm:"column:rules;type:text[];not null;default:'{}'" json:"rules"`
 
 	ViewsCount int64 `gorm:"column:views_count;not null;default:0" json:"views_count"`
 

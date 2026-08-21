@@ -74,3 +74,37 @@ func UserIDFrom(c *gin.Context) (uuid.UUID, bool) {
 	userID, ok := value.(uuid.UUID)
 	return userID, ok
 }
+
+// OptionalAuth identifies the caller when they present a valid token, and lets
+// them through as an anonymous visitor when they do not.
+//
+// It exists for endpoints that are public but answer differently for the owner:
+// the apartment detail page is readable by anyone, yet an owner opening their
+// own unpublished draft must see it while a stranger must not. Requiring a
+// token there would break browsing; ignoring one would hide a draft from the
+// person who wrote it.
+//
+// A malformed or expired token is treated as no token at all rather than as an
+// error. The request is valid without one, so there is nothing to reject — and
+// a stale token in an old tab should degrade to browsing, not to a wall.
+func OptionalAuth(tokens *token.Service) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		header := c.GetHeader("Authorization")
+		if len(header) < len(bearerPrefix) ||
+			!strings.EqualFold(header[:len(bearerPrefix)], bearerPrefix) {
+			c.Next()
+			return
+		}
+
+		raw := strings.TrimSpace(header[len(bearerPrefix):])
+		if raw == "" {
+			c.Next()
+			return
+		}
+
+		if userID, err := tokens.Validate(raw); err == nil {
+			c.Set(userIDKey.name, userID)
+		}
+		c.Next()
+	}
+}

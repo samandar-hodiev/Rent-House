@@ -22,6 +22,7 @@ import (
 	"github.com/samandar-hodiev/Rent-House/backend/internal/notify"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/repository"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/service"
+	"github.com/samandar-hodiev/Rent-House/backend/internal/storage"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/token"
 	"github.com/samandar-hodiev/Rent-House/backend/pkg/logger"
 	"github.com/samandar-hodiev/Rent-House/backend/pkg/response"
@@ -218,6 +219,46 @@ func newRouter(
 		// Protected.
 		auth.GET("/me", middleware.Auth(tokens), authHandler.Me)
 	}
+
+	// Listings. Same layering as auth: handler -> service -> repository -> db.
+	apartments := repository.NewApartmentRepository(db)
+	apartmentHandler := handler.NewApartmentHandler(service.NewApartmentService(apartments))
+
+	// Reference data the owner form needs before it can submit anything.
+	v1.GET("/districts", apartmentHandler.Districts)
+
+	listings := v1.Group("/apartments")
+	{
+		// Public: browsing and searching need no account.
+		listings.GET("", apartmentHandler.List)
+		// Optional auth, not none: an owner opening their own unpublished
+		// draft must see it, and nobody else may.
+		listings.GET("/:id", middleware.OptionalAuth(tokens), apartmentHandler.Get)
+
+		// Owner-only. The identity comes from the token; the service checks
+		// that the listing is actually theirs before writing anything.
+		listings.POST("", middleware.Auth(tokens), apartmentHandler.Create)
+		listings.PUT("/:id", middleware.Auth(tokens), apartmentHandler.Update)
+		listings.DELETE("/:id", middleware.Auth(tokens), apartmentHandler.Delete)
+	}
+
+	// The signed-in user's own listings, in every status — this is the
+	// dashboard, where a draft is exactly what they came to find.
+	me := v1.Group("/me", middleware.Auth(tokens))
+	{
+		me.GET("/apartments", apartmentHandler.ListMine)
+		me.GET("/apartments/stats", apartmentHandler.Stats)
+	}
+
+	// Uploaded photographs: stored by the configured backend, served straight
+	// off disk for the local one.
+	files, err := storage.NewLocalStorage(cfg.UploadDir, cfg.UploadPublicPath)
+	if err != nil {
+		return nil, fmt.Errorf("storage: %w", err)
+	}
+	router.Static(files.PublicPath(), files.Dir())
+	v1.POST("/uploads/images",
+		middleware.Auth(tokens), handler.NewUploadHandler(files).UploadImage)
 
 	return router, nil
 }
