@@ -39,12 +39,14 @@ function ImageUploader({ images, coverImageId, onChange, onCoverChange, error })
   // Patches one tile by id. The list may have changed while a request was in
   // flight — another file finished, or this one was removed — so the update
   // reads the current list rather than the one captured when it started.
-  // `imagesRef` is refreshed on every render, so an upload that finishes late
-  // patches the list as it stands now — not the one captured when it started,
-  // which may have gained or lost tiles since.
+  // An updater, not a value. Uploads run in parallel and finish in any order;
+  // each one has to patch the list as it is at that moment. Reading a snapshot
+  // — from props or from a ref — means two that land before the next render
+  // both start from the same list, and the second silently discards the
+  // first's URL. That is how three uploaded photographs became one saved one.
   const patchImage = (imageId, patch) => {
-    onChange(
-      imagesRef.current.map((image) => (image.id === imageId ? { ...image, ...patch } : image)),
+    onChange((current) =>
+      current.map((image) => (image.id === imageId ? { ...image, ...patch } : image)),
     )
   }
 
@@ -71,7 +73,7 @@ function ImageUploader({ images, coverImageId, onChange, onCoverChange, error })
       failed: false,
     }))
 
-    onChange([...imagesRef.current, ...added])
+    onChange((current) => [...current, ...added])
     // The first photo added becomes the cover, matching what the card shows.
     if (!coverImageId) onCoverChange(added[0].id)
 
@@ -82,9 +84,13 @@ function ImageUploader({ images, coverImageId, onChange, onCoverChange, error })
     const target = images.find((image) => image.id === imageId)
     if (target?.url?.startsWith('blob:')) URL.revokeObjectURL(target.url)
 
-    const next = images.filter((image) => image.id !== imageId)
-    onChange(next)
-    if (coverImageId === imageId) onCoverChange(next[0]?.id ?? null)
+    // Also an updater, so removing a tile while another upload is still in
+    // flight cannot drop that upload's result.
+    onChange((current) => current.filter((image) => image.id !== imageId))
+    if (coverImageId === imageId) {
+      const next = images.filter((image) => image.id !== imageId)
+      onCoverChange(next[0]?.id ?? null)
+    }
   }
 
   const handleDrop = (event) => {

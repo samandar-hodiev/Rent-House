@@ -18,6 +18,13 @@ const omitEmpty = (object) =>
  * `districtId`, `image`, `title` — and the components did not have to change.
  */
 export function toApartment(item) {
+  // The API returns `[{ url, is_primary }]`, already ordered cover-first by the
+  // repository. Every gallery in the app — the detail page's and the
+  // dashboard's — renders `<img src={images[i]}>`, so what they need is a list
+  // of URL strings. Handing them the raw objects produced `src="[object
+  // Object]"` and a page of broken images, while the card kept working because
+  // it reads the single `image` field below.
+  const urls = (item.images ?? []).map((image) => image.url).filter(Boolean)
   const cover = item.images?.find((image) => image.is_primary) ?? item.images?.[0] ?? null
 
   return {
@@ -52,14 +59,21 @@ export function toApartment(item) {
     rules: item.rules ?? [],
 
     amenities: item.amenities ?? [],
-    images: item.images ?? [],
-    image: cover?.url ?? null,
+    // Cover first, matching the order the API sends.
+    images: urls,
+    image: cover?.url ?? urls[0] ?? null,
 
     viewsCount: item.views_count ?? 0,
     owner: item.owner ?? null,
 
     createdAt: item.created_at,
     updatedAt: item.updated_at,
+    // The cards, the detail page and the "newest first" sort all read
+    // `postedAt` — the name the catalog used before the API existed. Aliased
+    // here rather than renamed in six components, and for the same reason as
+    // `districtId` and `image` above: the mapping layer is where the two
+    // vocabularies meet.
+    postedAt: item.created_at,
   }
 }
 

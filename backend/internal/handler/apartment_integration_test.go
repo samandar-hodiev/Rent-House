@@ -14,6 +14,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/samandar-hodiev/Rent-House/backend/internal/dto"
@@ -605,3 +606,145 @@ func TestDistrictsEndpointServesTheWholeList(t *testing.T) {
 
 // uuidString is a well-formed id that names nothing.
 func uuidString() string { return "11111111-2222-3333-4444-555555555555" }
+
+// The gallery bug: a listing created with several photographs came back with
+// one. Both halves are covered here — that every image is persisted, and that
+// the list and the detail responses agree on all of them.
+func TestListingKeepsEveryImageAndReturnsThemEverywhere(t *testing.T) {
+	h := newListingHarness(t)
+	token, _ := h.signUp(t)
+
+	body := validListing()
+	body["images"] = []map[string]any{
+		{"url": "http://localhost:8081/uploads/2026-08/one.jpg"},
+		{"url": "http://localhost:8081/uploads/2026-08/two.jpg", "is_primary": true},
+		{"url": "http://localhost:8081/uploads/2026-08/three.jpg"},
+	}
+
+	status, created := h.create(t, token, body)
+	if status != http.StatusCreated {
+		t.Fatalf("got status %d, want 201", status)
+	}
+	if len(created.Images) != 3 {
+		t.Fatalf("create returned %d images, want 3", len(created.Images))
+	}
+	// The cover leads, because that is what a gallery shows first.
+	if !created.Images[0].IsPrimary {
+		t.Errorf("the first image is not the cover: %+v", created.Images)
+	}
+	if !strings.HasSuffix(created.Images[0].URL, "two.jpg") {
+		t.Errorf("the wrong image is the cover: %s", created.Images[0].URL)
+	}
+
+	// The detail response is what the gallery reads.
+	rec := h.do(t, http.MethodGet, "/api/v1/apartments/"+created.ID.String(), nil, "")
+	var detail dto.ApartmentResponse
+	if err := json.Unmarshal(decode(t, rec).Data, &detail); err != nil {
+		t.Fatalf("decode detail: %v", err)
+	}
+	if len(detail.Images) != 3 {
+		t.Fatalf("the detail response carries %d images, want 3", len(detail.Images))
+	}
+
+	// The card reads the list response, and the two must not disagree — a
+	// listing whose photographs appear on the card but not on its own page is
+	// exactly the failure this guards against.
+	page := h.list(t, "", "")
+	var listed *dto.ApartmentResponse
+	for i := range page.Items {
+		if page.Items[i].ID == created.ID {
+			listed = &page.Items[i]
+		}
+	}
+	if listed == nil {
+		t.Fatal("the listing is missing from the feed")
+	}
+	if len(listed.Images) != len(detail.Images) {
+		t.Fatalf("list has %d images, detail has %d", len(listed.Images), len(detail.Images))
+	}
+	for i := range detail.Images {
+		if listed.Images[i] != detail.Images[i] {
+			t.Errorf("image %d differs: list %+v, detail %+v", i, listed.Images[i], detail.Images[i])
+		}
+	}
+}
+
+// An edit must keep the gallery it was given, not collapse it.
+func TestUpdateReplacesTheWholeGallery(t *testing.T) {
+	h := newListingHarness(t)
+	token, _ := h.signUp(t)
+	_, created := h.create(t, token, validListing())
+
+	updated := validListing()
+	updated["images"] = []map[string]any{
+		{"url": "http://localhost:8081/uploads/2026-08/a.jpg", "is_primary": true},
+		{"url": "http://localhost:8081/uploads/2026-08/b.jpg"},
+	}
+
+	path := "/api/v1/apartments/" + created.ID.String()
+	if rec := h.do(t, http.MethodPut, path, updated, token); rec.Code != http.StatusOK {
+		t.Fatalf("update got status %d, want 200", rec.Code)
+	}
+
+	rec := h.do(t, http.MethodGet, path, nil, "")
+	var after dto.ApartmentResponse
+	if err := json.Unmarshal(decode(t, rec).Data, &after); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(after.Images) != 2 {
+		t.Fatalf("got %d images after the edit, want 2", len(after.Images))
+	}
+	if !strings.HasSuffix(after.Images[0].URL, "a.jpg") || !after.Images[0].IsPrimary {
+		t.Errorf("the new cover was not applied: %+v", after.Images)
+	}
+}
+
+// Exactly one cover, whatever the client claims: the migration's partial unique
+// index allows only one, so two would otherwise fail at the database.
+func TestOnlyOneImageEndsUpAsTheCover(t *testing.T) {
+	h := newListingHarness(t)
+	token, _ := h.signUp(t)
+
+	body := validListing()
+	body["images"] = []map[string]any{
+		{"url": "http://localhost:8081/uploads/2026-08/a.jpg", "is_primary": true},
+		{"url": "http://localhost:8081/uploads/2026-08/b.jpg", "is_primary": true},
+		{"url": "http://localhost:8081/uploads/2026-08/c.jpg", "is_primary": true},
+	}
+
+	status, created := h.create(t, token, body)
+	if status != http.StatusCreated {
+		t.Fatalf("got status %d, want 201: three covers were rejected outright", status)
+	}
+
+	covers := 0
+	for _, image := range created.Images {
+		if image.IsPrimary {
+			covers++
+		}
+	}
+	if covers != 1 {
+		t.Errorf("got %d covers, want exactly 1", covers)
+	}
+}
+
+// A listing with no photographs is still a listing; the response must carry an
+// empty array rather than null, which the client maps over without a guard.
+func TestListingWithoutImagesReturnsAnEmptyArray(t *testing.T) {
+	h := newListingHarness(t)
+	token, _ := h.signUp(t)
+
+	body := validListing()
+	delete(body, "images")
+
+	status, created := h.create(t, token, body)
+	if status != http.StatusCreated {
+		t.Fatalf("got status %d, want 201", status)
+	}
+	if created.Images == nil {
+		t.Error("images is null; the client maps over it and would throw")
+	}
+	if len(created.Images) != 0 {
+		t.Errorf("got %d images, want none", len(created.Images))
+	}
+}

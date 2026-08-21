@@ -61,8 +61,15 @@ function ListingForm({ id, isEditMode, existing }) {
 
   // Clearing the field's error as it is edited keeps messages from lingering
   // after the user has already fixed them.
+  // `value` may be an updater, the way setState's is. Several image uploads
+  // finish independently and each patches the gallery; passing a plain array
+  // would make them read the same pre-update list and overwrite one another,
+  // so only the last one's URL survived.
   const setField = useCallback((field, value) => {
-    setListing((current) => ({ ...current, [field]: value }))
+    setListing((current) => ({
+      ...current,
+      [field]: typeof value === 'function' ? value(current[field]) : value,
+    }))
     setErrors((current) => ({ ...current, [field]: undefined }))
     setStatus(null)
   }, [])
