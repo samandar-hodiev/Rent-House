@@ -180,6 +180,7 @@ export default {
   'chat.sent': 'Yuborildi',
   'chat.read': "O'qildi",
   'chat.startFailed': "Suhbatni ochib bo'lmadi.",
+  'chat.startFailedSelf': "Bu sizning e'loningiz — o'zingizga xabar yoza olmaysiz.",
   'chat.selectConversation': 'Suhbatni tanlang',
   'chat.backToList': 'Suhbatlar',
   'chat.title': 'Suhbatlar',
@@ -343,6 +344,8 @@ export default {
   'apartmentDetails.similarApartments': "Sizga o'xshash uylar",
   'apartmentDetails.call': "Qo'ng'iroq qilish",
   'apartmentDetails.message': 'Xabar yozish',
+  'apartmentDetails.ownListing': "Bu — sizning e'loningiz.",
+  'apartmentDetails.editListing': "E'lonni tahrirlash",
 
   'chat.headerWithName': '{name}ga xabar',
   'chat.close': 'Yopish',

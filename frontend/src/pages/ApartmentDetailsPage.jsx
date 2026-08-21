@@ -9,6 +9,7 @@ import {
   Map,
   MapPin,
   MessageCircle,
+  Pencil,
   ParkingCircle,
   Phone,
   Ruler,
@@ -33,7 +34,7 @@ import { useWishlist } from '../context/WishlistContext'
 import { useRequireAuth } from '../hooks/useRequireAuth'
 import { getDistrictById, districtNameKey } from '../data/districts'
 import { fetchApartment, fetchApartments } from '../services/apartmentsApi'
-import { ROUTES } from '../routes/paths'
+import { ROUTES, editListingPath } from '../routes/paths'
 import { listingDescription, listingTitle } from '../utils/listingText'
 import { formatUzsAmount } from '../utils/formatPrice'
 import { formatPostedAt } from '../utils/formatRelativeTime'
@@ -77,7 +78,7 @@ function ApartmentDetailsPage() {
   const navigate = useNavigate()
   const { isSaved, toggleWishlist } = useWishlist()
   const requireAuth = useRequireAuth()
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const [apartment, setApartment] = useState(null)
   const [similarApartments, setSimilarApartments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -158,6 +159,12 @@ function ApartmentDetailsPage() {
   const description = listingDescription(t, apartment)
   const district = getDistrictById(apartment.districtId)
   const saved = isSaved(apartment.id)
+
+  // Your own listing offers no way to contact yourself. The backend refuses a
+  // conversation between an owner and their own listing, so a Call and a
+  // Message button here could only ever fail; what belongs in their place is
+  // the one action an owner actually wants, which is editing it.
+  const isOwnListing = Boolean(user?.id && apartment.owner?.id === user.id)
 
   const facts = [
     { Icon: BedDouble, label: t('filters.rooms'), value: apartment.rooms },
@@ -301,23 +308,36 @@ function ApartmentDetailsPage() {
             </h2>
             <p className="mt-2 text-sm font-medium text-text-primary">{apartment.owner.name}</p>
 
-            <div className="mt-4 hidden gap-3 lg:flex">
-              <a
-                href={`tel:${apartment.owner.phone}`}
-                className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                <Phone aria-hidden="true" size={16} />
-                {t('apartmentDetails.call')}
-              </a>
-              <button
-                type="button"
-                onClick={handleChatClick}
-                className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                <MessageCircle aria-hidden="true" size={16} />
-                {t('apartmentDetails.message')}
-              </button>
-            </div>
+            {isOwnListing ? (
+              <div className="mt-4 hidden lg:block">
+                <p className="text-sm text-text-muted">{t('apartmentDetails.ownListing')}</p>
+                <Link
+                  to={editListingPath(apartment.id)}
+                  className="mt-3 flex items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <Pencil aria-hidden="true" size={16} />
+                  {t('apartmentDetails.editListing')}
+                </Link>
+              </div>
+            ) : (
+              <div className="mt-4 hidden gap-3 lg:flex">
+                <a
+                  href={`tel:${apartment.owner.phone}`}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <Phone aria-hidden="true" size={16} />
+                  {t('apartmentDetails.call')}
+                </a>
+                <button
+                  type="button"
+                  onClick={handleChatClick}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <MessageCircle aria-hidden="true" size={16} />
+                  {t('apartmentDetails.message')}
+                </button>
+              </div>
+            )}
           </div>
 
           <button
@@ -345,21 +365,33 @@ function ApartmentDetailsPage() {
       ) : null}
 
       <div className="fixed inset-x-0 bottom-0 z-30 flex gap-3 border-t border-border bg-surface p-3 lg:hidden">
-        <a
-          href={`tel:${apartment.owner.phone}`}
-          className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          <Phone aria-hidden="true" size={16} />
-          {t('apartmentDetails.call')}
-        </a>
-        <button
-          type="button"
-          onClick={handleChatClick}
-          className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          <MessageCircle aria-hidden="true" size={16} />
-          {t('apartmentDetails.message')}
-        </button>
+        {isOwnListing ? (
+          <Link
+            to={editListingPath(apartment.id)}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <Pencil aria-hidden="true" size={16} />
+            {t('apartmentDetails.editListing')}
+          </Link>
+        ) : (
+          <>
+            <a
+              href={`tel:${apartment.owner.phone}`}
+              className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <Phone aria-hidden="true" size={16} />
+              {t('apartmentDetails.call')}
+            </a>
+            <button
+              type="button"
+              onClick={handleChatClick}
+              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <MessageCircle aria-hidden="true" size={16} />
+              {t('apartmentDetails.message')}
+            </button>
+          </>
+        )}
       </div>
 
       {isChatOpen ? (

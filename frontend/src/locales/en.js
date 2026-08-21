@@ -180,6 +180,7 @@ export default {
   'chat.sent': 'Sent',
   'chat.read': 'Read',
   'chat.startFailed': 'The conversation could not be opened.',
+  'chat.startFailedSelf': 'This is your own listing — you cannot message yourself.',
   'chat.selectConversation': 'Select a conversation',
   'chat.backToList': 'Conversations',
   'chat.title': 'Conversations',
@@ -342,6 +343,8 @@ export default {
   'apartmentDetails.similarApartments': 'Similar apartments',
   'apartmentDetails.call': 'Call',
   'apartmentDetails.message': 'Message',
+  'apartmentDetails.ownListing': 'This is your own listing.',
+  'apartmentDetails.editListing': 'Edit listing',
 
   'chat.headerWithName': 'Message to {name}',
   'chat.close': 'Close',

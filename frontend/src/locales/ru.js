@@ -180,6 +180,7 @@ export default {
   'chat.sent': 'Отправлено',
   'chat.read': 'Прочитано',
   'chat.startFailed': 'Не удалось открыть диалог.',
+  'chat.startFailedSelf': 'Это ваше объявление — нельзя написать самому себе.',
   'chat.selectConversation': 'Выберите диалог',
   'chat.backToList': 'Диалоги',
   'chat.title': 'Диалоги',
@@ -343,6 +344,8 @@ export default {
   'apartmentDetails.similarApartments': 'Похожие квартиры',
   'apartmentDetails.call': 'Позвонить',
   'apartmentDetails.message': 'Написать сообщение',
+  'apartmentDetails.ownListing': 'Это ваше объявление.',
+  'apartmentDetails.editListing': 'Редактировать объявление',
 
   'chat.headerWithName': 'Сообщение для {name}',
   'chat.close': 'Закрыть',

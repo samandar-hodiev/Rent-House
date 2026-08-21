@@ -17,7 +17,10 @@ function ContactChatModal({ apartmentId, onClose }) {
   const { startConversation } = useChat()
 
   const [conversation, setConversation] = useState(null)
-  const [failed, setFailed] = useState(false)
+  // The failure code, not just a flag: "you own this listing" is a different
+  // thing to say than "something went wrong", and only one of the two is worth
+  // the reader trying again.
+  const [failure, setFailure] = useState(null)
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -29,14 +32,14 @@ function ContactChatModal({ apartmentId, onClose }) {
 
   useEffect(() => {
     let cancelled = false
-    setFailed(false)
+    setFailure(null)
 
     startConversation(apartmentId)
       .then((opened) => {
         if (!cancelled) setConversation(opened)
       })
-      .catch(() => {
-        if (!cancelled) setFailed(true)
+      .catch((error) => {
+        if (!cancelled) setFailure(error?.code ?? 'unknown')
       })
 
     return () => {
@@ -69,9 +72,11 @@ function ContactChatModal({ apartmentId, onClose }) {
           </button>
         </div>
 
-        {failed ? (
+        {failure ? (
           <p role="alert" className="p-6 text-center text-sm text-error">
-            {t('chat.startFailed')}
+            {failure === 'cannot_message_self'
+              ? t('chat.startFailedSelf')
+              : t('chat.startFailed')}
           </p>
         ) : conversation ? (
           <ChatThread conversation={conversation} className="flex-1" />
