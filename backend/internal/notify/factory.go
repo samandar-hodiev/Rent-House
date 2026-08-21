@@ -9,6 +9,7 @@ import (
 const (
 	ProviderDev    = "dev"
 	ProviderResend = "resend"
+	ProviderSMTP   = "smtp"
 	ProviderEskiz  = "eskiz"
 )
 
@@ -17,6 +18,7 @@ type Settings struct {
 	EmailProvider string
 	SMSProvider   string
 	Resend        ResendConfig
+	SMTP          SMTPConfig
 	Eskiz         EskizConfig
 }
 
@@ -31,9 +33,11 @@ func BuildEmailSender(s Settings) (Sender, error) {
 		return DevelopmentEmailSender{}, nil
 	case ProviderResend:
 		return NewResendSender(s.Resend)
+	case ProviderSMTP:
+		return NewSMTPSender(s.SMTP)
 	default:
-		return nil, fmt.Errorf("unknown email provider %q (expected %q or %q)",
-			s.EmailProvider, ProviderDev, ProviderResend)
+		return nil, fmt.Errorf("unknown email provider %q (expected %q, %q or %q)",
+			s.EmailProvider, ProviderDev, ProviderResend, ProviderSMTP)
 	}
 }
 

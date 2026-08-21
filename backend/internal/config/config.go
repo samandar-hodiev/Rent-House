@@ -55,6 +55,17 @@ type Notify struct {
 	// stand-in without credentials. Never set it in production.
 	ResendBaseURL string
 
+	// SMTP is the provider that needs no verified domain: any mailbox that can
+	// send mail can send to any recipient. SMTPPort 465 means implicit TLS,
+	// anything else is upgraded with STARTTLS.
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUsername string
+	SMTPPassword string
+	SMTPFrom     string
+	SMTPSubject  string
+	SMTPBody     string
+
 	EskizEmail    string
 	EskizPassword string
 	EskizFrom     string
@@ -152,6 +163,13 @@ func Load() (*Config, error) {
 		RegistrationTokenExpiry: tokenExpiry,
 	}
 
+	// 587 is the submission port with STARTTLS, which is what Gmail, Brevo and
+	// SendGrid all document first.
+	smtpPort, err := parseInt(os.Getenv("SMTP_PORT"), 587, "SMTP_PORT")
+	if err != nil {
+		return nil, err
+	}
+
 	cfg.Notify = Notify{
 		EmailProvider: strings.ToLower(envOr("EMAIL_PROVIDER", "dev")),
 		SMSProvider:   strings.ToLower(envOr("SMS_PROVIDER", "dev")),
@@ -163,6 +181,14 @@ func Load() (*Config, error) {
 		ResendSubject: os.Getenv("RESEND_SUBJECT"),
 		ResendBody:    os.Getenv("RESEND_BODY"),
 		ResendBaseURL: os.Getenv("RESEND_BASE_URL"),
+
+		SMTPHost:     os.Getenv("SMTP_HOST"),
+		SMTPPort:     smtpPort,
+		SMTPUsername: os.Getenv("SMTP_USERNAME"),
+		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom:     os.Getenv("SMTP_FROM"),
+		SMTPSubject:  os.Getenv("SMTP_SUBJECT"),
+		SMTPBody:     os.Getenv("SMTP_BODY"),
 
 		EskizEmail:    os.Getenv("ESKIZ_EMAIL"),
 		EskizPassword: os.Getenv("ESKIZ_PASSWORD"),

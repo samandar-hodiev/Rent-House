@@ -127,6 +127,15 @@ func buildSenders(cfg *config.Config) (senders, error) {
 			BodyFormat: cfg.Notify.ResendBody,
 			BaseURL:    cfg.Notify.ResendBaseURL,
 		},
+		SMTP: notify.SMTPConfig{
+			Host:       cfg.Notify.SMTPHost,
+			Port:       cfg.Notify.SMTPPort,
+			Username:   cfg.Notify.SMTPUsername,
+			Password:   cfg.Notify.SMTPPassword,
+			From:       cfg.Notify.SMTPFrom,
+			Subject:    cfg.Notify.SMTPSubject,
+			BodyFormat: cfg.Notify.SMTPBody,
+		},
 		Eskiz: notify.EskizConfig{
 			Email:         cfg.Notify.EskizEmail,
 			Password:      cfg.Notify.EskizPassword,
