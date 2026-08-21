@@ -24,6 +24,8 @@ import (
 	"github.com/samandar-hodiev/Rent-House/backend/internal/repository"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/service"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/storage"
+
+	"github.com/google/uuid"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/token"
 	"github.com/samandar-hodiev/Rent-House/backend/pkg/logger"
 	"github.com/samandar-hodiev/Rent-House/backend/pkg/response"
@@ -251,12 +253,24 @@ func newRouter(
 		me.GET("/apartments/stats", apartmentHandler.Stats)
 	}
 
+	// Uploaded files: listing photographs and chat attachments share one store.
+	files, err := storage.NewLocalStorage(cfg.UploadDir, cfg.UploadPublicPath)
+	if err != nil {
+		return nil, fmt.Errorf("storage: %w", err)
+	}
+
 	// Chat. The hub is process-wide state — the set of live sockets — so it is
 	// built once here and shared by the service that publishes events and the
 	// handler that accepts connections.
 	hub := realtime.NewHub()
 	chatService := service.NewChatService(
-		repository.NewChatRepository(db), apartments, users, hub,
+		repository.NewChatRepository(db), apartments, users, hub, files,
+		// Chat attachments are served through an authorized endpoint, never as
+		// static files: they are as private as the conversation they were sent
+		// in. Listing photographs remain public, which is what a listing is.
+		func(id uuid.UUID) string {
+			return strings.TrimRight(cfg.PublicBaseURL, "/") + "/api/v1/attachments/" + id.String()
+		},
 	)
 	chatHandler := handler.NewChatHandler(chatService)
 
@@ -279,17 +293,21 @@ func newRouter(
 		messages.DELETE("/:id", chatHandler.DeleteMessage)
 	}
 
+	// What the client may send. Read from the server so the picker's filters
+	// and the size check are not numbers restated in the frontend.
+	v1.GET("/attachments/limits", chatHandler.AttachmentLimits)
+	// QueryAuth, not Auth: a browser cannot set an Authorization header on an
+	// <img> or an <audio> source, so the token may also arrive in the query.
+	v1.GET("/attachments/:id", middleware.QueryAuth(tokens), chatHandler.DownloadAttachment)
+
 	// The realtime channel. Authenticated inside the handler rather than by
 	// middleware: a browser cannot set an Authorization header on a WebSocket
 	// handshake, so the token arrives as a query parameter.
 	v1.GET("/ws", handler.NewWSHandler(hub, chatService, tokens, cfg.AllowedOrigins).Connect)
 
-	// Uploaded photographs: stored by the configured backend, served straight
-	// off disk for the local one.
-	files, err := storage.NewLocalStorage(cfg.UploadDir, cfg.UploadPublicPath)
-	if err != nil {
-		return nil, fmt.Errorf("storage: %w", err)
-	}
+	// Listing photographs are served straight off disk: a published listing's
+	// pictures are public by definition. Chat attachments are not here — they
+	// go through the authorized endpoint above.
 	router.Static(files.PublicPath(), files.Dir())
 	v1.POST("/uploads/images",
 		middleware.Auth(tokens), handler.NewUploadHandler(files, cfg.PublicBaseURL).UploadImage)

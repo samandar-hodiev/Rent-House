@@ -25,28 +25,32 @@ import (
 	"time"
 )
 
-// MaxImageBytes caps one upload. Large enough for a phone photo, small enough
-// that a handful of requests cannot fill the disk.
-const MaxImageBytes = 5 << 20 // 5 MiB
-
-// allowedImageTypes is an allow-list, not a block-list: anything not named here
-// is refused. The extension is decided by this map too, so a file called
-// "photo.php" cannot keep that name on disk.
-var allowedImageTypes = map[string]string{
-	"image/jpeg": ".jpg",
-	"image/png":  ".png",
-	"image/webp": ".webp",
-}
-
-// ErrUnsupportedType is returned for a content type that is not an accepted
-// image.
+// ErrUnsupportedType is returned for a content type that is not accepted.
 var ErrUnsupportedType = fmt.Errorf("unsupported image type")
 
-// Storage keeps a file and returns the URL it can be read back from.
+// Saved is where a stored file went.
+type Saved struct {
+	// Path is the location relative to the storage root, which is what the
+	// database records and what a protected download reads back.
+	Path string
+	// URL is where it is served from.
+	URL string
+	// Bytes actually written.
+	Bytes int64
+}
+
+// Storage keeps a file and returns where it went.
 type Storage interface {
 	// Save reads at most MaxImageBytes from r and stores it, returning a URL
-	// relative to the server root.
+	// relative to the server root. Kept for apartment photographs, which
+	// predate the typed API below.
 	Save(ctx context.Context, contentType string, r io.Reader) (string, error)
+	// SaveKind stores a file of a named category, enforcing that category's
+	// accepted types and size ceiling.
+	SaveKind(ctx context.Context, kind Kind, contentType string, r io.Reader) (Saved, error)
+	// Open reads a stored file back, for a download that has to check
+	// authorization before serving bytes.
+	Open(ctx context.Context, storedPath string) (io.ReadSeekCloser, error)
 	// Delete removes a previously stored file. A missing file is not an error:
 	// the caller wants it gone, and it is.
 	Delete(ctx context.Context, url string) error
@@ -85,52 +89,92 @@ func (s *LocalStorage) Dir() string { return s.dir }
 // PublicPath is the URL prefix those files are served under.
 func (s *LocalStorage) PublicPath() string { return s.publicPath }
 
-// Save writes the upload under a generated name.
+// Save writes an apartment photograph.
 //
-// The name never comes from the client. A user-supplied filename is a path
-// traversal waiting to happen ("../../etc/passwd") and a collision risk; a
-// random name plus the extension implied by the accepted content type has
-// neither problem.
-func (s *LocalStorage) Save(_ context.Context, contentType string, r io.Reader) (string, error) {
-	extension, ok := allowedImageTypes[normalizeContentType(contentType)]
+// Kept because the listing form calls it and predates the typed API. It is now
+// a thin wrapper over SaveKind, so the accepted types and the size ceiling are
+// defined once and both callers obey the same rules.
+func (s *LocalStorage) Save(ctx context.Context, contentType string, r io.Reader) (string, error) {
+	saved, err := s.SaveKind(ctx, Kinds[KindImage], contentType, r)
+	if err != nil {
+		return "", err
+	}
+	return saved.URL, nil
+}
+
+// SaveKind stores one file of a named category.
+//
+// The name is generated and the extension comes from the accepted content type,
+// so nothing about where the file lands is under the client's control. Files are
+// grouped by kind and then by month, so one directory never accumulates every
+// upload the system has ever taken.
+func (s *LocalStorage) SaveKind(
+	_ context.Context, kind Kind, contentType string, r io.Reader,
+) (Saved, error) {
+	extension, ok := kind.Extension(contentType)
 	if !ok {
-		return "", ErrUnsupportedType
+		return Saved{}, ErrUnsupportedType
 	}
 
 	name, err := randomName(extension)
 	if err != nil {
-		return "", err
+		return Saved{}, err
 	}
 
-	// Grouped by month so one directory does not accumulate every file the
-	// system has ever taken.
-	folder := time.Now().UTC().Format("2006-01")
-	if err := os.MkdirAll(filepath.Join(s.dir, folder), 0o755); err != nil {
-		return "", fmt.Errorf("storage: create folder: %w", err)
+	folder := path.Join(kind.Folder, time.Now().UTC().Format("2006-01"))
+	if err := os.MkdirAll(filepath.Join(s.dir, filepath.FromSlash(folder)), 0o755); err != nil {
+		return Saved{}, fmt.Errorf("storage: create folder: %w", err)
 	}
 
 	relative := path.Join(folder, name)
-	destination := filepath.Join(s.dir, folder, name)
+	destination := filepath.Join(s.dir, filepath.FromSlash(relative))
 
 	file, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
-		return "", fmt.Errorf("storage: create file: %w", err)
+		return Saved{}, fmt.Errorf("storage: create file: %w", err)
 	}
 	defer file.Close()
 
 	// LimitReader is the enforcement, not the declared Content-Length: a client
-	// can claim any length it likes.
-	written, err := io.Copy(file, io.LimitReader(r, MaxImageBytes+1))
+	// can claim any length it likes. One byte over the ceiling is read so the
+	// difference between "exactly at the limit" and "over it" is detectable.
+	written, err := io.Copy(file, io.LimitReader(r, kind.MaxBytes+1))
 	if err != nil {
 		_ = os.Remove(destination)
-		return "", fmt.Errorf("storage: write file: %w", err)
+		return Saved{}, fmt.Errorf("storage: write file: %w", err)
 	}
-	if written > MaxImageBytes {
+	if written > kind.MaxBytes {
 		_ = os.Remove(destination)
-		return "", fmt.Errorf("storage: file exceeds %d bytes", MaxImageBytes)
+		return Saved{}, ErrTooLarge{Kind: kind.Name, MaxBytes: kind.MaxBytes}
+	}
+	if written == 0 {
+		_ = os.Remove(destination)
+		return Saved{}, fmt.Errorf("storage: file is empty")
 	}
 
-	return s.publicPath + "/" + relative, nil
+	return Saved{
+		Path:  relative,
+		URL:   s.publicPath + "/" + relative,
+		Bytes: written,
+	}, nil
+}
+
+// Open reads a stored file back.
+//
+// The path is re-cleaned and re-checked against the root even though it came
+// from our own database: a bug elsewhere that let a crafted path be stored must
+// not become a way to read arbitrary files off the disk.
+func (s *LocalStorage) Open(_ context.Context, storedPath string) (io.ReadSeekCloser, error) {
+	target := filepath.Join(s.dir, filepath.FromSlash(path.Clean("/"+storedPath)))
+	if !strings.HasPrefix(target, s.dir+string(os.PathSeparator)) {
+		return nil, fmt.Errorf("storage: path escapes the storage root")
+	}
+
+	file, err := os.Open(target)
+	if err != nil {
+		return nil, fmt.Errorf("storage: open file: %w", err)
+	}
+	return file, nil
 }
 
 // Delete removes a stored file, ignoring anything that is not ours.

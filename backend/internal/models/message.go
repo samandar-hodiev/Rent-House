@@ -17,6 +17,10 @@ type Message struct {
 	ConversationID uuid.UUID `gorm:"column:conversation_id;type:uuid;not null;index:idx_messages_conversation_created,priority:1" json:"conversation_id"`
 	SenderID       uuid.UUID `gorm:"column:sender_id;type:uuid;not null;index:idx_messages_sender_id" json:"sender_id"`
 
+	// Kind decides whether Body or the attachment is the message. A column
+	// rather than a lookup, because the not-blank CHECK has to be satisfiable
+	// from this row alone.
+	Kind   string `gorm:"column:kind;type:varchar(10);not null;default:text" json:"kind"`
 	Body   string `gorm:"column:body;type:text;not null" json:"body"`
 	IsRead bool   `gorm:"column:is_read;not null;default:false" json:"is_read"`
 
@@ -32,8 +36,9 @@ type Message struct {
 
 	Timestamps
 
-	Conversation *Conversation `gorm:"foreignKey:ConversationID;references:ID" json:"conversation,omitempty"`
-	Sender       *User         `gorm:"foreignKey:SenderID;references:ID" json:"sender,omitempty"`
+	Conversation *Conversation      `gorm:"foreignKey:ConversationID;references:ID" json:"conversation,omitempty"`
+	Sender       *User              `gorm:"foreignKey:SenderID;references:ID" json:"sender,omitempty"`
+	Attachment   *MessageAttachment `gorm:"foreignKey:MessageID" json:"attachment,omitempty"`
 }
 
 func (Message) TableName() string { return "messages" }

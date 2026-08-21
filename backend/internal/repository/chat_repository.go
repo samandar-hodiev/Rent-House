@@ -268,8 +268,11 @@ func (r *ChatRepository) ListMessages(
 	}
 
 	// One extra row answers "is there more" without a second count query.
+	// Attachments are preloaded so a page of twenty messages is two queries
+	// rather than twenty-one.
 	var messages []models.Message
 	err := query.
+		Preload("Attachment").
 		Order("messages.created_at DESC, messages.id DESC").
 		Limit(limit + 1).
 		Find(&messages).Error
@@ -291,13 +294,24 @@ func (r *ChatRepository) ListMessages(
 	return page, nil
 }
 
-// CreateMessage stores a message and marks its thread as active.
+// CreateMessage stores a message, its attachment if it has one, and marks its
+// thread as active.
+//
+// One transaction: a message whose attachment row failed to insert would render
+// as an empty bubble, which is worse than the send having failed outright.
 func (r *ChatRepository) CreateMessage(
-	ctx context.Context, message *models.Message,
+	ctx context.Context, message *models.Message, attachment *models.MessageAttachment,
 ) error {
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(message).Error; err != nil {
+		if err := tx.Omit("Attachment").Create(message).Error; err != nil {
 			return err
+		}
+		if attachment != nil {
+			attachment.MessageID = message.ID
+			if err := tx.Create(attachment).Error; err != nil {
+				return err
+			}
+			message.Attachment = attachment
 		}
 		// The conversation list orders by activity, so writing to a thread has
 		// to move it.
@@ -311,10 +325,10 @@ func (r *ChatRepository) CreateMessage(
 	return nil
 }
 
-// FindMessage loads one message.
+// FindMessage loads one message with its attachment.
 func (r *ChatRepository) FindMessage(ctx context.Context, id uuid.UUID) (*models.Message, error) {
 	var message models.Message
-	if err := r.db.WithContext(ctx).First(&message, "id = ?", id).Error; err != nil {
+	if err := r.db.WithContext(ctx).Preload("Attachment").First(&message, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrMessageNotFound
 		}
@@ -401,6 +415,32 @@ func (r *ChatRepository) MarkRead(
 		ids = append(ids, row.ID)
 	}
 	return ids, nil
+}
+
+// FindAttachment loads one attachment together with the conversation it belongs
+// to, which is what a download has to check before serving any bytes.
+func (r *ChatRepository) FindAttachment(
+	ctx context.Context, id uuid.UUID,
+) (*models.MessageAttachment, uuid.UUID, error) {
+	var row struct {
+		models.MessageAttachment
+		ConversationID uuid.UUID
+	}
+	err := r.db.WithContext(ctx).
+		Model(&models.MessageAttachment{}).
+		Select("message_attachments.*, messages.conversation_id").
+		Joins("JOIN messages ON messages.id = message_attachments.message_id").
+		// A withdrawn message's attachment is no longer readable by anyone.
+		Where("message_attachments.id = ? AND messages.deleted_at IS NULL", id).
+		Take(&row).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, uuid.Nil, ErrMessageNotFound
+		}
+		return nil, uuid.Nil, fmt.Errorf("find attachment: %w", err)
+	}
+	attachment := row.MessageAttachment
+	return &attachment, row.ConversationID, nil
 }
 
 // UnreadTotal counts everything unread across all of a user's threads, for the

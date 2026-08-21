@@ -2,7 +2,10 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -10,6 +13,7 @@ import (
 	"github.com/samandar-hodiev/Rent-House/backend/internal/dto"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/middleware"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/service"
+	"github.com/samandar-hodiev/Rent-House/backend/internal/storage"
 	"github.com/samandar-hodiev/Rent-House/backend/pkg/logger"
 	"github.com/samandar-hodiev/Rent-House/backend/pkg/response"
 )
@@ -120,9 +124,15 @@ func (h *ChatHandler) ListMessages(c *gin.Context) {
 
 // SendMessage handles POST /api/v1/conversations/:id/messages.
 //
-// Messages travel over REST, not the socket: validation, authorization and
-// persistence then live in one place, and the sender gets a real status code
-// to act on rather than silence. The socket is for delivery to everyone else.
+// Accepts JSON for a text message and multipart for one carrying a file. One
+// endpoint rather than an upload followed by a send: there is no window in
+// which a stored file has no message, nothing to clean up when a client
+// abandons the second half, and the upload's own progress is the send's
+// progress.
+//
+// Messages travel over HTTP, not the socket: validation, authorization and
+// persistence then live in one place, and the sender gets a real status code to
+// act on rather than silence. The socket is for delivery to everyone else.
 func (h *ChatHandler) SendMessage(c *gin.Context) {
 	actorID, ok := h.actor(c)
 	if !ok {
@@ -133,20 +143,142 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	var req dto.SendMessageRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+	body, attachment, cleanup, ok := h.readMessage(c)
+	if !ok {
 		return
 	}
-	req.Normalize()
+	defer cleanup()
 
-	message, err := h.chat.SendMessage(c.Request.Context(), conversationID, actorID, req.Body)
+	message, err := h.chat.SendMessage(c.Request.Context(), conversationID, actorID, body, attachment)
 	if err != nil {
 		h.writeError(c, err, "send message")
 		return
 	}
 
 	response.Success(c, http.StatusCreated, "", message)
+}
+
+// readMessage pulls the text and the optional file out of either encoding.
+func (h *ChatHandler) readMessage(
+	c *gin.Context,
+) (body string, attachment *service.Attachment, cleanup func(), ok bool) {
+	cleanup = func() {}
+
+	if !strings.HasPrefix(c.ContentType(), "multipart/form-data") {
+		var req dto.SendMessageRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+			return "", nil, cleanup, false
+		}
+		req.Normalize()
+		return req.Body, nil, cleanup, true
+	}
+
+	header, err := c.FormFile("file")
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed",
+			"Attach a file in the 'file' field")
+		return "", nil, cleanup, false
+	}
+
+	// Checked before the file is opened, so an oversized upload is refused
+	// without reading it. Storage re-checks while reading, because a declared
+	// size is only a claim.
+	kind, known := storage.KindForContentType(header.Header.Get("Content-Type"))
+	if !known {
+		response.Error(c, http.StatusUnsupportedMediaType, "unsupported_type",
+			"This file type is not accepted")
+		return "", nil, cleanup, false
+	}
+	if header.Size > kind.MaxBytes {
+		response.Error(c, http.StatusRequestEntityTooLarge, "file_too_large",
+			"The file is larger than the limit for its type")
+		return "", nil, cleanup, false
+	}
+
+	file, err := header.Open()
+	if err != nil {
+		logger.Errorf("send message: open upload: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error", "Something went wrong")
+		return "", nil, cleanup, false
+	}
+	cleanup = func() { _ = file.Close() }
+
+	attachment = &service.Attachment{
+		Reader:       file,
+		ContentType:  header.Header.Get("Content-Type"),
+		OriginalName: header.Filename,
+	}
+	// A voice note carries its length, which the recorder knows and the server
+	// would otherwise have to decode the file to learn.
+	if raw := strings.TrimSpace(c.PostForm("duration_seconds")); raw != "" {
+		if seconds, err := strconv.Atoi(raw); err == nil && seconds >= 0 && seconds <= 3600 {
+			attachment.DurationSeconds = &seconds
+		}
+	}
+
+	return strings.TrimSpace(c.PostForm("body")), attachment, cleanup, true
+}
+
+// DownloadAttachment handles GET /api/v1/attachments/:id.
+//
+// Authorization happens before any bytes are read: an attachment is as private
+// as the conversation it was sent in.
+//
+// The token may arrive as a query parameter as well as a header, because a
+// browser cannot set headers on an <img> or an <audio> source. It is the same
+// short-lived access token the rest of the API uses.
+func (h *ChatHandler) DownloadAttachment(c *gin.Context) {
+	actorID, ok := h.actor(c)
+	if !ok {
+		return
+	}
+	attachmentID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusNotFound, "attachment_not_found", "Attachment not found")
+		return
+	}
+
+	attachment, file, err := h.chat.OpenAttachment(c.Request.Context(), attachmentID, actorID)
+	if err != nil {
+		h.writeError(c, err, "download attachment")
+		return
+	}
+	defer file.Close()
+
+	// The name is quoted and already stripped of control characters by the
+	// storage layer, so it cannot split this header.
+	disposition := "inline"
+	if attachment.Kind == storage.KindFile {
+		// Documents are offered as downloads; pictures and audio are played in
+		// place.
+		disposition = "attachment"
+	}
+	c.Header("Content-Disposition",
+		fmt.Sprintf("%s; filename=%q", disposition, attachment.OriginalName))
+	c.Header("Content-Type", attachment.MimeType)
+	// Private: a shared cache must not hold one conversation's files and serve
+	// them to another reader.
+	c.Header("Cache-Control", "private, max-age=3600")
+	c.Header("X-Content-Type-Options", "nosniff")
+
+	http.ServeContent(c.Writer, c.Request, attachment.OriginalName, attachment.CreatedAt, file)
+}
+
+// AttachmentLimits handles GET /api/v1/attachments/limits.
+//
+// The client reads its file-picker filters and its size checks from here, so
+// the rules are stated once, on the server that enforces them.
+func (h *ChatHandler) AttachmentLimits(c *gin.Context) {
+	limit := func(name string) dto.AttachmentLimit {
+		kind := storage.Kinds[name]
+		return dto.AttachmentLimit{MaxBytes: kind.MaxBytes, MimeTypes: kind.MimeTypes()}
+	}
+	response.OK(c, "", dto.AttachmentLimits{
+		Image: limit(storage.KindImage),
+		File:  limit(storage.KindFile),
+		Audio: limit(storage.KindAudio),
+	})
 }
 
 // MarkRead handles POST /api/v1/conversations/:id/read.
@@ -277,6 +409,17 @@ func (h *ChatHandler) writeError(c *gin.Context, err error, operation string) {
 			"This message has been deleted")
 	case errors.Is(err, service.ErrEmptyMessage):
 		response.Error(c, http.StatusBadRequest, "validation_failed", "The message is empty")
+	case errors.Is(err, service.ErrUnsupportedAttachment):
+		response.Error(c, http.StatusUnsupportedMediaType, "unsupported_type",
+			"This file type is not accepted")
+	case errors.Is(err, service.ErrAttachmentTooLarge):
+		response.Error(c, http.StatusRequestEntityTooLarge, "file_too_large",
+			"The file is larger than the limit for its type")
+	case errors.Is(err, service.ErrAttachmentNotFound):
+		response.Error(c, http.StatusNotFound, "attachment_not_found", "Attachment not found")
+	case errors.Is(err, service.ErrAttachmentNotEditable):
+		response.Error(c, http.StatusConflict, "attachment_not_editable",
+			"An attachment message cannot be edited")
 	default:
 		logger.Errorf("%s: %v", operation, err)
 		response.Error(c, http.StatusInternalServerError, "internal_error", "Something went wrong")

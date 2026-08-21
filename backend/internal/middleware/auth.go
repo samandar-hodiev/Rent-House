@@ -108,3 +108,42 @@ func OptionalAuth(tokens *token.Service) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// QueryAuth accepts the access token from the Authorization header or, failing
+// that, from a `token` query parameter.
+//
+// It exists for URLs a browser fetches without JavaScript in the loop: an
+// <img src>, an <audio src>, a download link. None of those can carry a header,
+// so a protected attachment would be unreachable without this — and serving
+// those files statically instead would make every chat attachment public to
+// anyone who learned its address.
+//
+// The trade-off is that the token appears in a URL, where it can reach browser
+// history and any intermediary's logs. It is the same short-lived access token
+// used everywhere else, and the alternative is worse.
+func QueryAuth(tokens *token.Service) gin.HandlerFunc {
+	header := Auth(tokens)
+
+	return func(c *gin.Context) {
+		if c.GetHeader("Authorization") != "" {
+			header(c)
+			return
+		}
+
+		raw := strings.TrimSpace(c.Query("token"))
+		if raw == "" {
+			response.AbortWithError(c, http.StatusUnauthorized, "missing_token",
+				"Authentication required")
+			return
+		}
+
+		userID, err := tokens.Validate(raw)
+		if err != nil {
+			response.AbortWithError(c, http.StatusUnauthorized, "invalid_token", "Invalid token")
+			return
+		}
+
+		c.Set(userIDKey.name, userID)
+		c.Next()
+	}
+}

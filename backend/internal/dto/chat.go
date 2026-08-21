@@ -32,8 +32,13 @@ type StartConversationRequest struct {
 }
 
 // SendMessageRequest is the body of POST /api/v1/conversations/:id/messages.
+//
+// Either text or an attachment; the service rejects a request carrying neither.
+// The attachment is referenced by the id an earlier upload returned — the bytes
+// travelled over HTTP, not through this JSON and not through the socket.
 type SendMessageRequest struct {
-	Body string `json:"body" binding:"required,min=1,max=4000"`
+	Body         string `json:"body"          binding:"omitempty,max=4000"`
+	AttachmentID string `json:"attachment_id" binding:"omitempty,uuid"`
 }
 
 // Normalize trims the text. A message of only whitespace is not a message, and
@@ -104,7 +109,11 @@ type MessageResponse struct {
 	ID             uuid.UUID `json:"id"`
 	ConversationID uuid.UUID `json:"conversation_id"`
 	SenderID       uuid.UUID `json:"sender_id"`
-	Body           string    `json:"body"`
+	// Kind is text, image, file or audio, so the client picks a renderer
+	// without inspecting the attachment.
+	Kind       string              `json:"kind"`
+	Body       string              `json:"body"`
+	Attachment *AttachmentResponse `json:"attachment,omitempty"`
 
 	IsRead   bool `json:"is_read"`
 	IsEdited bool `json:"is_edited"`
@@ -123,7 +132,9 @@ func NewMessageResponse(message *models.Message) MessageResponse {
 		ID:             message.ID,
 		ConversationID: message.ConversationID,
 		SenderID:       message.SenderID,
+		Kind:           message.Kind,
 		Body:           message.Body,
+		Attachment:     NewAttachmentResponse(message.Attachment),
 		IsRead:         message.IsRead,
 		IsEdited:       message.EditedAt != nil,
 		IsDeleted:      message.DeletedAt != nil,
@@ -132,8 +143,11 @@ func NewMessageResponse(message *models.Message) MessageResponse {
 		EditedAt:       message.EditedAt,
 	}
 	if out.IsDeleted {
-		// Never send the text of a withdrawn message, whatever the row holds.
+		// Never send the text of a withdrawn message, whatever the row holds —
+		// nor a link to its attachment, which stops being readable the moment
+		// the message is withdrawn.
 		out.Body = ""
+		out.Attachment = nil
 		out.EditedAt = nil
 		out.IsEdited = false
 	}
@@ -182,4 +196,61 @@ type ReadReceipt struct {
 	MessageIDs     []uuid.UUID `json:"message_ids"`
 	ReaderID       uuid.UUID   `json:"reader_id"`
 	ReadAt         time.Time   `json:"read_at"`
+}
+
+// --- attachments -----------------------------------------------------------
+
+// AttachmentResponse is a file sent in a conversation.
+//
+// StoredPath is deliberately absent: the client asks for the attachment by id
+// and the server decides where it lives, so an internal filesystem layout is
+// never something a browser has seen.
+type AttachmentResponse struct {
+	ID   uuid.UUID `json:"id"`
+	Kind string    `json:"kind"`
+	Name string    `json:"name"`
+	// URL is the protected endpoint for this attachment, not a path on disk.
+	URL       string `json:"url"`
+	MimeType  string `json:"mime_type"`
+	SizeBytes int64  `json:"size_bytes"`
+	// DurationSeconds is set for audio, so a player can show a length before
+	// the file has loaded.
+	DurationSeconds *int `json:"duration_seconds,omitempty"`
+}
+
+// NewAttachmentResponse converts a stored attachment into its API shape.
+func NewAttachmentResponse(attachment *models.MessageAttachment) *AttachmentResponse {
+	if attachment == nil {
+		return nil
+	}
+	return &AttachmentResponse{
+		ID:              attachment.ID,
+		Kind:            attachment.Kind,
+		Name:            attachment.OriginalName,
+		URL:             attachment.URL,
+		MimeType:        attachment.MimeType,
+		SizeBytes:       attachment.SizeBytes,
+		DurationSeconds: attachment.DurationSeconds,
+	}
+}
+
+// UploadedAttachment is what an upload hands back, ready to be attached to a
+// message. The client sends the id straight back in SendMessageRequest.
+type UploadedAttachment struct {
+	AttachmentResponse
+}
+
+// AttachmentLimits tells the client what it may send, so the file picker and
+// the size check are driven by the server rather than by numbers restated in
+// the frontend and left to drift.
+type AttachmentLimits struct {
+	Image AttachmentLimit `json:"image"`
+	File  AttachmentLimit `json:"file"`
+	Audio AttachmentLimit `json:"audio"`
+}
+
+// AttachmentLimit is one kind's rules.
+type AttachmentLimit struct {
+	MaxBytes  int64    `json:"max_bytes"`
+	MimeTypes []string `json:"mime_types"`
 }
