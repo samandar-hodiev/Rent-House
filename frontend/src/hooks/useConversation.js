@@ -6,9 +6,10 @@ import {
   editMessage as editMessageRequest,
   fetchMessages,
   markConversationRead,
+  sendAttachment,
   sendMessage as sendMessageRequest,
 } from '../services/chatApi'
-import { CHAT_EVENTS } from '../services/chatSocket'
+import { CHAT_EVENTS, SOCKET_STATUS } from '../services/chatSocket'
 
 /**
  * One open thread: its messages, its paging, and the realtime events that
@@ -20,7 +21,7 @@ import { CHAT_EVENTS } from '../services/chatSocket'
  */
 export function useConversation(conversationId) {
   const { token, user } = useAuth()
-  const { subscribe, markRead } = useChat()
+  const { subscribe, markRead, socketStatus } = useChat()
   const myId = user?.id ?? null
 
   const [messages, setMessages] = useState([])
@@ -122,6 +123,40 @@ export function useConversation(conversationId) {
     })
   }, [conversationId, subscribe])
 
+  // Recovery after a reconnect.
+  //
+  // The socket is a delivery channel, not the record: anything sent while it
+  // was down was never pushed to this client and would otherwise be missing
+  // until a manual reload. On every transition back to open, the newest page is
+  // refetched and merged — the database is the source of truth, and this is
+  // where that principle actually earns its keep.
+  const wasOpen = useRef(socketStatus === SOCKET_STATUS.open)
+  useEffect(() => {
+    const isOpen = socketStatus === SOCKET_STATUS.open
+    const reconnected = isOpen && !wasOpen.current
+    wasOpen.current = isOpen
+
+    if (!reconnected || !conversationId || !token) return
+
+    fetchMessages(conversationId, { token, limit: 30 })
+      .then((page) => {
+        setMessages((current) => {
+          // Merged by id, so a message this client already has — because the
+          // POST returned it, or because the socket delivered it before the
+          // drop — is not shown twice.
+          const held = new Set(current.map((message) => message.id))
+          const missed = page.items.filter((message) => !held.has(message.id))
+          if (missed.length === 0) return current
+          return [...current, ...missed].sort(
+            (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+          )
+        })
+      })
+      .catch(() => {
+        // The next reconnect tries again; nothing is lost, only delayed.
+      })
+  }, [socketStatus, conversationId, token])
+
   /** Loads the page before the oldest message held. */
   const loadOlder = useCallback(async () => {
     if (!hasMore || loadingOlder || !cursor.current) return
@@ -169,6 +204,36 @@ export function useConversation(conversationId) {
       }
     },
     [conversationId, token, sending],
+  )
+
+  /**
+   * Sends a file — image, document or voice note — with real progress.
+   *
+   * `onProgress` is fed by the upload's own byte counter, and the returned
+   * `abort` cancels it. Nothing is added to the list until the server has
+   * answered: a message that failed to upload must not appear as though it
+   * had been sent.
+   */
+  const sendFile = useCallback(
+    ({ file, body = '', durationSeconds, onProgress }) => {
+      const { promise, abort } = sendAttachment(conversationId, {
+        file,
+        body,
+        durationSeconds,
+        token,
+        onProgress,
+      })
+
+      const done = promise.then((message) => {
+        setMessages((current) =>
+          current.some((item) => item.id === message.id) ? current : [...current, message],
+        )
+        return message
+      })
+
+      return { promise: done, abort }
+    },
+    [conversationId, token],
   )
 
   const edit = useCallback(
@@ -228,6 +293,7 @@ export function useConversation(conversationId) {
     sendError,
     clearSendError: () => setSendError(null),
     send,
+    sendFile,
     edit,
     remove,
   }
@@ -239,7 +305,19 @@ function normalize(payload) {
     id: payload.id,
     conversationId: payload.conversation_id,
     senderId: payload.sender_id,
+    kind: payload.kind ?? 'text',
     body: payload.body,
+    attachment: payload.attachment
+      ? {
+          id: payload.attachment.id,
+          kind: payload.attachment.kind,
+          name: payload.attachment.name,
+          url: payload.attachment.url,
+          mimeType: payload.attachment.mime_type,
+          sizeBytes: payload.attachment.size_bytes,
+          durationSeconds: payload.attachment.duration_seconds ?? null,
+        }
+      : null,
     isRead: payload.is_read,
     isEdited: payload.is_edited,
     isDeleted: payload.is_deleted,

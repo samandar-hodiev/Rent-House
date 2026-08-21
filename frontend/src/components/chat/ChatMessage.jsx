@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, CheckCheck, Pencil, Trash2, X } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { formatMessageTime } from '../../utils/formatChatTime'
+import MessageAttachment from './MessageAttachment'
 
 /**
  * One bubble.
@@ -14,8 +15,9 @@ import { formatMessageTime } from '../../utils/formatChatTime'
  * would leave an unexplained gap where both people remember something being
  * said.
  */
-function ChatMessage({ message, isMine, onEdit, onDelete }) {
+function ChatMessage({ message, isMine, onEdit, onDelete, onOpenImage }) {
   const { t, locale } = useLocale()
+  const isText = (message.kind ?? 'text') === 'text'
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.body)
   const inputRef = useRef(null)
@@ -57,6 +59,10 @@ function ChatMessage({ message, isMine, onEdit, onDelete }) {
             touch screen where there is no hover to reveal them. */}
         {isMine && !editing ? (
           <div className="flex shrink-0 flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-100">
+            {/* An attachment is immutable — swapping the file under a message
+                would leave the two people looking at different things — so only
+                a text message offers Edit. */}
+            {isText ? (
             <button
               type="button"
               onClick={startEditing}
@@ -66,6 +72,7 @@ function ChatMessage({ message, isMine, onEdit, onDelete }) {
             >
               <Pencil aria-hidden="true" size={13} />
             </button>
+            ) : null}
             <button
               type="button"
               onClick={() => onDelete(message)}
@@ -115,13 +122,25 @@ function ChatMessage({ message, isMine, onEdit, onDelete }) {
             </form>
           ) : (
             <>
-              <p
-                className={`whitespace-pre-wrap break-words text-sm ${
-                  isMine ? '' : 'text-text-primary'
-                }`}
-              >
-                {message.body}
-              </p>
+              {message.attachment ? (
+                <div className={message.body ? 'mb-2' : undefined}>
+                  <MessageAttachment
+                    attachment={message.attachment}
+                    isMine={isMine}
+                    onOpenImage={onOpenImage}
+                  />
+                </div>
+              ) : null}
+
+              {message.body ? (
+                <p
+                  className={`whitespace-pre-wrap break-words text-sm ${
+                    isMine ? '' : 'text-text-primary'
+                  }`}
+                >
+                  {message.body}
+                </p>
+              ) : null}
 
               <p
                 className={`mt-1 flex items-center justify-end gap-1 text-[11px] ${

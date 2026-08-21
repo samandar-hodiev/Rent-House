@@ -3,7 +3,11 @@
 //
 // The API speaks snake_case and the UI speaks camelCase; the translation lives
 // here, as it does for listings.
-import { request } from './apiClient'
+import { ApiError, NETWORK_ERROR, request } from './apiClient'
+
+// The upload path builds its own request, so it needs the base URL the shared
+// client normally hides.
+const API_BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api/v1').replace(/\/$/, '')
 
 /** Turns an API message into the shape the bubbles render. */
 export function toMessage(item) {
@@ -11,7 +15,21 @@ export function toMessage(item) {
     id: item.id,
     conversationId: item.conversation_id,
     senderId: item.sender_id,
+    // text | image | file | audio — the client picks a renderer from this
+    // rather than inspecting the attachment.
+    kind: item.kind ?? 'text',
     body: item.body,
+    attachment: item.attachment
+      ? {
+          id: item.attachment.id,
+          kind: item.attachment.kind,
+          name: item.attachment.name,
+          url: item.attachment.url,
+          mimeType: item.attachment.mime_type,
+          sizeBytes: item.attachment.size_bytes,
+          durationSeconds: item.attachment.duration_seconds ?? null,
+        }
+      : null,
     isRead: item.is_read,
     isEdited: item.is_edited,
     isDeleted: item.is_deleted,
@@ -132,4 +150,86 @@ export function deleteMessage(messageId, scope, { token } = {}) {
 export async function fetchUnreadTotal({ token, signal } = {}) {
   const data = await request('/conversations/unread', { token, signal })
   return data.unread_total ?? 0
+}
+
+// --- attachments -----------------------------------------------------------
+
+/**
+ * Sends a message carrying a file, reporting real upload progress.
+ *
+ * XMLHttpRequest rather than fetch: fetch still has no upload-progress event in
+ * any shipping browser, and the alternative — animating a fake bar on a timer —
+ * would tell the user something the client does not know. This reports the
+ * bytes the browser has actually handed to the socket.
+ *
+ * Returns `{ promise, abort }` so a caller can cancel a large upload.
+ */
+export function sendAttachment(conversationId, { file, body = '', durationSeconds, token, onProgress }) {
+  const form = new FormData()
+  form.append('file', file, file.name || 'file')
+  if (body) form.append('body', body)
+  if (durationSeconds != null) form.append('duration_seconds', String(Math.round(durationSeconds)))
+
+  const xhr = new XMLHttpRequest()
+  const promise = new Promise((resolve, reject) => {
+    xhr.open('POST', `${API_BASE}/conversations/${conversationId}/messages`)
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    // Content-Type is deliberately not set: the browser adds it with the
+    // multipart boundary, which only it can generate.
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(event.loaded / event.total)
+    }
+
+    xhr.onload = () => {
+      let payload = null
+      try {
+        payload = JSON.parse(xhr.responseText || 'null')
+      } catch {
+        payload = null
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && payload?.success !== false) {
+        // The bar reaches full only once the server has answered, not when the
+        // last byte left the browser.
+        onProgress?.(1)
+        resolve(toMessage(payload.data))
+        return
+      }
+      reject(
+        new ApiError({
+          status: xhr.status,
+          code: payload?.error ?? 'unknown_error',
+          message: payload?.message ?? `Upload failed with status ${xhr.status}`,
+        }),
+      )
+    }
+
+    xhr.onerror = () =>
+      reject(new ApiError({ status: 0, code: NETWORK_ERROR, message: 'Upload failed' }))
+    xhr.onabort = () =>
+      reject(new ApiError({ status: 0, code: 'cancelled', message: 'Upload cancelled' }))
+
+    xhr.send(form)
+  })
+
+  return { promise, abort: () => xhr.abort() }
+}
+
+/**
+ * The URL an <img> or an <audio> can actually load.
+ *
+ * Those elements cannot carry an Authorization header, so the access token
+ * travels in the query string — the same compromise the WebSocket makes, and
+ * the reason chat attachments are not served as static files.
+ */
+export function attachmentSrc(url, token) {
+  if (!url) return null
+  if (!token) return url
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}token=${encodeURIComponent(token)}`
+}
+
+/** What the server accepts: sizes and MIME types, read rather than restated. */
+export function fetchAttachmentLimits({ signal } = {}) {
+  return request('/attachments/limits', { signal })
 }

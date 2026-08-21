@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Send } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useChat } from '../../context/ChatContext'
 import { useConversation } from '../../hooks/useConversation'
 import { SOCKET_STATUS } from '../../services/chatSocket'
 import UserAvatar from '../dashboard/UserAvatar'
+import { fetchAttachmentLimits } from '../../services/chatApi'
+import ChatComposer from './ChatComposer'
 import ChatMessage from './ChatMessage'
+import ImageLightbox from './ImageLightbox'
 import DeleteMessageDialog from './DeleteMessageDialog'
 
 /**
@@ -31,12 +34,24 @@ function ChatThread({ conversation, className = '' }) {
     sendError,
     clearSendError,
     send,
+    sendFile,
     edit,
     remove,
   } = useConversation(conversation?.id)
 
-  const [draft, setDraft] = useState('')
   const [pendingDelete, setPendingDelete] = useState(null)
+  const [lightbox, setLightbox] = useState(null)
+  const [limits, setLimits] = useState(null)
+
+  // What the server accepts, read once so the picker's filter and the size
+  // check come from the side that enforces them.
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchAttachmentLimits({ signal: controller.signal })
+      .then(setLimits)
+      .catch(() => setLimits(null))
+    return () => controller.abort()
+  }, [])
   const scrollRef = useRef(null)
   const bottomRef = useRef(null)
   // Whether the reader is at the bottom. Scrolling them down while they are
@@ -56,14 +71,14 @@ function ChatThread({ conversation, className = '' }) {
     }
   }, [messages])
 
-  const handleSend = async (event) => {
-    event.preventDefault()
-    const text = draft
-    // Cleared first so the input is free to type in again immediately; the
-    // draft is restored below if the send fails.
-    setDraft('')
+  const handleSendText = async (text) => {
     pinnedToBottom.current = true
-    if (!(await send(text))) setDraft(text)
+    return send(text)
+  }
+
+  const handleSendFile = (options) => {
+    pinnedToBottom.current = true
+    return sendFile(options)
   }
 
   const handleDelete = async (scope) => {
@@ -145,6 +160,7 @@ function ChatThread({ conversation, className = '' }) {
                   isMine={message.senderId === myId}
                   onEdit={edit}
                   onDelete={setPendingDelete}
+                  onOpenImage={setLightbox}
                 />
               ))}
             </ul>
@@ -154,44 +170,27 @@ function ChatThread({ conversation, className = '' }) {
       </div>
 
       {/* Composer */}
-      <div className="shrink-0 border-t border-border px-4 py-3">
-        {sendError ? (
-          <p role="alert" className="mb-2 flex items-center justify-between gap-2 text-xs text-error">
-            {t('chat.sendFailed')}
-            <button
-              type="button"
-              onClick={clearSendError}
-              className="font-medium underline hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              {t('chat.dismiss')}
-            </button>
-          </p>
-        ) : null}
-
-        {/* A row rather than a bare input, so an attachment or voice button can
-            be added later without rebuilding the composer. */}
-        <form onSubmit={handleSend} className="flex items-center gap-2">
-          <input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder={t('chat.placeholder')}
-            aria-label={t('chat.placeholder')}
-            className="h-10 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          />
+      {sendError ? (
+        <p role="alert" className="flex items-center justify-between gap-2 border-t border-border px-4 pt-2 text-xs text-error">
+          {t('chat.sendFailed')}
           <button
-            type="submit"
-            disabled={sending || !draft.trim()}
-            aria-label={t('chat.send')}
-            className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary text-white transition-colors hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            onClick={clearSendError}
+            className="font-medium underline hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            {sending ? (
-              <Loader2 aria-hidden="true" size={16} className="animate-spin" />
-            ) : (
-              <Send aria-hidden="true" size={16} />
-            )}
+            {t('chat.dismiss')}
           </button>
-        </form>
-      </div>
+        </p>
+      ) : null}
+
+      <ChatComposer
+        onSendText={handleSendText}
+        onSendFile={handleSendFile}
+        sending={sending}
+        limits={limits}
+      />
+
+      {lightbox ? <ImageLightbox image={lightbox} onClose={() => setLightbox(null)} /> : null}
 
       {pendingDelete ? (
         <DeleteMessageDialog
