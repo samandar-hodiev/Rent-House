@@ -363,7 +363,7 @@ function ApartmentDetailsPage() {
       </div>
 
       {isChatOpen ? (
-        <ContactChatModal ownerName={apartment.owner.name} onClose={() => setIsChatOpen(false)} />
+        <ContactChatModal apartmentId={apartment.id} onClose={() => setIsChatOpen(false)} />
       ) : null}
     </Container>
   )

@@ -1,6 +1,6 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { MessageSquare } from 'lucide-react'
+import { ArrowLeft, MessageSquare } from 'lucide-react'
 import ChatConversationList from '../components/chat/ChatConversationList'
 import ChatThread from '../components/chat/ChatThread'
 import EmptyState from '../components/EmptyState'
@@ -11,7 +11,7 @@ import { useLocale } from '../context/LocaleContext'
 // time — the list, or the selected thread with a back button.
 function DashboardChatsPage() {
   const { t } = useLocale()
-  const { conversations, markRead, sendMessage } = useChat()
+  const { conversations } = useChat()
   const [searchParams, setSearchParams] = useSearchParams()
 
   // The selection lives in the URL (`?c=<id>`) rather than in component state,
@@ -42,18 +42,8 @@ function DashboardChatsPage() {
     )
   }, [setSearchParams])
 
-  // Opening a conversation clears its badge here, in the sidebar and in the
-  // public header at once, since all three read the same context.
-  useEffect(() => {
-    if (selected) markRead(selected.id)
-  }, [selected, markRead])
-
-  const handleSend = useCallback(
-    (text) => {
-      if (selected) sendMessage(selected.id, text)
-    },
-    [selected, sendMessage],
-  )
+  // Marking a thread read is ChatThread's job: it has to tell the server as
+  // well as clear the badge, and the modal needs exactly the same behaviour.
 
   return (
     // Fills the dashboard main area exactly: viewport minus the 4rem header
@@ -67,15 +57,26 @@ function DashboardChatsPage() {
         }`}
       >
         <ChatConversationList
-          conversations={conversations}
           activeId={selected?.id ?? null}
-          onSelect={select}
+          onSelect={(conversation) => select(conversation.id)}
         />
       </div>
 
       <div className={`min-w-0 flex-1 flex-col ${selected ? 'flex' : 'hidden md:flex'}`}>
         {selected ? (
-          <ChatThread conversation={selected} onSend={handleSend} onBack={clearSelection} />
+          <>
+            {/* Below `md:` the thread replaces the list, so it needs its own
+                way back to it. */}
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="flex shrink-0 items-center gap-1.5 border-b border-border px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary md:hidden"
+            >
+              <ArrowLeft aria-hidden="true" size={16} />
+              {t('chat.backToList')}
+            </button>
+            <ChatThread conversation={selected} className="flex-1" />
+          </>
         ) : (
           <div className="flex flex-1 items-center justify-center p-4">
             <EmptyState

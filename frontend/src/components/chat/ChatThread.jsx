@@ -1,74 +1,206 @@
-import { useEffect, useRef } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Loader2, Send } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
-import { APARTMENTS } from '../../data/apartments'
+import { useChat } from '../../context/ChatContext'
+import { useConversation } from '../../hooks/useConversation'
+import { SOCKET_STATUS } from '../../services/chatSocket'
 import UserAvatar from '../dashboard/UserAvatar'
-import ChatApartmentPreview from './ChatApartmentPreview'
-import ChatComposer from './ChatComposer'
 import ChatMessage from './ChatMessage'
+import DeleteMessageDialog from './DeleteMessageDialog'
 
-// Right panel: participant header, the scrolling message area with the listing
-// context on top, and the composer pinned underneath.
-function ChatThread({ conversation, onSend, onBack }) {
+/**
+ * One open conversation: header, scrollback, composer.
+ *
+ * The same component behind the apartment-detail modal and the dashboard, which
+ * is what makes those one chat rather than two that happen to look alike. It
+ * takes a conversation and renders it; where it is mounted is the caller's
+ * business.
+ */
+function ChatThread({ conversation, className = '' }) {
   const { t } = useLocale()
-  const messagesRef = useRef(null)
+  const { socketStatus } = useChat()
+  const {
+    messages,
+    myId,
+    isLoading,
+    status,
+    hasMore,
+    loadingOlder,
+    loadOlder,
+    sending,
+    sendError,
+    clearSendError,
+    send,
+    edit,
+    remove,
+  } = useConversation(conversation?.id)
 
-  const apartment = conversation.apartmentId
-    ? (APARTMENTS.find((item) => item.id === conversation.apartmentId) ?? null)
-    : null
+  const [draft, setDraft] = useState('')
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const scrollRef = useRef(null)
+  const bottomRef = useRef(null)
+  // Whether the reader is at the bottom. Scrolling them down while they are
+  // reading older messages would yank the thread out from under them.
+  const pinnedToBottom = useRef(true)
 
-  // Jump to the newest message when the thread opens and after each send.
+  const handleScroll = () => {
+    const node = scrollRef.current
+    if (!node) return
+    const distance = node.scrollHeight - node.scrollTop - node.clientHeight
+    pinnedToBottom.current = distance < 80
+  }
+
   useEffect(() => {
-    const node = messagesRef.current
-    if (node) node.scrollTop = node.scrollHeight
-  }, [conversation.id, conversation.messages.length])
+    if (pinnedToBottom.current) {
+      bottomRef.current?.scrollIntoView({ block: 'end' })
+    }
+  }, [messages])
+
+  const handleSend = async (event) => {
+    event.preventDefault()
+    const text = draft
+    // Cleared first so the input is free to type in again immediately; the
+    // draft is restored below if the send fails.
+    setDraft('')
+    pinnedToBottom.current = true
+    if (!(await send(text))) setDraft(text)
+  }
+
+  const handleDelete = async (scope) => {
+    const message = pendingDelete
+    setPendingDelete(null)
+    if (message) await remove(message.id, scope)
+  }
+
+  if (!conversation) return null
+
+  const other = conversation.other
 
   return (
-    <>
-      <div className="flex shrink-0 items-center gap-3 border-b border-border px-3 py-3 sm:px-4">
-        {/* Below `md:` the thread replaces the list, so it needs a way back. */}
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label={t('chat.back')}
-          className="flex size-9 shrink-0 items-center justify-center rounded-md text-text-secondary hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary md:hidden"
-        >
-          <ArrowLeft aria-hidden="true" size={18} />
-        </button>
-
-        <UserAvatar name={conversation.name} />
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-text-primary">{conversation.name}</p>
+    <div className={`flex min-h-0 flex-col ${className}`}>
+      {/* Header */}
+      <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
+        <UserAvatar name={other.name} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-text-primary">{other.name}</p>
           <p className="flex items-center gap-1.5 text-xs text-text-muted">
             <span
               aria-hidden="true"
-              className={`size-2 rounded-full ${conversation.isOnline ? 'bg-primary' : 'bg-border'}`}
+              className={`size-2 shrink-0 rounded-full ${
+                other.online ? 'bg-primary' : 'bg-text-muted/40'
+              }`}
             />
-            {conversation.isOnline ? t('chat.online') : t('chat.offline')}
+            {other.online ? t('chat.online') : t('chat.offline')}
           </p>
         </div>
       </div>
 
-      <div ref={messagesRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-4">
-        {apartment ? (
-          <div className="mb-4">
-            <ChatApartmentPreview apartment={apartment} />
-          </div>
-        ) : null}
+      {/* The connection banner appears only when something is wrong, so a
+          healthy chat carries no chrome about being healthy. */}
+      {socketStatus === SOCKET_STATUS.reconnecting || socketStatus === SOCKET_STATUS.connecting ? (
+        <p
+          role="status"
+          className="shrink-0 bg-warning/10 px-4 py-1.5 text-center text-xs text-warning"
+        >
+          {socketStatus === SOCKET_STATUS.connecting ? t('chat.connecting') : t('chat.reconnecting')}
+        </p>
+      ) : null}
 
-        <ul className="flex flex-col gap-3">
-          {conversation.messages.map((message) => (
-            <ChatMessage
-              key={message.id}
-              conversationId={conversation.id}
-              message={message}
-            />
-          ))}
-        </ul>
+      {/* Messages */}
+      <div ref={scrollRef} onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        {isLoading ? (
+          <p className="flex items-center justify-center gap-2 py-8 text-sm text-text-muted">
+            <Loader2 aria-hidden="true" size={16} className="animate-spin" />
+            {t('chat.loading')}
+          </p>
+        ) : status === 'error' ? (
+          <p role="alert" className="py-8 text-center text-sm text-error">
+            {t('chat.loadFailed')}
+          </p>
+        ) : messages.length === 0 ? (
+          <p className="py-8 text-center text-sm text-text-muted">{t('chat.empty')}</p>
+        ) : (
+          <>
+            {hasMore ? (
+              <div className="mb-3 flex justify-center">
+                <button
+                  type="button"
+                  onClick={loadOlder}
+                  disabled={loadingOlder}
+                  className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
+                >
+                  {loadingOlder ? (
+                    <Loader2 aria-hidden="true" size={12} className="animate-spin" />
+                  ) : null}
+                  {t('chat.loadOlder')}
+                </button>
+              </div>
+            ) : null}
+
+            <ul className="flex flex-col gap-2">
+              {messages.map((message) => (
+                <ChatMessage
+                  key={message.id}
+                  message={message}
+                  isMine={message.senderId === myId}
+                  onEdit={edit}
+                  onDelete={setPendingDelete}
+                />
+              ))}
+            </ul>
+          </>
+        )}
+        <div ref={bottomRef} />
       </div>
 
-      <ChatComposer onSend={onSend} />
-    </>
+      {/* Composer */}
+      <div className="shrink-0 border-t border-border px-4 py-3">
+        {sendError ? (
+          <p role="alert" className="mb-2 flex items-center justify-between gap-2 text-xs text-error">
+            {t('chat.sendFailed')}
+            <button
+              type="button"
+              onClick={clearSendError}
+              className="font-medium underline hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {t('chat.dismiss')}
+            </button>
+          </p>
+        ) : null}
+
+        {/* A row rather than a bare input, so an attachment or voice button can
+            be added later without rebuilding the composer. */}
+        <form onSubmit={handleSend} className="flex items-center gap-2">
+          <input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={t('chat.placeholder')}
+            aria-label={t('chat.placeholder')}
+            className="h-10 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          />
+          <button
+            type="submit"
+            disabled={sending || !draft.trim()}
+            aria-label={t('chat.send')}
+            className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary text-white transition-colors hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {sending ? (
+              <Loader2 aria-hidden="true" size={16} className="animate-spin" />
+            ) : (
+              <Send aria-hidden="true" size={16} />
+            )}
+          </button>
+        </form>
+      </div>
+
+      {pendingDelete ? (
+        <DeleteMessageDialog
+          onCancel={() => setPendingDelete(null)}
+          onDeleteForMe={() => handleDelete('me')}
+          onDeleteForEveryone={() => handleDelete('everyone')}
+        />
+      ) : null}
+    </div>
   )
 }
 

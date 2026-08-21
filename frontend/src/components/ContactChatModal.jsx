@@ -1,11 +1,23 @@
 import { useEffect, useState } from 'react'
-import { X, Send } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import { useLocale } from '../context/LocaleContext'
+import { useChat } from '../context/ChatContext'
+import ChatThread from './chat/ChatThread'
 
-function ContactChatModal({ ownerName, onClose }) {
+/**
+ * The chat opened from an apartment's "Xabar yozish" button.
+ *
+ * It opens the real thread about this listing — the same one the dashboard
+ * shows — rather than a separate scratch conversation. Asking for it is
+ * idempotent: the backend keys a thread on (listing, enquirer), so reopening
+ * the modal returns the existing conversation with its history.
+ */
+function ContactChatModal({ apartmentId, onClose }) {
   const { t } = useLocale()
-  const [messages, setMessages] = useState([])
-  const [draft, setDraft] = useState('')
+  const { startConversation } = useChat()
+
+  const [conversation, setConversation] = useState(null)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -15,72 +27,60 @@ function ContactChatModal({ ownerName, onClose }) {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
-  const handleSend = (event) => {
-    event.preventDefault()
-    const text = draft.trim()
-    if (!text) return
-    setMessages((current) => [...current, { id: current.length, text }])
-    setDraft('')
-  }
+  useEffect(() => {
+    let cancelled = false
+    setFailed(false)
+
+    startConversation(apartmentId)
+      .then((opened) => {
+        if (!cancelled) setConversation(opened)
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [apartmentId, startConversation])
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={t('chat.headerWithName', { name: ownerName })}
+        aria-label={t('apartmentDetails.message')}
         onClick={(event) => event.stopPropagation()}
-        className="flex h-[70vh] w-full max-w-sm flex-col rounded-t-xl bg-surface shadow-md sm:h-[32rem] sm:rounded-xl"
+        // Full height on a phone, a panel on a desktop. `min-h-0` on the thread
+        // is what lets its message list scroll instead of the whole dialog.
+        className="flex h-[88vh] w-full flex-col overflow-hidden rounded-t-xl border border-border bg-surface sm:h-[600px] sm:max-w-lg sm:rounded-xl"
       >
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <p className="text-sm font-semibold text-text-primary">
-            {t('chat.headerWithName', { name: ownerName })}
-          </p>
+        <div className="flex shrink-0 items-center justify-end px-2 pt-2">
           <button
             type="button"
             onClick={onClose}
-            aria-label={t('chat.close')}
-            className="flex size-8 items-center justify-center rounded-full text-text-secondary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label={t('chat.cancel')}
+            className="flex size-8 items-center justify-center rounded-md text-text-muted hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <X aria-hidden="true" size={18} />
           </button>
         </div>
 
-        <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
-          {messages.length === 0 ? (
-            <p className="pt-8 text-center text-sm text-text-muted">{t('chat.empty')}</p>
-          ) : (
-            messages.map((message) => (
-              <div key={message.id} className="ml-auto max-w-[80%] rounded-lg bg-primary px-3 py-2">
-                <p className="text-sm text-white">{message.text}</p>
-              </div>
-            ))
-          )}
-        </div>
-
-        <form onSubmit={handleSend} className="flex items-center gap-2 border-t border-border p-3">
-          <label htmlFor="chat-message-input" className="sr-only">
-            {t('chat.placeholder')}
-          </label>
-          <input
-            id="chat-message-input"
-            type="text"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder={t('chat.placeholder')}
-            className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/40"
-          />
-          <button
-            type="submit"
-            aria-label={t('chat.send')}
-            className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            <Send aria-hidden="true" size={16} />
-          </button>
-        </form>
+        {failed ? (
+          <p role="alert" className="p-6 text-center text-sm text-error">
+            {t('chat.startFailed')}
+          </p>
+        ) : conversation ? (
+          <ChatThread conversation={conversation} className="flex-1" />
+        ) : (
+          <p className="flex flex-1 items-center justify-center gap-2 text-sm text-text-muted">
+            <Loader2 aria-hidden="true" size={16} className="animate-spin" />
+            {t('chat.loading')}
+          </p>
+        )}
       </div>
     </div>
   )
