@@ -257,8 +257,27 @@ func (c *Config) validateNotify() error {
 		if strings.TrimSpace(c.Notify.ResendFrom) == "" {
 			missing = append(missing, "RESEND_FROM")
 		}
+	case "smtp":
+		// Every one of these is required: a half-configured mail server cannot
+		// send, and failing at startup beats discovering it when a user is
+		// waiting for a code.
+		if strings.TrimSpace(c.Notify.SMTPHost) == "" {
+			missing = append(missing, "SMTP_HOST")
+		}
+		if c.Notify.SMTPPort <= 0 {
+			missing = append(missing, "SMTP_PORT")
+		}
+		if strings.TrimSpace(c.Notify.SMTPUsername) == "" {
+			missing = append(missing, "SMTP_USERNAME")
+		}
+		if strings.TrimSpace(c.Notify.SMTPPassword) == "" {
+			missing = append(missing, "SMTP_PASSWORD")
+		}
+		if strings.TrimSpace(c.Notify.SMTPFrom) == "" {
+			missing = append(missing, "SMTP_FROM")
+		}
 	default:
-		return fmt.Errorf("EMAIL_PROVIDER %q is not supported (expected dev or resend)", c.Notify.EmailProvider)
+		return fmt.Errorf("EMAIL_PROVIDER %q is not supported (expected dev, resend or smtp)", c.Notify.EmailProvider)
 	}
 
 	switch c.Notify.SMSProvider {
