@@ -6,6 +6,16 @@ import { TASHKENT_CENTER } from './districts'
 export const MAX_IMAGES = 10
 export const MAX_DESCRIPTION = 1200
 
+// Mirrors of the API's binding rules, so the form rejects what the server would
+// reject and says which field is at fault.
+export const TITLE_MIN = 10
+export const TITLE_MAX = 255
+export const ADDRESS_MIN = 5
+export const AREA_MAX = 10000
+export const FLOOR_MAX = 200
+export const NEIGHBORHOOD_MAX = 120
+export const MIN_MONTHS_MAX = 60
+
 export const ROOM_OPTIONS = ['1', '2', '3', '4', '5+']
 
 export const CURRENCIES = [
@@ -86,22 +96,56 @@ const isPositiveNumber = (value) => value !== '' && Number(value) > 0
 // validator itself stays free of translation concerns.
 export function validateListing(listing) {
   const errors = {}
+  const inRange = (value, min, max) => {
+    const number = Number(value)
+    return value !== '' && Number.isFinite(number) && number >= min && number <= max
+  }
 
   if (listing.images.length === 0) errors.images = 'listing.errorImages'
-  if (!listing.title.trim()) errors.title = 'listing.errorTitle'
+
+  // These bounds mirror the API's binding rules exactly. When the two drift the
+  // form accepts something the server then rejects, and the owner is told
+  // "something went wrong" with no field marked — which is what happened with
+  // a title shorter than ten characters.
+  const title = listing.title.trim()
+  if (!title) errors.title = 'listing.errorTitle'
+  else if (title.length < TITLE_MIN) errors.title = 'listing.errorTitleShort'
+  else if (title.length > TITLE_MAX) errors.title = 'listing.errorTitleLong'
+
   if (!isPositiveNumber(listing.price)) errors.price = 'listing.errorPrice'
   if (!listing.rooms) errors.rooms = 'listing.errorRooms'
+
   if (!isPositiveNumber(listing.area)) errors.area = 'listing.errorArea'
+  else if (!inRange(listing.area, 1, AREA_MAX)) errors.area = 'listing.errorAreaRange'
+
   if (!isPositiveNumber(listing.floor)) errors.floor = 'listing.errorFloor'
+  else if (!inRange(listing.floor, 1, FLOOR_MAX)) errors.floor = 'listing.errorFloorRange'
+
   if (!isPositiveNumber(listing.totalFloors)) {
     errors.totalFloors = 'listing.errorTotalFloors'
+  } else if (!inRange(listing.totalFloors, 1, FLOOR_MAX)) {
+    errors.totalFloors = 'listing.errorFloorRange'
   } else if (isPositiveNumber(listing.floor) && Number(listing.floor) > Number(listing.totalFloors)) {
     errors.floor = 'listing.errorFloorAboveTotal'
   }
+
   if (!listing.location.city.trim()) errors.city = 'listing.errorCity'
   if (!listing.location.district) errors.district = 'listing.errorDistrict'
-  if (!listing.location.address.trim()) errors.address = 'listing.errorAddress'
+
+  const address = listing.location.address.trim()
+  if (!address) errors.address = 'listing.errorAddress'
+  else if (address.length < ADDRESS_MIN) errors.address = 'listing.errorAddressShort'
+
+  if (listing.location.neighborhood.trim().length > NEIGHBORHOOD_MAX) {
+    errors.neighborhood = 'listing.errorNeighborhoodLong'
+  }
+
   if (!listing.description.trim()) errors.description = 'listing.errorDescription'
+
+  const minimumMonths = listing.rentalConditions.minimumMonths
+  if (minimumMonths !== '' && !inRange(minimumMonths, 1, MIN_MONTHS_MAX)) {
+    errors.minimumMonths = 'listing.errorMinimumMonths'
+  }
 
   return errors
 }

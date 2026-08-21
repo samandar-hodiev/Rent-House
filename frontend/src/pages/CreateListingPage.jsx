@@ -78,6 +78,9 @@ function ListingForm({ id, isEditMode, existing }) {
       ...current,
       rentalConditions: { ...current.rentalConditions, [field]: value },
     }))
+    // Same as the other setters: an error message must not outlive the value
+    // that caused it.
+    setErrors((current) => ({ ...current, [field]: undefined }))
     setStatus(null)
   }, [])
 
@@ -96,6 +99,11 @@ function ListingForm({ id, isEditMode, existing }) {
     switch (error.code) {
       case NETWORK_ERROR:
         return t('listing.errorNetwork')
+      case 'validation_failed':
+        // The server found something the form let through. The fields are
+        // already marked where the client caught it; this says plainly that
+        // the problem is in the form rather than 'something went wrong'.
+        return t('listing.errorValidation')
       case 'invalid_district':
         return t('listing.errorDistrictUnknown')
       case 'invalid_amenity':
@@ -304,6 +312,7 @@ function ListingForm({ id, isEditMode, existing }) {
                 label={t('listing.neighborhood')}
                 value={listing.location.neighborhood}
                 onChange={(value) => setLocationField('neighborhood', value)}
+                error={errorText('neighborhood')}
                 placeholder={t('listing.neighborhoodPlaceholder')}
               />
               <FormField
@@ -335,6 +344,7 @@ function ListingForm({ id, isEditMode, existing }) {
                 label={t('listing.minimumMonths')}
                 value={listing.rentalConditions.minimumMonths}
                 onChange={(value) => setConditionField('minimumMonths', value.replace(/[^\d]/g, ''))}
+                error={errorText('minimumMonths')}
                 placeholder="6"
                 inputMode="numeric"
               />
