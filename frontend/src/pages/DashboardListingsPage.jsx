@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Building2, Check, Plus } from 'lucide-react'
+import { Building2, Check, Loader2, Plus } from 'lucide-react'
 import EmptyState from '../components/EmptyState'
 import MyListingCard from '../components/dashboard/MyListingCard'
 import { useLocale } from '../context/LocaleContext'
 import { useListings } from '../context/ListingsContext'
-import { LISTING_STATUS, LISTING_STATUS_CLASS, getMyListingsSummary } from '../data/myListings'
+import { LISTING_STATUS, LISTING_STATUS_CLASS, getMyListingsSummary } from '../data/listingStatus'
 import { ROUTES } from '../routes/paths'
 
 function SummaryItem({ label, value }) {
@@ -35,10 +35,45 @@ function DashboardListingsPage() {
   const navigate = useNavigate()
 
   // Shared with the edit form, so saving an edit updates the card here.
-  const { listings } = useListings()
+  const { listings, isLoading, status, reload } = useListings()
   // Set by the edit form when it navigates back after a successful save.
   const justSaved = Boolean(useLocation().state?.saved)
   const summary = useMemo(() => getMyListingsSummary(listings), [listings])
+
+  // A first load has nothing to show yet, and an empty list means something
+  // different from "not loaded" — showing the empty state during the request
+  // would flash "you have no listings" at someone who has several.
+  if (isLoading && listings.length === 0) {
+    return (
+      <section className="flex flex-col gap-4">
+        <h1 className="text-xl font-semibold text-text-primary">{t('dashboard.listingsTitle')}</h1>
+        <p className="flex items-center gap-2 text-sm text-text-secondary">
+          <Loader2 aria-hidden="true" size={16} className="animate-spin" />
+          {t('listing.loading')}
+        </p>
+      </section>
+    )
+  }
+
+  if (status === 'error' && listings.length === 0) {
+    return (
+      <section className="flex flex-col gap-4">
+        <h1 className="text-xl font-semibold text-text-primary">{t('dashboard.listingsTitle')}</h1>
+        <p role="alert" className="text-sm text-error">
+          {t('listing.loadFailed')}
+        </p>
+        <div>
+          <button
+            type="button"
+            onClick={reload}
+            className="rounded-md border border-border px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {t('listing.retry')}
+          </button>
+        </div>
+      </section>
+    )
+  }
 
   if (listings.length === 0) {
     return (
@@ -71,20 +106,33 @@ function DashboardListingsPage() {
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
             <SummaryItem label={t('dashboard.summaryTotal')} value={summary.total} />
             <SummaryBadge
-              status={LISTING_STATUS.approved}
-              label={t('listingStatus.APPROVED')}
-              value={summary.approved}
+              status={LISTING_STATUS.active}
+              label={t('listingStatus.active')}
+              value={summary.active}
             />
-            <SummaryBadge
-              status={LISTING_STATUS.pending}
-              label={t('listingStatus.PENDING')}
-              value={summary.pending}
-            />
-            <SummaryBadge
-              status={LISTING_STATUS.closed}
-              label={t('listingStatus.CLOSED')}
-              value={summary.closed}
-            />
+            {/* Drafts are shown only when there are any: a permanent "0
+                Qoralama" is noise on a dashboard that has none. */}
+            {summary.draft > 0 ? (
+              <SummaryBadge
+                status={LISTING_STATUS.draft}
+                label={t('listingStatus.draft')}
+                value={summary.draft}
+              />
+            ) : null}
+            {summary.pending > 0 ? (
+              <SummaryBadge
+                status={LISTING_STATUS.pending}
+                label={t('listingStatus.pending')}
+                value={summary.pending}
+              />
+            ) : null}
+            {summary.closed > 0 ? (
+              <SummaryBadge
+                status={LISTING_STATUS.closed}
+                label={t('listingStatus.closed')}
+                value={summary.closed}
+              />
+            ) : null}
           </div>
         </div>
 

@@ -110,12 +110,24 @@ export function validateListing(listing) {
 // `title` is passed in because the canonical title is translated
 // (`apartmentTitle.<id>`) unless the owner has already overridden it.
 export function listingToFormValues(listing, title, description) {
+  // The API returns `{ url, is_primary }`; older callers passed bare strings.
+  // Both are accepted so this stays the one place the form learns about a
+  // listing's gallery.
   const gallery = listing.images?.length ? listing.images : [listing.image].filter(Boolean)
-  const images = gallery.map((url, index) => ({
-    id: `existing-${listing.id}-${index}`,
-    name: `${index + 1}`,
-    url,
-  }))
+  const images = gallery.map((entry, index) => {
+    const url = typeof entry === 'string' ? entry : entry.url
+    return {
+      id: `existing-${listing.id}-${index}`,
+      name: `${index + 1}`,
+      url,
+      // Already on the server: an edit that does not touch the gallery must
+      // resubmit these, or saving would silently empty it.
+      uploadedUrl: url,
+      uploading: false,
+      failed: false,
+      isPrimary: typeof entry === 'object' && entry.is_primary,
+    }
+  })
 
   const rooms = String(listing.rooms ?? '')
   return {
@@ -133,20 +145,20 @@ export function listingToFormValues(listing, title, description) {
     // The catalog carries a couple of tags the form does not offer as amenities.
     amenities: (listing.amenities ?? []).filter((id) => AMENITIES.includes(id)),
     images,
-    coverImageId: images[0]?.id ?? null,
+    coverImageId: (images.find((image) => image.isPrimary) ?? images[0])?.id ?? null,
     location: {
       city: listing.location?.city ?? 'Toshkent',
       district: listing.districtId ?? '',
-      neighborhood: listing.location?.neighborhood ?? '',
+      neighborhood: listing.neighborhood ?? listing.location?.neighborhood ?? '',
       address: listing.address ?? '',
       latitude: listing.latitude ?? TASHKENT_CENTER.latitude,
       longitude: listing.longitude ?? TASHKENT_CENTER.longitude,
     },
     rentalConditions: listing.rentalConditions ?? {
-      deposit: '',
-      utilities: UTILITIES[0].id,
-      minimumMonths: '',
-      rules: [],
+      deposit: listing.deposit != null ? String(listing.deposit) : '',
+      utilities: listing.utilities ?? UTILITIES[0].id,
+      minimumMonths: listing.minimumMonths != null ? String(listing.minimumMonths) : '',
+      rules: listing.rules ?? [],
     },
   }
 }

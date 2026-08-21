@@ -4,7 +4,7 @@ import { Building2, MessageSquare } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useChat } from '../../context/ChatContext'
 import { useListings } from '../../context/ListingsContext'
-import { LISTING_STATUS } from '../../data/myListings'
+import { LISTING_STATUS } from '../../data/listingStatus'
 import { getTotalViews, getViewsAnalytics } from '../../data/viewsAnalytics'
 import { formatCount } from '../../utils/formatPeriod'
 import { ROUTES } from '../../routes/paths'
@@ -85,7 +85,7 @@ function DashboardOverview() {
   // Real: the same array "Mening e'lonlarim" renders, so publishing or closing
   // a listing moves this number with it.
   const activeListings = useMemo(
-    () => listings.filter((listing) => listing.status === LISTING_STATUS.approved).length,
+    () => listings.filter((listing) => listing.status === LISTING_STATUS.active).length,
     [listings],
   )
 

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useLocale } from '../../context/LocaleContext'
+import { listingTitle } from '../../utils/listingText'
 import { districtNameKey, getDistrictById } from '../../data/districts'
 import { apartmentDetailsPath } from '../../routes/paths'
 import { formatUzsAmount } from '../../utils/formatPrice'
@@ -8,7 +9,7 @@ import { formatUzsAmount } from '../../utils/formatPrice'
 // both sides always know which apartment is being discussed.
 function ChatApartmentPreview({ apartment }) {
   const { t } = useLocale()
-  const title = t(`apartmentTitle.${apartment.id}`)
+  const title = listingTitle(t, apartment)
   const district = getDistrictById(apartment.districtId)
 
   return (

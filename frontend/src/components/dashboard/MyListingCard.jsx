@@ -1,21 +1,44 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Eye, Heart, Pencil } from 'lucide-react'
+import { Eye, Pencil, Trash2 } from 'lucide-react'
+import { useListings } from '../../context/ListingsContext'
 import { useLocale } from '../../context/LocaleContext'
 import { districtNameKey, getDistrictById } from '../../data/districts'
-import { LISTING_STATUS_CLASS } from '../../data/myListings'
+import { LISTING_STATUS_CLASS } from '../../data/listingStatus'
 import { apartmentDetailsPath, editListingPath } from '../../routes/paths'
 import { formatUzsAmount } from '../../utils/formatPrice'
 import { formatPostedAt } from '../../utils/formatRelativeTime'
+import { listingTitle } from '../../utils/listingText'
 import ListingGalleryModal from './ListingGalleryModal'
 
 // One row in "Mening e'lonlarim": image left, details right on `sm:` and up,
 // stacked below that.
 function MyListingCard({ listing }) {
   const { t } = useLocale()
+  const { removeListing } = useListings()
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
+
+  // `confirm` rather than a modal: the project has no dialog system, and
+  // inventing one for a single destructive action would be more UI than the
+  // feature needs. The guard that matters is the server's ownership check.
+  const handleDelete = async () => {
+    if (deleting) return
+    if (!window.confirm(t('listing.deleteConfirm'))) return
+
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await removeListing(listing.id)
+      // No state reset afterwards: a successful delete unmounts this card.
+    } catch {
+      setDeleteError(t('listing.errorDeleteFailed'))
+      setDeleting(false)
+    }
+  }
   const [isGalleryOpen, setIsGalleryOpen] = useState(false)
   // An owner-edited title wins; otherwise the catalog title stays translated.
-  const title = listing.customTitle ?? t(`apartmentTitle.${listing.id}`)
+  const title = listingTitle(t, listing)
   const district = getDistrictById(listing.districtId)
   // This listing's own photos, falling back to the cover when it has just one.
   const galleryImages = listing.images?.length ? listing.images : [listing.image].filter(Boolean)
@@ -71,12 +94,11 @@ function MyListingCard({ listing }) {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-muted">
           <span className="flex items-center gap-1.5">
             <Eye aria-hidden="true" size={14} />
-            {t('dashboard.listingViews', { count: listing.views })}
+            {t('dashboard.listingViews', { count: listing.viewsCount ?? 0 })}
           </span>
-          <span className="flex items-center gap-1.5">
-            <Heart aria-hidden="true" size={14} />
-            {t('dashboard.listingSaves', { count: listing.saves })}
-          </span>
+          {/* The saves count is deliberately absent: favourites are stored, but
+              nothing counts them per listing yet, and a number invented here
+              would be worse than no number. It returns with that endpoint. */}
           <span>{formatPostedAt(listing.createdAt, t)}</span>
         </div>
 
@@ -96,7 +118,27 @@ function MyListingCard({ listing }) {
             <Eye aria-hidden="true" size={14} />
             {t('dashboard.listingView')}
           </Link>
+
+          {/* Destructive and irreversible, so it asks first and stays disabled
+              while the request runs — a second click must not fire a second
+              delete. Styled as the lightest action on the row, not a red
+              button competing with Edit. */}
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-error/40 hover:bg-error/10 hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Trash2 aria-hidden="true" size={14} />
+            {deleting ? t('listing.deleting') : t('listing.delete')}
+          </button>
         </div>
+
+        {deleteError ? (
+          <p role="alert" className="text-xs text-error">
+            {deleteError}
+          </p>
+        ) : null}
       </div>
 
       {isGalleryOpen ? (

@@ -4,6 +4,7 @@ import { useLocale } from '../context/LocaleContext'
 import { useWishlist } from '../context/WishlistContext'
 import { useRequireAuth } from '../hooks/useRequireAuth'
 import { getDistrictById, districtNameKey } from '../data/districts'
+import { listingTitle } from '../utils/listingText'
 import { apartmentDetailsPath } from '../routes/paths'
 import { formatUzsAmount } from '../utils/formatPrice'
 import { formatPostedAt } from '../utils/formatRelativeTime'
@@ -41,7 +42,7 @@ function ApartmentCard({ apartment, title: titleOverride, interactive = true }) 
   const isWishlisted = isSaved(apartment.id)
 
   const district = getDistrictById(apartment.districtId)
-  const title = titleOverride ?? t(`apartmentTitle.${apartment.id}`)
+  const title = titleOverride ?? listingTitle(t, apartment)
 
   // Saving a listing belongs to an account, so a signed-out visitor is sent to
   // sign in first and returned here afterwards. The button stays visible either

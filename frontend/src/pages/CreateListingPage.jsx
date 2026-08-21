@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Check } from 'lucide-react'
+import { Check, Loader2 } from 'lucide-react'
 import FormField from '../components/FormField'
 import CheckboxGroup from '../components/listing/CheckboxGroup'
 import FormSection from '../components/listing/FormSection'
@@ -13,6 +13,8 @@ import TextAreaField from '../components/listing/TextAreaField'
 import { useLocale } from '../context/LocaleContext'
 import { useListings } from '../context/ListingsContext'
 import { DISTRICTS, districtNameKey } from '../data/districts'
+import { ApiError, NETWORK_ERROR } from '../services/apiClient'
+import { toApartmentPayload } from '../services/apartmentsApi'
 import {
   AMENITIES,
   CURRENCIES,
@@ -23,22 +25,21 @@ import {
   ROOM_OPTIONS,
   UTILITIES,
   createEmptyListing,
-  formValuesToListing,
   listingToFormValues,
   validateListing,
 } from '../data/listingForm'
 import { ROUTES } from '../routes/paths'
+import { listingDescription, listingTitle } from '../utils/listingText'
 
-// One component, two modes: `/create-listing` starts empty, `/edit-listing/:id`
-// opens the same form pre-filled with the selected listing.
-function CreateListingPage() {
+// The form itself. It is mounted only once the listing it edits is known —
+// see CreateListingPage below — because the working copy is seeded from props
+// on the first render and never re-seeded. Seeding it from data that arrives
+// later would mean either a stale empty form or overwriting what the user has
+// already typed.
+function ListingForm({ id, isEditMode, existing }) {
   const { t } = useLocale()
   const navigate = useNavigate()
-  const { id } = useParams()
-  const { getListing, updateListing } = useListings()
-
-  const isEditMode = Boolean(id)
-  const existing = isEditMode ? getListing(id) : null
+  const { createListing, updateListing } = useListings()
 
   // Seeded once: the form owns a working copy from here on, so leaving without
   // saving (cancel, back) cannot mutate the stored listing.
@@ -46,13 +47,17 @@ function CreateListingPage() {
     existing
       ? listingToFormValues(
           existing,
-          existing.customTitle ?? t(`apartmentTitle.${existing.id}`),
-          existing.description ?? t(`apartmentDescription.${existing.id}`),
+          listingTitle(t, existing),
+          listingDescription(t, existing),
         )
       : createEmptyListing(),
   )
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState(null) // null | 'published' | 'draft'
+  // `saving` is what stops a second submission: the buttons are disabled
+  // while a request is in flight, so a double click cannot create two listings.
+  const [saving, setSaving] = useState(false)
+  const [submitError, setSubmitError] = useState(null)
 
   // Clearing the field's error as it is edited keeps messages from lingering
   // after the user has already fixed them.
@@ -84,35 +89,71 @@ function CreateListingPage() {
     setStatus(null)
   }, [])
 
-  const handleSubmit = (event) => {
-    event.preventDefault()
-    const nextErrors = validateListing(listing)
-    setErrors(nextErrors)
+  // Turns a backend error code into something the owner can act on. Unknown
+  // codes fall back to a generic line rather than exposing internals.
+  const messageFor = (error) => {
+    if (!(error instanceof ApiError)) return t('listing.errorUnexpected')
+    switch (error.code) {
+      case NETWORK_ERROR:
+        return t('listing.errorNetwork')
+      case 'invalid_district':
+        return t('listing.errorDistrictUnknown')
+      case 'invalid_amenity':
+        return t('listing.errorAmenityUnknown')
+      case 'invalid_price':
+        return t('listing.errorPriceInvalid')
+      case 'invalid_floors':
+        return t('listing.errorFloorTooHigh')
+      case 'not_apartment_owner':
+        return t('listing.errorNotOwner')
+      case 'apartment_not_found':
+        return t('listing.notFound')
+      case 'missing_token':
+      case 'token_expired':
+      case 'invalid_token':
+        return t('listing.errorSessionExpired')
+      default:
+        return t('listing.errorUnexpected')
+    }
+  }
 
+  const save = async (publish) => {
+    if (saving) return
+
+    // Publishing is validated; a draft is the owner's private work in progress
+    // and is saved as it stands, which is what a draft is for.
+    const nextErrors = publish ? validateListing(listing) : {}
+    setErrors(nextErrors)
+    setSubmitError(null)
     if (Object.keys(nextErrors).length > 0) {
       setStatus(null)
       return
     }
 
-    if (isEditMode) {
-      // Writes the working copy back to the shared listing state; `status` is
-      // deliberately not part of the patch, so Faol/Kutilmoqda/Yopilgan stays.
-      updateListing(id, formValuesToListing(listing))
+    setSaving(true)
+    try {
+      const payload = toApartmentPayload(listing, { publish })
+      if (isEditMode) await updateListing(id, payload)
+      else await createListing(payload)
+
       // The project has no toast system; confirmation uses the same inline
       // `role="status"` pattern the rest of the app uses, rendered on the page
       // the user lands on.
       navigate(ROUTES.dashboardListings, { state: { saved: true } })
-      return
+    } catch (error) {
+      setStatus(null)
+      setSubmitError(messageFor(error))
+    } finally {
+      setSaving(false)
     }
-    // Mock submission: the listing object is complete and matches what
-    // `POST /api/v1/apartments` will take, but nothing is sent anywhere.
-    setStatus('published')
   }
 
-  const handleSaveDraft = () => {
-    setErrors({})
-    setStatus('draft')
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    save(true)
   }
+
+  const handleSaveDraft = () => save(false)
 
   const districtOptions = useMemo(
     () => DISTRICTS.map((district) => ({ id: district.id, label: t(districtNameKey(district.id)) })),
@@ -123,24 +164,6 @@ function CreateListingPage() {
   const amenityOptions = AMENITIES.map((id) => ({ id, label: t(`amenity.${id}`) }))
   const ruleOptions = RENTAL_RULES.map((id) => ({ id, label: t(`listing.rule${id}`) }))
   const errorText = (field) => (errors[field] ? t(errors[field]) : undefined)
-
-  if (isEditMode && !existing) {
-    return (
-      <section className="flex flex-col gap-4">
-        <h1 className="text-xl font-semibold text-text-primary">{t('listing.editTitle')}</h1>
-        <p className="text-sm text-text-secondary">{t('listing.notFound')}</p>
-        <div>
-          <button
-            type="button"
-            onClick={() => navigate(ROUTES.dashboardListings)}
-            className="rounded-md border border-border px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            {t('listing.backToListings')}
-          </button>
-        </div>
-      </section>
-    )
-  }
 
   return (
     <section className="flex flex-col gap-5">
@@ -351,17 +374,29 @@ function CreateListingPage() {
               </p>
             ) : null}
 
+            {submitError ? (
+              <p
+                role="alert"
+                className="rounded-md border border-error bg-error/10 px-3 py-2.5 text-sm text-error"
+              >
+                {submitError}
+              </p>
+            ) : null}
+
             <div className="flex flex-wrap gap-2">
               <button
                 type="submit"
-                className="rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                disabled={saving}
+                className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
               >
+                {saving ? <Loader2 aria-hidden="true" size={16} className="animate-spin" /> : null}
                 {isEditMode ? t('listing.saveChanges') : t('listing.publish')}
               </button>
               <button
                 type="button"
                 onClick={handleSaveDraft}
-                className="rounded-md border border-border px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                disabled={saving}
+                className="rounded-md border border-border px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {t('listing.saveDraft')}
               </button>
@@ -383,6 +418,53 @@ function CreateListingPage() {
       </form>
     </section>
   )
+}
+
+/**
+ * Route entry for both `/create-listing` and `/edit-listing/:id`.
+ *
+ * Its whole job is to answer "which listing, if any?" before the form exists,
+ * so the form can seed itself from a value that is already there.
+ */
+function CreateListingPage() {
+  const { t } = useLocale()
+  const navigate = useNavigate()
+  const { id } = useParams()
+  const { getListing, isLoading, status } = useListings()
+
+  const isEditMode = Boolean(id)
+  const existing = isEditMode ? getListing(id) : null
+
+  if (isEditMode && !existing && (isLoading || status === 'idle')) {
+    return (
+      <section className="flex items-center gap-2 text-sm text-text-secondary">
+        <Loader2 aria-hidden="true" size={16} className="animate-spin" />
+        {t('listing.loading')}
+      </section>
+    )
+  }
+
+  if (isEditMode && !existing) {
+    return (
+      <section className="flex flex-col gap-4">
+        <h1 className="text-xl font-semibold text-text-primary">{t('listing.editTitle')}</h1>
+        <p className="text-sm text-text-secondary">{t('listing.notFound')}</p>
+        <div>
+          <button
+            type="button"
+            onClick={() => navigate(ROUTES.dashboardListings)}
+            className="rounded-md border border-border px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {t('listing.backToListings')}
+          </button>
+        </div>
+      </section>
+    )
+  }
+
+  // Keyed so switching between two listings remounts the form rather than
+  // leaving the previous one's values in place.
+  return <ListingForm key={existing?.id ?? 'new'} id={id} isEditMode={isEditMode} existing={existing} />
 }
 
 export default CreateListingPage

@@ -1,0 +1,185 @@
+// Listing endpoints. Components call these rather than fetch directly, so the
+// request shapes stay in one file next to the backend contract.
+//
+// The API speaks snake_case and the UI speaks camelCase. The translation lives
+// here, in `toApartment` and `toApartmentPayload`, so a rename on either side
+// is a change to one file rather than to every screen that renders a listing.
+import { request } from './apiClient'
+
+/** Strips the empty values so an optional field is absent rather than "". */
+const omitEmpty = (object) =>
+  Object.fromEntries(Object.entries(object).filter(([, value]) => value !== '' && value != null))
+
+/**
+ * Turns an API listing into the shape the existing cards and pages already
+ * render.
+ *
+ * The UI was built against the mock data, so this maps onto that vocabulary —
+ * `districtId`, `image`, `title` — and the components did not have to change.
+ */
+export function toApartment(item) {
+  const cover = item.images?.find((image) => image.is_primary) ?? item.images?.[0] ?? null
+
+  return {
+    id: item.id,
+    title: item.title,
+    description: item.description ?? '',
+
+    price: Number(item.price),
+    currency: item.currency,
+    rentalPeriod: item.rental_period,
+
+    rooms: item.rooms,
+    area: item.area,
+    floor: item.floor,
+    totalFloors: item.total_floors,
+    furnished: item.furnished,
+
+    status: item.status,
+
+    // The card and the filters key off the slug, which is also what the
+    // frontend's district list uses — so they line up without a lookup table.
+    districtId: item.district?.slug ?? '',
+    districtName: item.district?.name ?? '',
+    neighborhood: item.neighborhood ?? '',
+    address: item.address,
+    latitude: item.latitude,
+    longitude: item.longitude,
+
+    deposit: item.deposit ? Number(item.deposit) : null,
+    utilities: item.utilities,
+    minimumMonths: item.minimum_months ?? null,
+    rules: item.rules ?? [],
+
+    amenities: item.amenities ?? [],
+    images: item.images ?? [],
+    image: cover?.url ?? null,
+
+    viewsCount: item.views_count ?? 0,
+    owner: item.owner ?? null,
+
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
+  }
+}
+
+/** Builds the request body from the listing form's values. */
+export function toApartmentPayload(values, { publish }) {
+  const { location, rentalConditions } = values
+
+  return {
+    title: values.title.trim(),
+    description: values.description.trim(),
+
+    price: String(values.price),
+    currency: values.currency,
+    // The form's ids are upper case ('MONTHLY'); the column stores the API's
+    // lower-case vocabulary.
+    rental_period: values.rentalPeriod.toLowerCase(),
+
+    // The form's top option is "5+", which the column stores as plain 5.
+    rooms: Number(String(values.rooms).replace('+', '')),
+    area: Number(values.area),
+    floor: Number(values.floor),
+    total_floors: Number(values.totalFloors),
+    // The form stores this as an id ('FURNISHED' / 'UNFURNISHED'); the column
+    // is a boolean.
+    furnished: values.furnished === 'FURNISHED',
+
+    district_slug: location.district,
+    address: location.address.trim(),
+    latitude: location.latitude,
+    longitude: location.longitude,
+
+    ...omitEmpty({
+      neighborhood: location.neighborhood.trim(),
+      deposit: rentalConditions.deposit === '' ? null : String(rentalConditions.deposit),
+      minimum_months:
+        rentalConditions.minimumMonths === '' ? null : Number(rentalConditions.minimumMonths),
+    }),
+
+    utilities: rentalConditions.utilities,
+    rules: rentalConditions.rules,
+    amenities: values.amenities,
+
+    // Only pictures that actually reached the server. A blob: URL is local to
+    // this browser tab and would be a dead link for everyone else, so it is
+    // dropped rather than stored as if it were a real image.
+    images: values.images
+      .filter((image) => image.uploadedUrl)
+      .map((image) => ({
+        url: image.uploadedUrl,
+        is_primary: image.id === values.coverImageId,
+      })),
+
+    publish,
+  }
+}
+
+/** Public feed. Returns `{ items, total, page, limit, pages }`. */
+export async function fetchApartments({ signal, ...params } = {}) {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue
+    // `rooms` repeats rather than joining, which is what Gin binds to a slice.
+    if (Array.isArray(value)) value.forEach((entry) => query.append(key, entry))
+    else query.set(key, value)
+  }
+
+  const suffix = query.toString() ? `?${query}` : ''
+  const data = await request(`/apartments${suffix}`, { signal })
+  return { ...data, items: data.items.map(toApartment) }
+}
+
+/** One listing. A draft resolves only for its owner, hence the token. */
+export async function fetchApartment(id, { token, signal } = {}) {
+  return toApartment(await request(`/apartments/${id}`, { token, signal }))
+}
+
+/** The signed-in user's own listings, drafts included. */
+export async function fetchMyApartments({ token, signal, ...params } = {}) {
+  const query = new URLSearchParams(omitEmpty(params)).toString()
+  const data = await request(`/me/apartments${query ? `?${query}` : ''}`, { token, signal })
+  return { ...data, items: data.items.map(toApartment) }
+}
+
+/** The dashboard's listing counters. */
+export function fetchMyApartmentStats({ token, signal } = {}) {
+  return request('/me/apartments/stats', { token, signal })
+}
+
+export async function createApartment(payload, { token } = {}) {
+  return toApartment(await request('/apartments', { method: 'POST', body: payload, token }))
+}
+
+export async function updateApartment(id, payload, { token } = {}) {
+  return toApartment(await request(`/apartments/${id}`, { method: 'PUT', body: payload, token }))
+}
+
+export function deleteApartment(id, { token } = {}) {
+  return request(`/apartments/${id}`, { method: 'DELETE', token })
+}
+
+/** The districts a listing can be placed in. */
+export function fetchDistricts({ signal } = {}) {
+  return request('/districts', { signal })
+}
+
+/**
+ * Uploads one photograph and returns the URL it is served from.
+ *
+ * Pictures go up as they are chosen rather than with the listing: a gallery
+ * base64'd into the JSON body would inflate every request by a third and hold
+ * the whole set in memory on both sides. The listing then references URLs.
+ */
+export async function uploadApartmentImage(file, { token, signal } = {}) {
+  const form = new FormData()
+  form.append('image', file)
+  const data = await request('/uploads/images', {
+    method: 'POST',
+    body: form,
+    token,
+    signal,
+  })
+  return data.url
+}

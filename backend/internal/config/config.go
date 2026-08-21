@@ -42,10 +42,13 @@ type Config struct {
 	// binary.
 	UploadDir        string
 	UploadPublicPath string
-	Database         Database
-	JWT              JWT
-	OTP              OTP
-	Notify           Notify
+	// PublicBaseURL is the origin uploaded files are served from, e.g.
+	// "https://api.renthouse.uz". Empty means derive it from each request.
+	PublicBaseURL string
+	Database      Database
+	JWT           JWT
+	OTP           OTP
+	Notify        Notify
 }
 
 // Notify selects how verification codes are delivered.
@@ -179,6 +182,7 @@ func Load() (*Config, error) {
 
 	cfg.UploadDir = envOr("UPLOAD_DIR", "./uploads")
 	cfg.UploadPublicPath = envOr("UPLOAD_PUBLIC_PATH", "/uploads")
+	cfg.PublicBaseURL = os.Getenv("PUBLIC_BASE_URL")
 
 	cfg.Notify = Notify{
 		EmailProvider: strings.ToLower(envOr("EMAIL_PROVIDER", "dev")),

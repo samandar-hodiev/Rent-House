@@ -7,7 +7,7 @@ import SortDropdown, { DEFAULT_SORT_OPTIONS } from '../components/SortDropdown'
 import ApartmentGrid from '../components/ApartmentGrid'
 import { useWishlist } from '../context/WishlistContext'
 import { useLocale } from '../context/LocaleContext'
-import { APARTMENTS } from '../data/apartments'
+import { fetchApartment } from '../services/apartmentsApi'
 import { filterApartments } from '../utils/filterApartments'
 import { sortApartments } from '../utils/sortApartments'
 import { ROUTES } from '../routes/paths'
@@ -34,11 +34,6 @@ function WishlistPage() {
   const { savedItems } = useWishlist()
   const [filters, setFiltersState] = useState(EMPTY_FILTERS)
   const [sort, setSort] = useState('newest')
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    setLoading(false)
-  }, [])
 
   const setFilters = (partial) => setFiltersState((current) => ({ ...current, ...partial }))
   const clearFilters = () => setFiltersState(EMPTY_FILTERS)
@@ -48,13 +43,47 @@ function WishlistPage() {
     [filters],
   )
 
+  // The wishlist stores ids; the listings themselves come from the database.
+  // Each saved id is fetched on its own because a listing may since have been
+  // deleted or unpublished — those simply drop out rather than failing the
+  // whole page.
+  const [catalog, setCatalog] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const savedIds = useMemo(() => [...savedItems.keys()], [savedItems])
+
+  useEffect(() => {
+    if (savedIds.length === 0) {
+      setCatalog([])
+      setLoading(false)
+      return undefined
+    }
+
+    const controller = new AbortController()
+    setLoading(true)
+    Promise.all(
+      savedIds.map((id) =>
+        fetchApartment(id, { signal: controller.signal }).catch(() => null),
+      ),
+    )
+      .then((results) => {
+        if (controller.signal.aborted) return
+        setCatalog(results.filter(Boolean))
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [savedIds])
+
   const savedApartments = useMemo(
     () =>
-      APARTMENTS.filter((apartment) => savedItems.has(apartment.id)).map((apartment) => ({
+      catalog.map((apartment) => ({
         ...apartment,
         savedAt: savedItems.get(apartment.id),
       })),
-    [savedItems],
+    [catalog, savedItems],
   )
 
   const filteredApartments = useMemo(

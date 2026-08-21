@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -24,10 +25,13 @@ const formField = "image"
 // URLs.
 type UploadHandler struct {
 	files storage.Storage
+	// baseURL is the public origin uploaded files are reachable at. Empty means
+	// "work it out from the request", which is what development wants.
+	baseURL string
 }
 
-func NewUploadHandler(files storage.Storage) *UploadHandler {
-	return &UploadHandler{files: files}
+func NewUploadHandler(files storage.Storage, baseURL string) *UploadHandler {
+	return &UploadHandler{files: files, baseURL: strings.TrimRight(baseURL, "/")}
 }
 
 // UploadImage handles POST /api/v1/uploads/images.
@@ -66,7 +70,7 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 
 	// The browser's declared type is a hint; storage re-checks it against its
 	// allow-list and decides the extension itself.
-	url, err := h.files.Save(c.Request.Context(), header.Header.Get("Content-Type"), file)
+	path, err := h.files.Save(c.Request.Context(), header.Header.Get("Content-Type"), file)
 	if err != nil {
 		if errors.Is(err, storage.ErrUnsupportedType) {
 			response.Error(c, http.StatusUnsupportedMediaType, "unsupported_type",
@@ -78,5 +82,26 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, http.StatusCreated, "Image uploaded", gin.H{"url": url})
+	// An absolute URL, not the stored path. The frontend runs on a different
+	// origin in development and may sit behind a different host in production,
+	// so a bare "/uploads/..." would resolve against the wrong server and 404.
+	// What goes into the database is a URL that works from anywhere.
+	response.Success(c, http.StatusCreated, "Image uploaded", gin.H{"url": h.absolute(c, path)})
+}
+
+// absolute turns a stored path into a full URL.
+//
+// PUBLIC_BASE_URL wins when it is set, which is what a deployment behind a
+// proxy or a CDN needs. Otherwise the request's own scheme and host are used,
+// so a developer needs no configuration at all.
+func (h *UploadHandler) absolute(c *gin.Context, path string) string {
+	if h.baseURL != "" {
+		return h.baseURL + path
+	}
+
+	scheme := "http"
+	if c.Request.TLS != nil || strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") {
+		scheme = "https"
+	}
+	return scheme + "://" + c.Request.Host + path
 }

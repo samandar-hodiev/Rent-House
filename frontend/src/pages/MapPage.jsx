@@ -7,8 +7,8 @@ import MapLayerSelector from '../components/MapLayerSelector'
 import FilterBar from '../components/FilterBar'
 import { useSearch } from '../context/SearchContext'
 import { useLocale } from '../context/LocaleContext'
-import { APARTMENTS } from '../data/apartments'
 import { readStoredMapLayerId, storeMapLayerId } from '../data/mapLayers'
+import { fetchApartments } from '../services/apartmentsApi'
 import { filterApartments } from '../utils/filterApartments'
 import { getNearbyApartments } from '../utils/geo'
 import { applyMapFiltersToParams, parseMapFiltersFromParams } from '../utils/mapFilterParams'
@@ -76,11 +76,26 @@ function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [districtId, filters])
 
+  // Every published listing carries coordinates from the database, so the map
+  // pins come from the same rows the listing pages render — nothing here is
+  // positioned by hand.
+  const [catalog, setCatalog] = useState([])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchApartments({ signal: controller.signal, limit: 60 })
+      .then((page) => setCatalog(page.items))
+      .catch((error) => {
+        if (error?.name !== 'AbortError') setCatalog([])
+      })
+    return () => controller.abort()
+  }, [])
+
   // Map MVP: district + filters only, no keyword search (kept disabled in
   // the header — see SearchBar.jsx).
   const visibleApartments = useMemo(
-    () => filterApartments(APARTMENTS, { districtId, keyword: '', filters }),
-    [districtId, filters],
+    () => filterApartments(catalog, { districtId, keyword: '', filters }),
+    [catalog, districtId, filters],
   )
 
   const nearbyApartments = useMemo(

@@ -28,16 +28,27 @@ export const NETWORK_ERROR = 'network_error'
  * has to check `success` by hand.
  */
 export async function request(path, { method = 'GET', body, token, signal } = {}) {
+  // FormData carries its own multipart boundary in the Content-Type header,
+  // which only the browser can generate. Setting the header by hand would
+  // produce one without a boundary and the server would reject the upload, so
+  // the body is passed through untouched and the header is left off.
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
+
   const headers = {}
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  if (body !== undefined && !isFormData) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
+
+  let requestBody
+  if (body === undefined) requestBody = undefined
+  else if (isFormData) requestBody = body
+  else requestBody = JSON.stringify(body)
 
   let response
   try {
     response = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: requestBody,
       signal,
     })
   } catch (error) {

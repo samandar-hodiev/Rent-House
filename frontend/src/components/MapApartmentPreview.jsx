@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { useLocale } from '../context/LocaleContext'
+import { listingTitle } from '../utils/listingText'
 import { getDistrictById, districtNameKey } from '../data/districts'
 import { apartmentDetailsPath } from '../routes/paths'
 import { formatUzsAmount } from '../utils/formatPrice'
@@ -14,7 +15,7 @@ function MapApartmentPreview({ apartment, onClose, variant = 'floating' }) {
   const { t } = useLocale()
   const navigate = useNavigate()
 
-  const title = t(`apartmentTitle.${apartment.id}`)
+  const title = listingTitle(t, apartment)
   const district = getDistrictById(apartment.districtId)
 
   return (

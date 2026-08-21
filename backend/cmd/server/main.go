@@ -258,7 +258,7 @@ func newRouter(
 	}
 	router.Static(files.PublicPath(), files.Dir())
 	v1.POST("/uploads/images",
-		middleware.Auth(tokens), handler.NewUploadHandler(files).UploadImage)
+		middleware.Auth(tokens), handler.NewUploadHandler(files, cfg.PublicBaseURL).UploadImage)
 
 	return router, nil
 }

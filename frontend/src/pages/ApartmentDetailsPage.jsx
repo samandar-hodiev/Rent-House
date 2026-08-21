@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowUpDown,
@@ -28,14 +28,15 @@ import ApartmentDetailsSkeleton from '../components/ApartmentDetailsSkeleton'
 import ContactChatModal from '../components/ContactChatModal'
 import ApartmentCard from '../components/ApartmentCard'
 import { useLocale } from '../context/LocaleContext'
+import { useAuth } from '../context/AuthContext'
 import { useWishlist } from '../context/WishlistContext'
 import { useRequireAuth } from '../hooks/useRequireAuth'
-import { APARTMENTS } from '../data/apartments'
 import { getDistrictById, districtNameKey } from '../data/districts'
+import { fetchApartment, fetchApartments } from '../services/apartmentsApi'
 import { ROUTES } from '../routes/paths'
+import { listingDescription, listingTitle } from '../utils/listingText'
 import { formatUzsAmount } from '../utils/formatPrice'
 import { formatPostedAt } from '../utils/formatRelativeTime'
-import { getSimilarApartments } from '../utils/getSimilarApartments'
 
 const AMENITY_ICONS = {
   wifi: Wifi,
@@ -76,6 +77,9 @@ function ApartmentDetailsPage() {
   const navigate = useNavigate()
   const { isSaved, toggleWishlist } = useWishlist()
   const requireAuth = useRequireAuth()
+  const { token } = useAuth()
+  const [apartment, setApartment] = useState(null)
+  const [similarApartments, setSimilarApartments] = useState([])
   const [loading, setLoading] = useState(true)
   const [isChatOpen, setIsChatOpen] = useState(false)
 
@@ -85,16 +89,48 @@ function ApartmentDetailsPage() {
   const handleChatClick = requireAuth(() => setIsChatOpen(true))
   const [shareCopied, setShareCopied] = useState(false)
 
+  // The token is sent when there is one so an owner can open their own
+  // unpublished draft; to everyone else the backend answers 404, and the
+  // not-found state below is what renders.
   useEffect(() => {
-    setLoading(false)
-  }, [])
+    const controller = new AbortController()
+    setLoading(true)
+    setApartment(null)
 
-  const apartment = useMemo(() => APARTMENTS.find((item) => String(item.id) === id), [id])
+    fetchApartment(id, { token, signal: controller.signal })
+      .then(setApartment)
+      .catch((error) => {
+        if (error?.name !== 'AbortError') setApartment(null)
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false)
+      })
 
-  const similarApartments = useMemo(
-    () => (apartment ? getSimilarApartments(apartment, APARTMENTS, 4) : []),
-    [apartment],
-  )
+    return () => controller.abort()
+  }, [id, token])
+
+  // "Similar" is a second request against the same district, minus this
+  // listing. It is not worth blocking the page on, so a failure simply leaves
+  // the section empty.
+  useEffect(() => {
+    if (!apartment) {
+      setSimilarApartments([])
+      return undefined
+    }
+
+    const controller = new AbortController()
+    fetchApartments({
+      signal: controller.signal,
+      district: apartment.districtId,
+      limit: 5,
+    })
+      .then((page) =>
+        setSimilarApartments(page.items.filter((item) => item.id !== apartment.id).slice(0, 4)),
+      )
+      .catch(() => setSimilarApartments([]))
+
+    return () => controller.abort()
+  }, [apartment])
 
   if (loading) {
     return (
@@ -118,8 +154,8 @@ function ApartmentDetailsPage() {
     )
   }
 
-  const title = t(`apartmentTitle.${apartment.id}`)
-  const description = t(`apartmentDescription.${apartment.id}`)
+  const title = listingTitle(t, apartment)
+  const description = listingDescription(t, apartment)
   const district = getDistrictById(apartment.districtId)
   const saved = isSaved(apartment.id)
 

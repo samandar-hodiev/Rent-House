@@ -1,33 +1,119 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
-import { getMyListings } from '../data/myListings'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { useAuth } from './AuthContext'
+import {
+  createApartment as createApartmentRequest,
+  deleteApartment as deleteApartmentRequest,
+  fetchMyApartments,
+  updateApartment as updateApartmentRequest,
+} from '../services/apartmentsApi'
 
 const ListingsContext = createContext(null)
 
-// Holds the signed-in user's listings so "Mening e'lonlarim" and the edit form
-// read and write the same objects — saving an edit updates the card behind it.
-// In-memory only: nothing is persisted and no request is sent. This is the seam
-// `GET/PATCH /api/v1/apartments/:id` replaces.
+// Holds the signed-in user's listings, loaded from the API.
+//
+// PostgreSQL is the source of truth: this is a cache of what the server last
+// said, kept so "Mening e'lonlarim" and the edit form read the same objects and
+// so a save updates the card behind it without a refetch. Every mutation goes
+// to the server first and only then to this state — an optimistic update that
+// the server rejected would leave the screen showing something that does not
+// exist.
 export function ListingsProvider({ children }) {
-  const [listings, setListings] = useState(getMyListings)
+  const { token, isAuthenticated } = useAuth()
+
+  const [listings, setListings] = useState([])
+  const [status, setStatus] = useState('idle') // idle | loading | ready | error
+  const [error, setError] = useState(null)
+
+  const load = useCallback(
+    async (signal) => {
+      if (!token) {
+        setListings([])
+        setStatus('idle')
+        return
+      }
+
+      setStatus('loading')
+      setError(null)
+      try {
+        // The whole set, not a page: an owner's dashboard is small, and the
+        // count shown on the overview has to be the real one.
+        const page = await fetchMyApartments({ token, signal, limit: 60 })
+        setListings(page.items)
+        setStatus('ready')
+      } catch (requestError) {
+        if (requestError?.name === 'AbortError') return
+        setError(requestError)
+        setStatus('error')
+      }
+    },
+    [token],
+  )
+
+  // Reloads when the session changes: signing out must not leave the previous
+  // account's listings on screen.
+  useEffect(() => {
+    const controller = new AbortController()
+    load(controller.signal)
+    return () => controller.abort()
+  }, [load])
 
   const getListing = useCallback(
     (id) => listings.find((listing) => String(listing.id) === String(id)) ?? null,
     [listings],
   )
 
-  // `patch` never carries `status`: editing a listing must not move it between
-  // Faol / Kutilmoqda / Yopilgan.
-  const updateListing = useCallback((id, patch) => {
-    setListings((current) =>
-      current.map((listing) =>
-        String(listing.id) === String(id) ? { ...listing, ...patch, status: listing.status } : listing,
-      ),
-    )
-  }, [])
+  const createListing = useCallback(
+    async (payload) => {
+      const created = await createApartmentRequest(payload, { token })
+      setListings((current) => [created, ...current])
+      return created
+    },
+    [token],
+  )
+
+  const updateListing = useCallback(
+    async (id, payload) => {
+      const updated = await updateApartmentRequest(id, payload, { token })
+      setListings((current) =>
+        current.map((listing) => (String(listing.id) === String(id) ? updated : listing)),
+      )
+      return updated
+    },
+    [token],
+  )
+
+  const removeListing = useCallback(
+    async (id) => {
+      await deleteApartmentRequest(id, { token })
+      setListings((current) => current.filter((listing) => String(listing.id) !== String(id)))
+    },
+    [token],
+  )
 
   const value = useMemo(
-    () => ({ listings, getListing, updateListing }),
-    [listings, getListing, updateListing],
+    () => ({
+      listings,
+      status,
+      error,
+      isLoading: status === 'loading',
+      isAuthenticated,
+      getListing,
+      createListing,
+      updateListing,
+      removeListing,
+      reload: () => load(),
+    }),
+    [
+      listings,
+      status,
+      error,
+      isAuthenticated,
+      getListing,
+      createListing,
+      updateListing,
+      removeListing,
+      load,
+    ],
   )
 
   return <ListingsContext.Provider value={value}>{children}</ListingsContext.Provider>
