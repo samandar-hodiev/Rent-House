@@ -8,6 +8,7 @@ import UserAvatar from '../dashboard/UserAvatar'
 import { fetchAttachmentLimits } from '../../services/chatApi'
 import ApartmentContextBar from './ApartmentContextBar'
 import BlockUserDialog from './BlockUserDialog'
+import { ArchiveConversationDialog, DeleteConversationDialog } from './ConversationDialogs'
 import ChatComposer from './ChatComposer'
 import ChatHeaderMenu from './ChatHeaderMenu'
 import ChatMessage from './ChatMessage'
@@ -28,9 +29,15 @@ import DeleteMessageDialog from './DeleteMessageDialog'
  * it, which is what lets one conversation hold several listings' worth of
  * discussion and still show which is which.
  */
-function ChatThread({ conversation, apartmentId = null, className = '' }) {
+function ChatThread({
+  conversation,
+  apartmentId = null,
+  onConversationGone,
+  className = '',
+}) {
   const { t } = useLocale()
-  const { socketStatus, setActiveConversation, setBlocked } = useChat()
+  const { socketStatus, setActiveConversation, setBlocked, setArchived, removeConversation } =
+    useChat()
 
   // Two different facts. `isBlocked` is this reader's own decision and offers a
   // way back; `isBlockedBy` is the other party's, and only explains why the
@@ -40,6 +47,31 @@ function ChatThread({ conversation, apartmentId = null, className = '' }) {
   const [blockDialog, setBlockDialog] = useState(false)
   const [blockBusy, setBlockBusy] = useState(false)
   const [blockError, setBlockError] = useState(null)
+
+  // Archiving and deleting from the header run the same context methods and
+  // open the same dialogs as the conversation's own row in the sidebar. There
+  // is one archive and one delete in the application, reachable from two
+  // places rather than implemented in two.
+  const [pending, setPending] = useState(null) // 'archive' | 'delete'
+  const [actionBusy, setActionBusy] = useState(false)
+  const [actionError, setActionError] = useState(null)
+
+  const act = async (run) => {
+    setActionBusy(true)
+    setActionError(null)
+    try {
+      await run()
+      setPending(null)
+      // The dashboard drops the panel on its own — it reads the selection from
+      // the list, which no longer holds this thread. The apartment modal has no
+      // list to read, so it is told.
+      onConversationGone?.()
+    } catch {
+      setActionError(t('chat.actionFailed'))
+    } finally {
+      setActionBusy(false)
+    }
+  }
 
   const changeBlock = async (blocked, reason) => {
     setBlockBusy(true)
@@ -155,6 +187,14 @@ function ChatThread({ conversation, apartmentId = null, className = '' }) {
             setBlockDialog(true)
           }}
           onUnblock={() => changeBlock(false)}
+          onArchive={() => {
+            setActionError(null)
+            setPending('archive')
+          }}
+          onDelete={() => {
+            setActionError(null)
+            setPending('delete')
+          }}
         />
       </div>
 
@@ -287,6 +327,28 @@ function ChatThread({ conversation, apartmentId = null, className = '' }) {
           limits={limits}
         />
       )}
+
+      {/* The sidebar's own dialogs, imported rather than reproduced. */}
+      {pending === 'archive' ? (
+        <ArchiveConversationDialog
+          busy={actionBusy}
+          error={actionError}
+          onCancel={() => (actionBusy ? undefined : setPending(null))}
+          onConfirm={() => act(() => setArchived(conversation.id, true))}
+        />
+      ) : null}
+
+      {pending === 'delete' ? (
+        <DeleteConversationDialog
+          busy={actionBusy}
+          error={actionError}
+          onCancel={() => (actionBusy ? undefined : setPending(null))}
+          onDeleteForMe={() => act(() => removeConversation(conversation.id))}
+          onDeleteForEveryone={() =>
+            act(() => removeConversation(conversation.id, { forEveryone: true }))
+          }
+        />
+      ) : null}
 
       {blockDialog ? (
         <BlockUserDialog

@@ -80,7 +80,14 @@ function ContactChatModal({ apartmentId, onClose }) {
               : t('chat.startFailed')}
           </p>
         ) : conversation ? (
-          <ChatThread conversation={conversation} apartmentId={apartmentId} className="flex-1" />
+          <ChatThread
+            conversation={conversation}
+            apartmentId={apartmentId}
+            // Archiving or deleting from here leaves nothing to show, and the
+            // modal has no conversation list to fall back to.
+            onConversationGone={onClose}
+            className="flex-1"
+          />
         ) : (
           <p className="flex flex-1 items-center justify-center gap-2 text-sm text-text-muted">
             <Loader2 aria-hidden="true" size={16} className="animate-spin" />
