@@ -148,13 +148,14 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	body, attachment, cleanup, ok := h.readMessage(c)
+	body, attachment, apartmentID, cleanup, ok := h.readMessage(c)
 	if !ok {
 		return
 	}
 	defer cleanup()
 
-	message, err := h.chat.SendMessage(c.Request.Context(), conversationID, actorID, body, attachment)
+	message, err := h.chat.SendMessage(
+		c.Request.Context(), conversationID, actorID, body, attachment, apartmentID)
 	if err != nil {
 		h.writeError(c, err, "send message")
 		return
@@ -166,24 +167,27 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 // readMessage pulls the text and the optional file out of either encoding.
 func (h *ChatHandler) readMessage(
 	c *gin.Context,
-) (body string, attachment *service.Attachment, cleanup func(), ok bool) {
+) (body string, attachment *service.Attachment, apartmentID *uuid.UUID, cleanup func(), ok bool) {
 	cleanup = func() {}
 
 	if !strings.HasPrefix(c.ContentType(), "multipart/form-data") {
 		var req dto.SendMessageRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
-			return "", nil, cleanup, false
+			return "", nil, nil, cleanup, false
 		}
 		req.Normalize()
-		return req.Body, nil, cleanup, true
+		return req.Body, nil, parseOptionalUUID(req.ApartmentID), cleanup, true
 	}
+
+	// Multipart carries it as a field beside the file.
+	apartmentID = parseOptionalUUID(c.PostForm("apartment_id"))
 
 	header, err := c.FormFile("file")
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "validation_failed",
 			"Attach a file in the 'file' field")
-		return "", nil, cleanup, false
+		return "", nil, nil, cleanup, false
 	}
 
 	// Checked before the file is opened, so an oversized upload is refused
@@ -193,19 +197,19 @@ func (h *ChatHandler) readMessage(
 	if !known {
 		response.Error(c, http.StatusUnsupportedMediaType, "unsupported_type",
 			"This file type is not accepted")
-		return "", nil, cleanup, false
+		return "", nil, nil, cleanup, false
 	}
 	if header.Size > kind.MaxBytes {
 		response.Error(c, http.StatusRequestEntityTooLarge, "file_too_large",
 			"The file is larger than the limit for its type")
-		return "", nil, cleanup, false
+		return "", nil, nil, cleanup, false
 	}
 
 	file, err := header.Open()
 	if err != nil {
 		logger.Errorf("send message: open upload: %v", err)
 		response.Error(c, http.StatusInternalServerError, "internal_error", "Something went wrong")
-		return "", nil, cleanup, false
+		return "", nil, nil, cleanup, false
 	}
 	cleanup = func() { _ = file.Close() }
 
@@ -222,7 +226,7 @@ func (h *ChatHandler) readMessage(
 		}
 	}
 
-	return strings.TrimSpace(c.PostForm("body")), attachment, cleanup, true
+	return strings.TrimSpace(c.PostForm("body")), attachment, apartmentID, cleanup, true
 }
 
 // DownloadAttachment handles GET /api/v1/attachments/:id.
@@ -525,4 +529,18 @@ func (h *ChatHandler) DeleteConversation(c *gin.Context) {
 		return
 	}
 	response.OK(c, "", gin.H{"for_everyone": req.ForEveryone})
+}
+
+// parseOptionalUUID reads an id that may legitimately be absent. An unparseable
+// value is treated as absent rather than as an error: the field is context, and
+// a message is worth delivering without it.
+func parseOptionalUUID(value string) *uuid.UUID {
+	if value == "" {
+		return nil
+	}
+	parsed, err := uuid.Parse(value)
+	if err != nil {
+		return nil
+	}
+	return &parsed
 }

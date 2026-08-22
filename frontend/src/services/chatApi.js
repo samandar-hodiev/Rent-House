@@ -19,6 +19,9 @@ export function toMessage(item) {
     // rather than inspecting the attachment.
     kind: item.kind ?? 'text',
     body: item.body,
+    // Which listing this message was written about. The same conversation can
+    // hold messages about several, and this is what tells them apart.
+    apartmentId: item.apartment_id ?? null,
     attachment: item.attachment
       ? {
           id: item.attachment.id,
@@ -43,11 +46,20 @@ export function toMessage(item) {
 export function toConversation(item) {
   return {
     id: item.id,
-    apartment: {
-      id: item.apartment?.id ?? null,
-      title: item.apartment?.title ?? '',
-      image: item.apartment?.image ?? null,
-    },
+    // The thread's current listing context — the one most recently written
+    // about. Null when that listing has been withdrawn, or when the pair have
+    // never named one: a conversation belongs to two people, not to a listing.
+    apartment: item.apartment
+      ? {
+          id: item.apartment.id,
+          title: item.apartment.title ?? '',
+          image: item.apartment.image ?? null,
+          district: item.apartment.district ?? '',
+          price: item.apartment.price ? Number(item.apartment.price) : null,
+          currency: item.apartment.currency ?? 'UZS',
+          rentalPeriod: item.apartment.rental_period ?? 'monthly',
+        }
+      : null,
     other: {
       id: item.other?.id ?? null,
       name: item.other?.name ?? '',
@@ -74,7 +86,9 @@ export function toConversation(item) {
  * Opens the thread about a listing, or returns the one already open.
  *
  * Safe to call every time the modal opens: the backend keys the thread on
- * (apartment, enquirer) and returns the existing one rather than a second.
+ * (buyer, owner) — the pair, not the listing — so writing to the same person
+ * about a second apartment continues the conversation already underway. The
+ * listing passed here becomes the thread's current context.
  */
 export async function startConversation(apartmentId, { token, signal } = {}) {
   const data = await request('/conversations', {
@@ -129,10 +143,17 @@ export async function fetchMessages(conversationId, { token, signal, limit = 30,
   }
 }
 
-export async function sendMessage(conversationId, body, { token } = {}) {
+/**
+ * Sends a text message.
+ *
+ * `apartmentId` records which listing it is about. Context, not routing: the
+ * thread is chosen by who the two people are, and this says what was being
+ * discussed when the message was written.
+ */
+export async function sendMessage(conversationId, body, { token, apartmentId } = {}) {
   const data = await request(`/conversations/${conversationId}/messages`, {
     method: 'POST',
-    body: { body },
+    body: apartmentId ? { body, apartment_id: apartmentId } : { body },
     token,
   })
   return toMessage(data)
@@ -175,10 +196,14 @@ export async function fetchUnreadTotal({ token, signal } = {}) {
  *
  * Returns `{ promise, abort }` so a caller can cancel a large upload.
  */
-export function sendAttachment(conversationId, { file, body = '', durationSeconds, token, onProgress }) {
+export function sendAttachment(
+  conversationId,
+  { file, body = '', durationSeconds, apartmentId, token, onProgress },
+) {
   const form = new FormData()
   form.append('file', file, file.name || 'file')
   if (body) form.append('body', body)
+  if (apartmentId) form.append('apartment_id', apartmentId)
   if (durationSeconds != null) form.append('duration_seconds', String(Math.round(durationSeconds)))
 
   const xhr = new XMLHttpRequest()

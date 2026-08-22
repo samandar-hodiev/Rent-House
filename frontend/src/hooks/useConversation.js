@@ -19,7 +19,15 @@ import { CHAT_EVENTS, SOCKET_STATUS } from '../services/chatSocket'
  * them one chat rather than two implementations of the same idea. Both mount
  * this against a conversation id and get identical behaviour.
  */
-export function useConversation(conversationId) {
+/**
+ * One open thread.
+ *
+ * `apartmentId` is the listing the reader arrived from, recorded on every
+ * message sent while it is set. It does not select the thread — the pair does
+ * that — it says what a message is about, so one conversation can hold
+ * messages about several listings and still tell them apart.
+ */
+export function useConversation(conversationId, apartmentId = null) {
   const { token, user } = useAuth()
   const { subscribe, markRead, socketStatus } = useChat()
   const myId = user?.id ?? null
@@ -191,7 +199,7 @@ export function useConversation(conversationId) {
       setSending(true)
       setSendError(null)
       try {
-        const message = await sendMessageRequest(conversationId, text, { token })
+        const message = await sendMessageRequest(conversationId, text, { token, apartmentId })
         setMessages((current) =>
           current.some((item) => item.id === message.id) ? current : [...current, message],
         )
@@ -203,7 +211,7 @@ export function useConversation(conversationId) {
         setSending(false)
       }
     },
-    [conversationId, token, sending],
+    [conversationId, token, sending, apartmentId],
   )
 
   /**
@@ -220,6 +228,7 @@ export function useConversation(conversationId) {
         file,
         body,
         durationSeconds,
+        apartmentId,
         token,
         onProgress,
       })
@@ -233,7 +242,7 @@ export function useConversation(conversationId) {
 
       return { promise: done, abort }
     },
-    [conversationId, token],
+    [conversationId, token, apartmentId],
   )
 
   const edit = useCallback(

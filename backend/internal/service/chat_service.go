@@ -105,8 +105,13 @@ func NewChatService(
 // SetClock replaces the service's clock. Tests only.
 func (s *ChatService) SetClock(now func() time.Time) { s.now = now }
 
-// StartConversation returns the thread between this user and a listing's owner,
-// opening it the first time.
+// StartConversation returns this user's thread with a listing's owner, opening
+// it the first time, and makes that listing the thread's current context.
+//
+// One thread per pair of people, not per listing: writing to the same owner
+// about a second apartment continues the conversation already underway rather
+// than starting a parallel one. The listing is context, and is recorded on each
+// message.
 //
 // The caller is the enquirer and the owner comes from the listing, so neither
 // side of the thread is anything the client chose.
@@ -222,7 +227,8 @@ func (s *ChatService) ListMessages(
 // present the file is written to storage first: a database row pointing at a
 // file that failed to save would render as a broken bubble for both people.
 func (s *ChatService) SendMessage(
-	ctx context.Context, conversationID, actorID uuid.UUID, body string, attachment *Attachment,
+	ctx context.Context, conversationID, actorID uuid.UUID, body string,
+	attachment *Attachment, apartmentID *uuid.UUID,
 ) (*dto.MessageResponse, error) {
 	if err := s.assertParticipant(ctx, conversationID, actorID); err != nil {
 		return nil, err
@@ -233,11 +239,21 @@ func (s *ChatService) SendMessage(
 		return nil, ErrEmptyMessage
 	}
 
+	// The listing this message is about, if the sender was looking at one. It
+	// is verified rather than trusted: a client naming a listing that does not
+	// exist gets a message with no context, not a broken reference.
+	if apartmentID != nil {
+		if _, err := s.apartments.FindByID(ctx, *apartmentID); err != nil {
+			apartmentID = nil
+		}
+	}
+
 	message := &models.Message{
 		ConversationID: conversationID,
 		SenderID:       actorID,
 		Kind:           models.MessageKindText,
 		Body:           body,
+		ApartmentID:    apartmentID,
 	}
 
 	var stored *models.MessageAttachment
@@ -248,6 +264,14 @@ func (s *ChatService) SendMessage(
 			return nil, err
 		}
 		message.Kind = stored.Kind
+	}
+
+	if apartmentID != nil {
+		// The thread's pinned context follows the most recent message that
+		// named a listing, so the header shows what is being discussed now.
+		if err := s.chat.SetConversationApartment(ctx, conversationID, *apartmentID); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := s.chat.CreateMessage(ctx, message, stored); err != nil {
@@ -558,10 +582,6 @@ func (s *ChatService) describe(
 func conversationFrom(summary repository.ConversationSummary, online bool) dto.ConversationResponse {
 	out := dto.ConversationResponse{
 		ID: summary.ConversationID,
-		Apartment: dto.ChatApartmentResponse{
-			ID:    summary.ApartmentID,
-			Title: summary.ApartmentTitle,
-		},
 		Other: dto.ChatUserResponse{
 			ID:     summary.OtherUserID,
 			Name:   strings.TrimSpace(summary.OtherFirstName + " " + summary.OtherLastName),
@@ -572,8 +592,27 @@ func conversationFrom(summary repository.ConversationSummary, online bool) dto.C
 		IsPinned:    summary.PinnedAt != nil,
 		IsArchived:  summary.ArchivedAt != nil,
 	}
-	if summary.ApartmentImage != nil {
-		out.Apartment.Image = *summary.ApartmentImage
+	// The listing the pair last wrote about, when there still is one.
+	if summary.ApartmentID != nil {
+		out.Apartment = &dto.ChatApartmentResponse{ID: *summary.ApartmentID}
+		if summary.ApartmentTitle != nil {
+			out.Apartment.Title = *summary.ApartmentTitle
+		}
+		if summary.ApartmentImage != nil {
+			out.Apartment.Image = *summary.ApartmentImage
+		}
+		if summary.ApartmentDistrict != nil {
+			out.Apartment.District = *summary.ApartmentDistrict
+		}
+		if summary.ApartmentPrice != nil {
+			out.Apartment.Price = *summary.ApartmentPrice
+		}
+		if summary.ApartmentCurrency != nil {
+			out.Apartment.Currency = *summary.ApartmentCurrency
+		}
+		if summary.ApartmentRentalPeriod != nil {
+			out.Apartment.RentalPeriod = *summary.ApartmentRentalPeriod
+		}
 	}
 
 	if summary.LastMessageAt != nil {

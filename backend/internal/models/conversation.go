@@ -6,17 +6,27 @@ import (
 	"github.com/google/uuid"
 )
 
-// Conversation is a thread about one apartment.
+// Conversation is the correspondence between two people.
 //
-// Membership lives in conversation_participants, so the schema is not limited
-// to two people even though today's UI shows a pair. BuyerID is separate from
-// that: it names the person who opened the thread, and carries the UNIQUE
-// constraint that stops two taps on "Xabar yozish" producing two threads about
-// the same listing. The other side is always the apartment's owner.
+// Identity is the pair — UNIQUE (buyer_id, owner_id) — not the listing. Two
+// people who write to each other about three apartments have one conversation,
+// because that is what they have: one conversation. The listing is what a
+// message is *about*, and lives on the message.
+//
+// Membership also lives in conversation_participants, which is what every
+// authorization check reads and what holds each person's own view of the
+// thread. BuyerID and OwnerID name the pair for the uniqueness constraint,
+// which only a column on the row itself can carry.
 type Conversation struct {
 	Base
-	ApartmentID uuid.UUID `gorm:"column:apartment_id;type:uuid;not null;index:idx_conversations_apartment_id" json:"apartment_id"`
-	BuyerID     uuid.UUID `gorm:"column:buyer_id;type:uuid;not null" json:"buyer_id"`
+	// ApartmentID is the thread's current context — the listing most recently
+	// written about. Nullable: that listing can be withdrawn while the
+	// conversation carries on.
+	ApartmentID *uuid.UUID `gorm:"column:apartment_id;type:uuid;index:idx_conversations_apartment_id" json:"apartment_id,omitempty"`
+
+	// The pair. BuyerID opened the thread; OwnerID is the person they wrote to.
+	BuyerID uuid.UUID `gorm:"column:buyer_id;type:uuid;not null" json:"buyer_id"`
+	OwnerID uuid.UUID `gorm:"column:owner_id;type:uuid;not null" json:"owner_id"`
 
 	// DeletedAt is set when the thread is withdrawn from both sides. Soft, so
 	// the removal is a state every read enforces rather than an absence the

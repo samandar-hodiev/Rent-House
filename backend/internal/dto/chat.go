@@ -39,6 +39,10 @@ type StartConversationRequest struct {
 type SendMessageRequest struct {
 	Body         string `json:"body"          binding:"omitempty,max=4000"`
 	AttachmentID string `json:"attachment_id" binding:"omitempty,uuid"`
+	// ApartmentID is the listing the sender was looking at. Context, not
+	// routing: it does not decide which thread the message lands in — the pair
+	// does that — it records what the message is about.
+	ApartmentID string `json:"apartment_id" binding:"omitempty,uuid"`
 }
 
 // Normalize trims the text. A message of only whitespace is not a message, and
@@ -98,6 +102,12 @@ type ChatApartmentResponse struct {
 	ID    uuid.UUID `json:"id"`
 	Title string    `json:"title"`
 	Image string    `json:"image,omitempty"`
+	// District and price make the pinned context worth pinning: enough to
+	// recognise the listing without leaving the conversation.
+	District     string `json:"district,omitempty"`
+	Price        string `json:"price,omitempty"`
+	Currency     string `json:"currency,omitempty"`
+	RentalPeriod string `json:"rental_period,omitempty"`
 }
 
 // MessageResponse is one message.
@@ -121,6 +131,11 @@ type MessageResponse struct {
 	// me" is simply absent for that reader.
 	IsDeleted bool `json:"is_deleted"`
 
+	// ApartmentID is the listing this message was written about, when the
+	// sender had one in view. Context: the same conversation can hold messages
+	// about several listings, and this is what tells them apart.
+	ApartmentID *uuid.UUID `json:"apartment_id,omitempty"`
+
 	CreatedAt time.Time  `json:"created_at"`
 	ReadAt    *time.Time `json:"read_at,omitempty"`
 	EditedAt  *time.Time `json:"edited_at,omitempty"`
@@ -129,6 +144,7 @@ type MessageResponse struct {
 // NewMessageResponse converts a stored message into its API shape.
 func NewMessageResponse(message *models.Message) MessageResponse {
 	out := MessageResponse{
+		ApartmentID:    message.ApartmentID,
 		ID:             message.ID,
 		ConversationID: message.ConversationID,
 		SenderID:       message.SenderID,
@@ -165,8 +181,11 @@ type MessagePageResponse struct {
 
 // ConversationResponse is one thread as the list and the header show it.
 type ConversationResponse struct {
-	ID        uuid.UUID             `json:"id"`
-	Apartment ChatApartmentResponse `json:"apartment"`
+	ID uuid.UUID `json:"id"`
+	// Apartment is the thread's current context — the listing most recently
+	// written about — and is absent when that listing has been withdrawn or
+	// the pair have never named one.
+	Apartment *ChatApartmentResponse `json:"apartment,omitempty"`
 	// Other is the person on the other side, which is who the UI names.
 	Other       ChatUserResponse `json:"other"`
 	LastMessage *LastMessage     `json:"last_message,omitempty"`

@@ -86,8 +86,28 @@ func TestUpMigrationsDoNotDropTables(t *testing.T) {
 	}
 
 	for _, m := range migrations {
-		if strings.Contains(strings.ToUpper(m.UpSQL), "DROP TABLE") {
-			t.Errorf("migration %04d_%s drops a table in its up file", m.Version, m.Name)
+		upper := strings.ToUpper(m.UpSQL)
+		// A temporary table is scratch space the migration created for itself
+		// and must clean up; it holds no data anyone deployed. Only permanent
+		// tables are what this guard is about.
+		temporary := map[string]bool{}
+		for _, line := range strings.Split(upper, "\n") {
+			if rest, found := strings.CutPrefix(strings.TrimSpace(line), "CREATE TEMP TABLE "); found {
+				temporary[strings.Fields(rest)[0]] = true
+			}
+		}
+
+		for _, line := range strings.Split(upper, "\n") {
+			rest, found := strings.CutPrefix(strings.TrimSpace(line), "DROP TABLE ")
+			if !found {
+				continue
+			}
+			rest = strings.TrimPrefix(rest, "IF EXISTS ")
+			name := strings.TrimRight(strings.Fields(rest)[0], ";")
+			if !temporary[name] {
+				t.Errorf("migration %04d_%s drops table %q in its up file",
+					m.Version, m.Name, name)
+			}
 		}
 	}
 }

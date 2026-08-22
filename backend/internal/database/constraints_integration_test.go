@@ -229,7 +229,7 @@ func TestConversationParticipantIsUnique(t *testing.T) {
 			t.Fatalf("create buyer: %v", err)
 		}
 
-		conversation := &models.Conversation{ApartmentID: apartment.ID, BuyerID: buyer.ID}
+		conversation := &models.Conversation{ApartmentID: &apartment.ID, BuyerID: buyer.ID, OwnerID: owner.ID}
 		if err := tx.Create(conversation).Error; err != nil {
 			t.Fatalf("create conversation: %v", err)
 		}
@@ -257,7 +257,7 @@ func TestConversationSupportsMoreThanTwoParticipants(t *testing.T) {
 			t.Fatalf("create buyer: %v", err)
 		}
 
-		conversation := &models.Conversation{ApartmentID: apartment.ID, BuyerID: buyer.ID}
+		conversation := &models.Conversation{ApartmentID: &apartment.ID, BuyerID: buyer.ID, OwnerID: owner.ID}
 		if err := tx.Create(conversation).Error; err != nil {
 			t.Fatalf("create conversation: %v", err)
 		}
@@ -314,7 +314,7 @@ func TestDeletingAnApartmentLeavesNoOrphans(t *testing.T) {
 			t.Fatalf("create buyer: %v", err)
 		}
 
-		conversation := &models.Conversation{ApartmentID: apartment.ID, BuyerID: buyer.ID}
+		conversation := &models.Conversation{ApartmentID: &apartment.ID, BuyerID: buyer.ID, OwnerID: owner.ID}
 		if err := tx.Create(conversation).Error; err != nil {
 			t.Fatalf("create conversation: %v", err)
 		}
@@ -337,14 +337,33 @@ func TestDeletingAnApartmentLeavesNoOrphans(t *testing.T) {
 			{"images", &models.ApartmentImage{}, "apartment_id = ?", apartment.ID},
 			{"favorites", &models.Favorite{}, "apartment_id = ?", apartment.ID},
 			{"amenity links", &models.ApartmentAmenity{}, "apartment_id = ?", apartment.ID},
-			{"conversations", &models.Conversation{}, "apartment_id = ?", apartment.ID},
-			{"messages", &models.Message{}, "conversation_id = ?", conversation.ID},
 		} {
 			var count int64
 			tx.Model(c.model).Where(c.where, c.arg).Count(&count)
 			if count != 0 {
 				t.Errorf("%d orphaned %s remain after deleting the apartment", count, c.label)
 			}
+		}
+
+		// Since 0009 a conversation belongs to a pair of people, not to a
+		// listing: it survives the listing being withdrawn, and so do its
+		// messages. What they lose is the context, which is set to null.
+		var conversations int64
+		tx.Model(&models.Conversation{}).Where("id = ?", conversation.ID).Count(&conversations)
+		if conversations != 1 {
+			t.Error("deleting a listing destroyed the conversation about it")
+		}
+		var context *string
+		tx.Model(&models.Conversation{}).Where("id = ?", conversation.ID).
+			Select("apartment_id").Row().Scan(&context)
+		if context != nil {
+			t.Errorf("the conversation still points at the deleted listing (%v)", *context)
+		}
+
+		var messages int64
+		tx.Model(&models.Message{}).Where("conversation_id = ?", conversation.ID).Count(&messages)
+		if messages != 1 {
+			t.Errorf("deleting a listing destroyed %d of the pair's messages", 1-messages)
 		}
 
 		// The amenity itself is reference data and must survive.

@@ -472,3 +472,213 @@ func TestAWithdrawnThreadCanBeStartedAgain(t *testing.T) {
 		t.Error("the owner cannot see a message sent in the reopened thread")
 	}
 }
+
+// --- one conversation per pair ---------------------------------------------
+
+// The rule this whole model exists for: two people have one conversation,
+// however many listings they write about.
+func TestOneConversationPerPairAcrossListings(t *testing.T) {
+	h := newChatHarness(t)
+	ownerToken, _ := h.signUp(t)
+	buyerToken, _ := h.signUp(t)
+
+	// One seller, three listings.
+	listings := make([]string, 0, 3)
+	for i := 0; i < 3; i++ {
+		listings = append(listings, h.publish(t, ownerToken))
+	}
+
+	ids := map[string]bool{}
+	for i, apartmentID := range listings {
+		rec := h.do(t, http.MethodPost, "/api/v1/conversations",
+			map[string]any{"apartment_id": apartmentID}, buyerToken)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("listing %d: start got status %d: %s", i, rec.Code, rec.Body.String())
+		}
+		var conversation dto.ConversationResponse
+		if err := json.Unmarshal(decode(t, rec).Data, &conversation); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		ids[conversation.ID.String()] = true
+
+		// Each message carries the listing it was written from.
+		h.sayAbout(t, conversation.ID.String(), buyerToken,
+			"Listing "+apartmentID[:8]+" haqida", apartmentID)
+	}
+
+	if len(ids) != 1 {
+		t.Errorf("three listings produced %d conversations, want 1", len(ids))
+	}
+
+	// The sidebar agrees, for both people.
+	for _, who := range []struct {
+		name  string
+		token string
+	}{{"buyer", buyerToken}, {"owner", ownerToken}} {
+		items := h.list(t, who.token, false)
+		if len(items) != 1 {
+			t.Errorf("%s sees %d conversations, want 1", who.name, len(items))
+		}
+	}
+
+	// And all three messages are inside it, each with its own context.
+	conversationID := h.list(t, buyerToken, false)[0].ID.String()
+	rec := h.do(t, http.MethodGet,
+		"/api/v1/conversations/"+conversationID+"/messages?limit=50", nil, buyerToken)
+	var page dto.MessagePageResponse
+	if err := json.Unmarshal(decode(t, rec).Data, &page); err != nil {
+		t.Fatalf("decode messages: %v", err)
+	}
+	if len(page.Items) != 3 {
+		t.Fatalf("the conversation holds %d messages, want all 3", len(page.Items))
+	}
+
+	contexts := map[string]bool{}
+	for _, message := range page.Items {
+		if message.ApartmentID == nil {
+			t.Errorf("message %q lost its listing context", message.Body)
+			continue
+		}
+		contexts[message.ApartmentID.String()] = true
+	}
+	if len(contexts) != 3 {
+		t.Errorf("the messages name %d distinct listings, want 3", len(contexts))
+	}
+	for _, apartmentID := range listings {
+		if !contexts[apartmentID] {
+			t.Errorf("no message is about listing %s", apartmentID)
+		}
+	}
+}
+
+// The thread's pinned context follows the listing most recently written about.
+func TestTheThreadContextFollowsTheLatestListing(t *testing.T) {
+	h := newChatHarness(t)
+	ownerToken, _ := h.signUp(t)
+	buyerToken, _ := h.signUp(t)
+
+	first := h.publish(t, ownerToken)
+	second := h.publish(t, ownerToken)
+
+	id := h.startAbout(t, buyerToken, first)
+	h.sayAbout(t, id, buyerToken, "Birinchi uy haqida", first)
+	if got := h.find(t, buyerToken, id, false); got == nil ||
+		got.Apartment == nil || got.Apartment.ID.String() != first {
+		t.Errorf("the context is %v, want the first listing", got.Apartment)
+	}
+
+	// Writing about the second one moves the pin, and does not fork the thread.
+	again := h.startAbout(t, buyerToken, second)
+	if again != id {
+		t.Fatalf("a second listing produced a different conversation (%s vs %s)", again, id)
+	}
+	h.sayAbout(t, id, buyerToken, "Ikkinchi uy haqida", second)
+
+	got := h.find(t, buyerToken, id, false)
+	if got == nil || got.Apartment == nil || got.Apartment.ID.String() != second {
+		t.Errorf("the context did not follow the newer listing: %v", got.Apartment)
+	}
+	// Both sides see the same one thread.
+	if items := h.list(t, ownerToken, false); len(items) != 1 {
+		t.Errorf("the owner sees %d conversations, want 1", len(items))
+	}
+}
+
+// A withdrawn listing must not take the conversation with it.
+func TestAConversationOutlivesItsListing(t *testing.T) {
+	h := newChatHarness(t)
+	ownerToken, _ := h.signUp(t)
+	buyerToken, _ := h.signUp(t)
+
+	apartmentID := h.publish(t, ownerToken)
+	id := h.startAbout(t, buyerToken, apartmentID)
+	h.sayAbout(t, id, buyerToken, "Bu uy bo'shmi?", apartmentID)
+
+	if rec := h.do(t, http.MethodDelete, "/api/v1/apartments/"+apartmentID, nil, ownerToken); rec.Code != http.StatusOK {
+		t.Fatalf("delete listing got status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	got := h.find(t, buyerToken, id, false)
+	if got == nil {
+		t.Fatal("deleting the listing destroyed the conversation")
+	}
+	if got.Apartment != nil {
+		t.Errorf("the thread still points at the withdrawn listing: %v", got.Apartment)
+	}
+	if got.LastMessage == nil || got.LastMessage.Body != "Bu uy bo'shmi?" {
+		t.Error("the messages were lost with the listing")
+	}
+}
+
+// Reopening a withdrawn thread must not destroy the pair's correspondence.
+func TestReopeningHidesHistoryWithoutDestroyingIt(t *testing.T) {
+	h := newChatHarness(t)
+	ownerToken, _ := h.signUp(t)
+	buyerToken, _ := h.signUp(t)
+	apartmentID := h.publish(t, ownerToken)
+
+	id := h.startAbout(t, buyerToken, apartmentID)
+	h.sayAbout(t, id, buyerToken, "Eski yozishma", apartmentID)
+
+	h.do(t, http.MethodDelete, "/api/v1/conversations/"+id,
+		map[string]any{"for_everyone": true}, buyerToken)
+
+	// Reopened by asking again.
+	again := h.startAbout(t, buyerToken, apartmentID)
+	if again != id {
+		t.Fatalf("reopening produced a different conversation")
+	}
+
+	// Neither participant is served the old messages...
+	for _, who := range []struct {
+		name  string
+		token string
+	}{{"buyer", buyerToken}, {"owner", ownerToken}} {
+		rec := h.do(t, http.MethodGet,
+			"/api/v1/conversations/"+id+"/messages?limit=50", nil, who.token)
+		var page dto.MessagePageResponse
+		if err := json.Unmarshal(decode(t, rec).Data, &page); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if len(page.Items) != 0 {
+			t.Errorf("%s was served %d messages from before the withdrawal", who.name, len(page.Items))
+		}
+	}
+
+	// ...but they are still on the row. This is the difference from the
+	// previous behaviour, which deleted them outright — and which, now that a
+	// conversation is a pair's whole correspondence, would have destroyed
+	// every message they had ever exchanged.
+	var stored int64
+	if err := h.db.Table("messages").Where("conversation_id = ?", id).Count(&stored).Error; err != nil {
+		t.Fatalf("count messages: %v", err)
+	}
+	if stored != 1 {
+		t.Errorf("%d messages survive on the row, want the 1 that was hidden", stored)
+	}
+}
+
+// startAbout opens the pair's thread from a listing and returns its id.
+func (h *chatHarness) startAbout(t *testing.T, token, apartmentID string) string {
+	t.Helper()
+	rec := h.do(t, http.MethodPost, "/api/v1/conversations",
+		map[string]any{"apartment_id": apartmentID}, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("start got status %d: %s", rec.Code, rec.Body.String())
+	}
+	var conversation dto.ConversationResponse
+	if err := json.Unmarshal(decode(t, rec).Data, &conversation); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return conversation.ID.String()
+}
+
+// sayAbout sends a message naming the listing it is about.
+func (h *chatHarness) sayAbout(t *testing.T, conversationID, token, body, apartmentID string) {
+	t.Helper()
+	rec := h.do(t, http.MethodPost, "/api/v1/conversations/"+conversationID+"/messages",
+		map[string]any{"body": body, "apartment_id": apartmentID}, token)
+	if rec.Code != http.StatusCreated && rec.Code != http.StatusOK {
+		t.Fatalf("send got status %d: %s", rec.Code, rec.Body.String())
+	}
+}

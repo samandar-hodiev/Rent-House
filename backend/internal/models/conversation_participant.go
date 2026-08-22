@@ -22,7 +22,14 @@ type ConversationParticipant struct {
 	// the thread back.
 	PinnedAt   *time.Time `gorm:"column:pinned_at" json:"pinned_at,omitempty"`
 	ArchivedAt *time.Time `gorm:"column:archived_at" json:"archived_at,omitempty"`
-	DeletedAt  *time.Time `gorm:"column:deleted_at" json:"deleted_at,omitempty"`
+
+	// HiddenAt takes the thread out of this user's list. A later message
+	// clears it, which is how the other side reaches someone who deleted it.
+	HiddenAt *time.Time `gorm:"column:hidden_at" json:"hidden_at,omitempty"`
+	// ClearedAt is the history cutoff: messages at or before it are not served
+	// to this user. They stay on the row for the other participant, who
+	// deleted nothing.
+	ClearedAt *time.Time `gorm:"column:cleared_at" json:"cleared_at,omitempty"`
 
 	CreatedAt time.Time `gorm:"column:created_at;not null;default:now()" json:"created_at"`
 

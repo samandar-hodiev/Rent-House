@@ -49,7 +49,7 @@ function ChatConversationList({ activeId, onSelect }) {
     return source.filter((conversation) => {
       const haystack = [
         conversation.other.name,
-        conversation.apartment.title,
+        conversation.apartment?.title ?? '',
         conversation.lastMessage?.isDeleted ? '' : (conversation.lastMessage?.body ?? ''),
       ]
       return haystack.some((value) => value.toLowerCase().includes(needle))
@@ -207,8 +207,10 @@ function ChatConversationList({ activeId, onSelect }) {
                     ) : null}
                   </span>
 
+                  {/* A secondary label, not a second conversation: the same
+                      pair writing about another listing stays one row. */}
                   <span className="truncate text-xs text-text-muted">
-                    {conversation.apartment.title}
+                    {conversation.apartment?.title ?? t('chat.noApartmentContext')}
                   </span>
 
                   <span className="flex items-center justify-between gap-2">

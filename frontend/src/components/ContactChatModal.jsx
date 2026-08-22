@@ -7,10 +7,11 @@ import ChatThread from './chat/ChatThread'
 /**
  * The chat opened from an apartment's "Xabar yozish" button.
  *
- * It opens the real thread about this listing — the same one the dashboard
- * shows — rather than a separate scratch conversation. Asking for it is
- * idempotent: the backend keys a thread on (listing, enquirer), so reopening
- * the modal returns the existing conversation with its history.
+ * It opens this user's real conversation with the owner — the same one the
+ * dashboard shows — and makes this listing its current context. Asking is
+ * idempotent, and writing to the same owner about a different listing
+ * continues the same conversation rather than starting a second one: the
+ * backend keys a thread on the pair of people, not on the listing.
  */
 function ContactChatModal({ apartmentId, onClose }) {
   const { t } = useLocale()
@@ -79,7 +80,7 @@ function ContactChatModal({ apartmentId, onClose }) {
               : t('chat.startFailed')}
           </p>
         ) : conversation ? (
-          <ChatThread conversation={conversation} className="flex-1" />
+          <ChatThread conversation={conversation} apartmentId={apartmentId} className="flex-1" />
         ) : (
           <p className="flex flex-1 items-center justify-center gap-2 text-sm text-text-muted">
             <Loader2 aria-hidden="true" size={16} className="animate-spin" />

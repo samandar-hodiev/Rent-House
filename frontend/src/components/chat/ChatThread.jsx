@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useChat } from '../../context/ChatContext'
@@ -6,6 +6,7 @@ import { useConversation } from '../../hooks/useConversation'
 import { SOCKET_STATUS } from '../../services/chatSocket'
 import UserAvatar from '../dashboard/UserAvatar'
 import { fetchAttachmentLimits } from '../../services/chatApi'
+import ApartmentContextBar from './ApartmentContextBar'
 import ChatComposer from './ChatComposer'
 import ChatMessage from './ChatMessage'
 import ImageLightbox from './ImageLightbox'
@@ -19,7 +20,13 @@ import DeleteMessageDialog from './DeleteMessageDialog'
  * takes a conversation and renders it; where it is mounted is the caller's
  * business.
  */
-function ChatThread({ conversation, className = '' }) {
+/**
+ * `apartmentId` is the listing the reader arrived from — the apartment detail
+ * page passes it, the dashboard does not. Messages sent while it is set record
+ * it, which is what lets one conversation hold several listings' worth of
+ * discussion and still show which is which.
+ */
+function ChatThread({ conversation, apartmentId = null, className = '' }) {
   const { t } = useLocale()
   const { socketStatus, setActiveConversation } = useChat()
 
@@ -45,7 +52,7 @@ function ChatThread({ conversation, className = '' }) {
     sendFile,
     edit,
     remove,
-  } = useConversation(conversation?.id)
+  } = useConversation(conversation?.id, apartmentId)
 
   const [pendingDelete, setPendingDelete] = useState(null)
   const [lightbox, setLightbox] = useState(null)
@@ -118,6 +125,10 @@ function ChatThread({ conversation, className = '' }) {
         </div>
       </div>
 
+      {/* What the pair are discussing now. Absent when the listing has been
+          withdrawn — the conversation carries on regardless. */}
+      <ApartmentContextBar apartment={conversation.apartment} />
+
       {/* The connection banner appears only when something is wrong, so a
           healthy chat carries no chrome about being healthy. */}
       {socketStatus === SOCKET_STATUS.reconnecting || socketStatus === SOCKET_STATUS.connecting ? (
@@ -161,16 +172,34 @@ function ChatThread({ conversation, className = '' }) {
             ) : null}
 
             <ul className="flex flex-col gap-2">
-              {messages.map((message) => (
-                <ChatMessage
-                  key={message.id}
-                  message={message}
-                  isMine={message.senderId === myId}
-                  onEdit={edit}
-                  onDelete={setPendingDelete}
-                  onOpenImage={setLightbox}
-                />
-              ))}
+              {messages.map((message, index) => {
+                // A divider whenever the listing being discussed changes, so a
+                // reader scrolling back can see where one apartment's thread of
+                // discussion ended and the next began.
+                const previous = index > 0 ? messages[index - 1].apartmentId : null
+                const changed = message.apartmentId && message.apartmentId !== previous
+
+                return (
+                  <Fragment key={message.id}>
+                    {changed ? (
+                      <li className="flex justify-center py-1">
+                        <span className="rounded-full bg-surface-secondary px-3 py-1 text-[11px] text-text-muted">
+                          {message.apartmentId === conversation.apartment?.id
+                            ? conversation.apartment.title
+                            : t('chat.otherApartment')}
+                        </span>
+                      </li>
+                    ) : null}
+                    <ChatMessage
+                      message={message}
+                      isMine={message.senderId === myId}
+                      onEdit={edit}
+                      onDelete={setPendingDelete}
+                      onOpenImage={setLightbox}
+                    />
+                  </Fragment>
+                )
+              })}
             </ul>
           </>
         )}

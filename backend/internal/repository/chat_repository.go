@@ -28,11 +28,19 @@ var (
 // queries for the last message and twenty more for the unread count.
 type ConversationSummary struct {
 	ConversationID uuid.UUID
-	ApartmentID    uuid.UUID
-	ApartmentTitle string
-	ApartmentImage *string
-	OwnerID        uuid.UUID
-	BuyerID        uuid.UUID
+	// The thread's current listing context. All nullable: a conversation
+	// outlives the listing it last referred to.
+	ApartmentID           *uuid.UUID
+	ApartmentTitle        *string
+	ApartmentDistrict     *string
+	ApartmentPrice        *string
+	ApartmentCurrency     *string
+	ApartmentRentalPeriod *string
+	ApartmentImage        *string
+
+	// The pair.
+	OwnerID uuid.UUID
+	BuyerID uuid.UUID
 
 	OtherUserID    uuid.UUID
 	OtherFirstName string
@@ -80,46 +88,52 @@ func NewChatRepository(db *gorm.DB) *ChatRepository {
 func (r *ChatRepository) FindOrCreateConversation(
 	ctx context.Context, apartmentID, buyerID, ownerID uuid.UUID,
 ) (*models.Conversation, error) {
-	conversation := &models.Conversation{ApartmentID: apartmentID, BuyerID: buyerID}
+	conversation := &models.Conversation{
+		BuyerID:     buyerID,
+		OwnerID:     ownerID,
+		ApartmentID: &apartmentID,
+	}
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		result := tx.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "apartment_id"}, {Name: "buyer_id"}},
+			Columns:   []clause.Column{{Name: "buyer_id"}, {Name: "owner_id"}},
 			DoNothing: true,
 		}).Create(conversation)
 		if result.Error != nil {
 			return result.Error
 		}
 
-		// DoNothing means the row already existed; read it back.
+		// DoNothing means the pair already had a thread; read it back.
 		if result.RowsAffected == 0 {
 			if err := tx.First(conversation,
-				"apartment_id = ? AND buyer_id = ?", apartmentID, buyerID).Error; err != nil {
+				"buyer_id = ? AND owner_id = ?", buyerID, ownerID).Error; err != nil {
 				return err
 			}
 
-			// The pair already had a thread about this listing and withdrew it
-			// from both sides. UNIQUE (apartment_id, buyer_id) means a second
-			// row cannot be inserted, so without this the two of them could
-			// never speak about the listing again — the button would keep
-			// returning a thread neither of them is allowed to see.
+			// The listing being asked about becomes the thread's current
+			// context, so the chat header names what the reader just came from.
+			if err := tx.Model(&models.Conversation{}).
+				Where("id = ?", conversation.ID).
+				UpdateColumn("apartment_id", apartmentID).Error; err != nil {
+				return err
+			}
+			conversation.ApartmentID = &apartmentID
+
+			// Withdrawn from both sides and now being reopened. The pair cannot
+			// get a second row, so this one is revived.
 			//
-			// Reopening it starts genuinely empty. The old messages were
-			// already unreachable by both participants — that is what the
-			// withdrawal did — so they are removed rather than left behind a
-			// cutoff, which keeps the reopened thread indistinguishable from a
-			// brand new one and spares every read a special case.
+			// The messages are kept. Each participant's history cutoff is moved
+			// to now instead, which hides everything said before without
+			// destroying it — and matters far more since a conversation became
+			// the pair's whole correspondence rather than one listing's thread.
 			if conversation.DeletedAt != nil {
-				if err := tx.Where("conversation_id = ?", conversation.ID).
-					Delete(&models.Message{}).Error; err != nil {
-					return err
-				}
+				now := time.Now()
 				if err := tx.Model(&models.ConversationParticipant{}).
 					Where("conversation_id = ?", conversation.ID).
 					UpdateColumns(map[string]any{
-						"deleted_at":  nil,
+						"cleared_at":  now,
+						"hidden_at":   nil,
 						"archived_at": nil,
-						"pinned_at":   nil,
 					}).Error; err != nil {
 					return err
 				}
@@ -224,6 +238,10 @@ SELECT
     cp.archived_at      AS archived_at,
     c.apartment_id      AS apartment_id,
     a.title             AS apartment_title,
+    d.name              AS apartment_district,
+    a.price             AS apartment_price,
+    a.currency          AS apartment_currency,
+    a.rental_period     AS apartment_rental_period,
     img.url             AS apartment_image,
     a.owner_id          AS owner_id,
     c.buyer_id          AS buyer_id,
@@ -239,13 +257,19 @@ SELECT
 FROM conversations c
 JOIN conversation_participants cp
     ON cp.conversation_id = c.id AND cp.user_id = @user_id
-JOIN apartments a ON a.id = c.apartment_id
--- The other side of a two-party thread: the owner when I am the buyer, the
--- buyer when I am the owner.
+-- The thread's current listing context. LEFT, because a conversation outlives
+-- the listing it last referred to — the pair keep talking, and the header
+-- simply has nothing to pin.
+LEFT JOIN apartments a ON a.id = c.apartment_id
+LEFT JOIN districts d ON d.id = a.district_id
+-- The other side of the pair. Read from the conversation itself now rather than
+-- through the listing, so who this thread is with does not depend on a listing
+-- still existing.
 JOIN users other
-    ON other.id = CASE WHEN c.buyer_id = @user_id THEN a.owner_id ELSE c.buyer_id END
--- The listing's cover, for the thumbnail beside each thread. Ordered the same
--- way the listing endpoints order a gallery, so the two never disagree.
+    ON other.id = CASE WHEN c.buyer_id = @user_id THEN c.owner_id ELSE c.buyer_id END
+-- The context listing's cover, for the thumbnail beside each thread. Ordered
+-- the same way the listing endpoints order a gallery, so the two never
+-- disagree.
 LEFT JOIN LATERAL (
     SELECT ai.url
     FROM apartment_images ai
@@ -259,7 +283,7 @@ LEFT JOIN LATERAL (
     WHERE m.conversation_id = c.id
       -- Everything before this user deleted the thread is no longer theirs to
       -- read, so it is not their last message either.
-      AND (cp.deleted_at IS NULL OR m.created_at > cp.deleted_at)
+      AND (cp.cleared_at IS NULL OR m.created_at > cp.cleared_at)
       -- A message this user hid is not their last message.
       AND NOT EXISTS (
           SELECT 1 FROM message_deletions d
@@ -272,7 +296,7 @@ LEFT JOIN LATERAL (
     SELECT count(*) AS count
     FROM messages m
     WHERE m.conversation_id = c.id
-      AND (cp.deleted_at IS NULL OR m.created_at > cp.deleted_at)
+      AND (cp.cleared_at IS NULL OR m.created_at > cp.cleared_at)
       AND m.sender_id <> @user_id
       AND NOT m.is_read
       AND m.deleted_at IS NULL
@@ -287,7 +311,7 @@ WHERE
     c.deleted_at IS NULL
     -- Deleted by this user, and nothing has been said since. A later message
     -- brings the thread back, carrying only what arrived after the deletion.
-    AND (cp.deleted_at IS NULL OR last.created_at IS NOT NULL)
+    AND (cp.hidden_at IS NULL OR last.created_at IS NOT NULL)
     -- One list or the other, never both.
     AND (CASE WHEN @archived THEN cp.archived_at IS NOT NULL ELSE cp.archived_at IS NULL END)
 -- Pinned first, most recently pinned at the top of that group; everything else
@@ -324,8 +348,8 @@ func (r *ChatRepository) ListMessages(
 			SELECT 1 FROM conversation_participants cp
 			WHERE cp.conversation_id = messages.conversation_id
 			  AND cp.user_id = ?
-			  AND cp.deleted_at IS NOT NULL
-			  AND messages.created_at <= cp.deleted_at
+			  AND cp.cleared_at IS NOT NULL
+			  AND messages.created_at <= cp.cleared_at
 		)`, viewerID).
 		// Messages this reader hid are invisible to them and to nobody else.
 		Where(`NOT EXISTS (
@@ -530,7 +554,7 @@ func (r *ChatRepository) UnreadTotal(ctx context.Context, userID uuid.UUID) (int
 		// The badge counts what the user can actually open: not a withdrawn
 		// thread, and not messages from before they deleted it themselves.
 		Where("c.deleted_at IS NULL").
-		Where("cp.deleted_at IS NULL OR messages.created_at > cp.deleted_at").
+		Where("cp.cleared_at IS NULL OR messages.created_at > cp.cleared_at").
 		Where("messages.sender_id <> ?", userID).
 		Where("NOT messages.is_read").
 		Where("messages.deleted_at IS NULL").
@@ -601,10 +625,11 @@ func (r *ChatRepository) SetArchived(
 func (r *ChatRepository) DeleteForUser(
 	ctx context.Context, conversationID, userID uuid.UUID,
 ) error {
+	now := time.Now()
 	err := r.db.WithContext(ctx).
 		Model(&models.ConversationParticipant{}).
 		Where("conversation_id = ? AND user_id = ?", conversationID, userID).
-		UpdateColumns(map[string]any{"deleted_at": time.Now(), "archived_at": nil}).Error
+		UpdateColumns(map[string]any{"hidden_at": now, "cleared_at": now, "archived_at": nil}).Error
 	if err != nil {
 		return fmt.Errorf("delete conversation for user: %w", err)
 	}
@@ -627,19 +652,19 @@ func (r *ChatRepository) DeleteForEveryone(ctx context.Context, conversationID u
 	return nil
 }
 
-// DeletedCutoff is when this user deleted the thread, or nil if they have not.
-// Reads use it to stop serving messages from before that moment.
-func (r *ChatRepository) DeletedCutoff(
-	ctx context.Context, conversationID, userID uuid.UUID,
-) (*time.Time, error) {
-	var cutoff *time.Time
+// SetConversationApartment moves a thread's pinned context to a listing.
+//
+// The context follows the most recent message that named one, so the header
+// shows what the pair are discussing now rather than what they discussed first.
+func (r *ChatRepository) SetConversationApartment(
+	ctx context.Context, conversationID, apartmentID uuid.UUID,
+) error {
 	err := r.db.WithContext(ctx).
-		Model(&models.ConversationParticipant{}).
-		Where("conversation_id = ? AND user_id = ?", conversationID, userID).
-		Select("deleted_at").
-		Row().Scan(&cutoff)
+		Model(&models.Conversation{}).
+		Where("id = ?", conversationID).
+		UpdateColumn("apartment_id", apartmentID).Error
 	if err != nil {
-		return nil, fmt.Errorf("read deletion cutoff: %w", err)
+		return fmt.Errorf("set conversation apartment: %w", err)
 	}
-	return cutoff, nil
+	return nil
 }

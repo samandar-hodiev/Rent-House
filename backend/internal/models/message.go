@@ -17,6 +17,11 @@ type Message struct {
 	ConversationID uuid.UUID `gorm:"column:conversation_id;type:uuid;not null;index:idx_messages_conversation_created,priority:1" json:"conversation_id"`
 	SenderID       uuid.UUID `gorm:"column:sender_id;type:uuid;not null;index:idx_messages_sender_id" json:"sender_id"`
 
+	// ApartmentID is the listing this message is about, captured when it was
+	// sent. Nil for a message sent with no listing in view, and set to nil if
+	// the listing is later withdrawn — the message outlives it either way.
+	ApartmentID *uuid.UUID `gorm:"column:apartment_id;type:uuid" json:"apartment_id,omitempty"`
+
 	// Kind decides whether Body or the attachment is the message. A column
 	// rather than a lookup, because the not-blank CHECK has to be satisfiable
 	// from this row alone.
