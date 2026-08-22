@@ -6,6 +6,7 @@ import MapControls from '../components/MapControls'
 import MapLayerSelector from '../components/MapLayerSelector'
 import FilterBar from '../components/FilterBar'
 import { useSearch } from '../context/SearchContext'
+import { useGeolocation } from '../hooks/useGeolocation'
 import { useLocale } from '../context/LocaleContext'
 import { readStoredMapLayerId, storeMapLayerId } from '../data/mapLayers'
 import { fetchApartments } from '../services/apartmentsApi'
@@ -15,23 +16,20 @@ import { applyMapFiltersToParams, parseMapFiltersFromParams } from '../utils/map
 
 const NEARBY_RADIUS_KM = 3
 
-const GEOLOCATION_ERROR_KEYS = {
-  1: 'map.locationDenied',
-  2: 'map.locationUnavailable',
-  3: 'map.locationTimeout',
-}
-
 function MapPage() {
   const { t } = useLocale()
   const [searchParams, setSearchParams] = useSearchParams()
   const { districtId, setDistrictId, filters, setFilters, clearFilters, activeFilterCount } =
     useSearch()
   const [selectedApartment, setSelectedApartment] = useState(null)
-  const [userLocation, setUserLocation] = useState(null)
-  const [locationStatus, setLocationStatus] = useState('idle') // idle | locating | granted | error
-  const [locationErrorKey, setLocationErrorKey] = useState(null)
   const [layerId, setLayerId] = useState(readStoredMapLayerId)
-  const isLocatingRef = useRef(false)
+  const {
+    status: locationStatus,
+    position: userLocation,
+    errorKey: locationErrorKey,
+    isLocating,
+    locate: handleLocateRequest,
+  } = useGeolocation()
   const mapControllerRef = useRef(null)
   const skipNextUrlSync = useRef(false)
 
@@ -111,35 +109,6 @@ function MapPage() {
     setSelectedApartment(apartment)
   }, [])
 
-  const handleLocateRequest = useCallback(() => {
-    if (isLocatingRef.current) return
-    if (!navigator.geolocation) {
-      setLocationStatus('error')
-      setLocationErrorKey('map.locationUnsupported')
-      return
-    }
-    isLocatingRef.current = true
-    setLocationStatus('locating')
-    setLocationErrorKey(null)
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        isLocatingRef.current = false
-        setUserLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-        })
-        setLocationStatus('granted')
-      },
-      (error) => {
-        isLocatingRef.current = false
-        setLocationStatus('error')
-        setLocationErrorKey(GEOLOCATION_ERROR_KEYS[error.code] ?? 'map.locationUnavailable')
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
-    )
-  }, [])
-
   const isFiltered = Boolean(districtId) || activeFilterCount > 0
   const countText = isFiltered
     ? t('apartments.foundCount', { count: visibleApartments.length })
@@ -163,7 +132,7 @@ function MapPage() {
         selectedDistrictId={districtId}
         focusApartmentId={focusApartmentId}
         onMarkerClick={handleMarkerClick}
-        userLocation={locationStatus === 'granted' ? userLocation : null}
+        userLocation={userLocation}
         nearbyApartmentIds={nearbyApartmentIds}
         layerId={layerId}
         mapRef={mapControllerRef}
@@ -218,6 +187,7 @@ function MapPage() {
           <MapLayerSelector layerId={layerId} onLayerChange={handleLayerChange} />
           <MapControls
             onLocate={handleLocateRequest}
+            locating={isLocating}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
             orientation="horizontal"

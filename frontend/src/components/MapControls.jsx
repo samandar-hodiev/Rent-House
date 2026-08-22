@@ -1,4 +1,4 @@
-import { LocateFixed, Minus, Plus } from 'lucide-react'
+import { Loader2, LocateFixed, Minus, Plus } from 'lucide-react'
 import { useLocale } from '../context/LocaleContext'
 
 const BUTTON_CLASS =
@@ -6,7 +6,11 @@ const BUTTON_CLASS =
 
 // My Location / Zoom in / Zoom out. The layer picker is its own card next to
 // this row — see MapLayerSelector.
-function MapControls({ onLocate, onZoomIn, onZoomOut, orientation = 'horizontal' }) {
+//
+// `locating` turns the location button into a spinner while a fix is in
+// flight. A satellite fix can take several seconds, and a button that looks
+// idle the whole time reads as one that did not register the tap.
+function MapControls({ onLocate, onZoomIn, onZoomOut, locating = false, orientation = 'horizontal' }) {
   const { t } = useLocale()
 
   return (
@@ -18,11 +22,17 @@ function MapControls({ onLocate, onZoomIn, onZoomOut, orientation = 'horizontal'
       <button
         type="button"
         onClick={onLocate}
-        aria-label={t('map.locateMe')}
-        title={t('map.locateMe')}
-        className={BUTTON_CLASS}
+        disabled={locating}
+        aria-label={locating ? t('map.locating') : t('map.locateMe')}
+        aria-busy={locating || undefined}
+        title={locating ? t('map.locating') : t('map.locateMe')}
+        className={`${BUTTON_CLASS} disabled:cursor-wait`}
       >
-        <LocateFixed aria-hidden="true" size={16} />
+        {locating ? (
+          <Loader2 aria-hidden="true" size={16} className="animate-spin text-primary" />
+        ) : (
+          <LocateFixed aria-hidden="true" size={16} />
+        )}
       </button>
       <button
         type="button"

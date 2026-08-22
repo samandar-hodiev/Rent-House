@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { TASHKENT_CENTER } from '../data/districts'
-import { getDistrictFeature } from '../data/districtBoundaries'
-import { boundsOfRings, outerRingsOf } from '../utils/districtGeometry'
+import { drawDistrictFocus } from '../utils/districtFocus'
 import { DEFAULT_MAP_LAYER_ID, getMapLayerById } from '../data/mapLayers'
 import { formatListingPriceShort } from '../utils/formatPrice'
 import { loadYandexMaps } from '../utils/yandexMaps'
@@ -12,22 +11,7 @@ const LOCATION_ZOOM = 15
 const FLY_DURATION_MS = 600
 const LOCATION_FLY_DURATION_MS = 800
 
-const DISTRICT_BORDER_COLOR = '#059669'
-const DIM_MASK_COLOR = '#0f172a'
 const USER_LOCATION_COLOR = '#3b82f6'
-
-// Outer ring of the "dim everything outside the district" mask, in Yandex's
-// [lat, lng] order (our GeoJSON boundaries are [lng, lat]). A full-globe
-// rectangle is not rendered reliably by the Yandex renderer, so this is a
-// generous box around the Tashkent region instead — far outside any view the
-// district-level zoom can reach.
-const MASK_OUTER_RING = [
-  [30, 50],
-  [30, 90],
-  [50, 90],
-  [50, 50],
-  [30, 50],
-]
 
 const MARKER_WIDTH = 64
 const MARKER_HEIGHT = 26
@@ -199,55 +183,18 @@ function ApartmentMap({
     const collection = districtCollectionRef.current
     if (!ymaps || !map || !collection || !isMapReady) return
 
-    collection.removeAll()
-
-    const feature = selectedDistrictId ? getDistrictFeature(selectedDistrictId) : null
-    if (!feature) {
+    const focus = drawDistrictFocus(ymaps, collection, selectedDistrictId)
+    if (!focus) {
       map.setCenter([TASHKENT_CENTER.latitude, TASHKENT_CENTER.longitude], DEFAULT_ZOOM, {
         duration: FLY_DURATION_MS,
       })
       return
     }
 
-    const rings = outerRingsOf(feature.geometry)
-
-    // Dim everything outside the district: one polygon covering the world
-    // with the district's ring(s) punched out via the even-odd fill rule.
-    collection.add(
-      new ymaps.Polygon(
-        [MASK_OUTER_RING, ...rings],
-        {},
-        {
-          fillColor: DIM_MASK_COLOR,
-          fillOpacity: 0.22,
-          fillRule: 'evenOdd',
-          stroke: false,
-          interactivityModel: 'default#transparent',
-        },
-      ),
-    )
-
-    // Clear green outline for the district's actual boundary.
-    rings.forEach((ring) => {
-      collection.add(
-        new ymaps.Polygon(
-          [ring],
-          {},
-          {
-            fill: false,
-            strokeColor: DISTRICT_BORDER_COLOR,
-            strokeWidth: 2.5,
-            strokeOpacity: 0.9,
-            interactivityModel: 'default#transparent',
-          },
-        ),
-      )
-    })
-
     // setBounds is asynchronous — clamp the zoom only after it settles, or
     // the clamp would interrupt the animation instead of following it.
     Promise.resolve(
-      map.setBounds(boundsOfRings(rings), {
+      map.setBounds(focus.bounds, {
         checkZoomRange: true,
         zoomMargin: 40,
         duration: FLY_DURATION_MS,

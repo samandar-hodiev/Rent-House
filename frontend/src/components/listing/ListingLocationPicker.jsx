@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocale } from '../../context/LocaleContext'
+import MapControls from '../MapControls'
 import MapLayerSelector from '../MapLayerSelector'
-import { getDistrictFeature } from '../../data/districtBoundaries'
 import { MAP_LAYERS, getMapLayerById } from '../../data/mapLayers'
-import { boundsOfRings, centerOfBounds, outerRingsOf } from '../../utils/districtGeometry'
+import { useGeolocation } from '../../hooks/useGeolocation'
+import { drawDistrictFocus } from '../../utils/districtFocus'
 import { loadYandexMaps } from '../../utils/yandexMaps'
 
 const PICK_ZOOM = 13
 const DISTRICT_ZOOM = 15
+const LOCATION_ZOOM = 16
 const FLY_DURATION_MS = 600
-const DISTRICT_BORDER_COLOR = '#059669'
 
 // Traffic is left out of the picker's layer choices on purpose: it answers a
 // question ("is this road busy right now") that has nothing to do with marking
@@ -17,19 +18,31 @@ const DISTRICT_BORDER_COLOR = '#059669'
 // building. The Map page still offers all three.
 const PICKER_LAYERS = MAP_LAYERS.filter((layer) => !layer.traffic)
 
+// "You are here", distinct from the draggable pin that marks the apartment.
+// Same blue dot the Map page uses, so the two maps say it the same way.
+const LOCATION_TEMPLATE = `
+  <div class="renthouse-location-marker" style="position:absolute;transform:translate(-50%,-50%);">
+    <span class="relative flex size-4 items-center justify-center">
+      <span class="absolute size-full animate-ping rounded-full bg-blue-400 opacity-60"></span>
+      <span class="relative size-3 rounded-full border-2 border-white bg-blue-500 shadow-md"></span>
+    </span>
+  </div>
+`
+
 // Click-to-pick map for the listing's coordinates. It deliberately does not
 // reuse `ApartmentMap` — that component belongs to the Map page and carries
-// price markers, a dimming mask and traffic, none of which apply here. It does
-// reuse the shared `loadYandexMaps()` loader, the same OpenStreetMap district
-// boundaries and the same layer control, so there is still only one Yandex
-// integration and one source of district geography in the project.
+// price markers and traffic, neither of which applies here. It does reuse the
+// shared Yandex loader, the same OpenStreetMap district boundaries, the same
+// district focus rendering, the same geolocation hook and the same control
+// components, so there is still one integration and one source of truth.
 function ListingLocationPicker({ districtId, latitude, longitude, onChange }) {
   const { t } = useLocale()
   const containerRef = useRef(null)
   const ymapsRef = useRef(null)
   const mapRef = useRef(null)
   const placemarkRef = useRef(null)
-  const outlineRef = useRef(null)
+  const focusRef = useRef(null)
+  const locationRef = useRef(null)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
 
@@ -41,6 +54,42 @@ function ListingLocationPicker({ districtId, latitude, longitude, onChange }) {
 
   const [status, setStatus] = useState('loading') // loading | ready | error
   const [layerId, setLayerId] = useState(PICKER_LAYERS[0].id)
+
+  const commit = useCallback((coords) => {
+    hasPickedRef.current = true
+    placemarkRef.current?.geometry.setCoordinates(coords)
+    onChangeRef.current({ latitude: coords[0], longitude: coords[1] })
+  }, [])
+
+  // Finding the owner is treated as picking the spot: on this map the pin is
+  // the apartment, and someone standing in the flat they are listing means
+  // "here". The blue dot stays behind to show where the fix actually was, so
+  // dragging the pin away afterwards still leaves that visible.
+  const handleLocated = useCallback(
+    ({ latitude: lat, longitude: lng }) => {
+      const map = mapRef.current
+      const ymaps = ymapsRef.current
+      if (!map || !ymaps) return
+
+      locationRef.current?.removeAll()
+      locationRef.current?.add(
+        new ymaps.Placemark(
+          [lat, lng],
+          {},
+          {
+            iconLayout: ymaps.templateLayoutFactory.createClass(LOCATION_TEMPLATE),
+            iconShape: { type: 'Circle', coordinates: [0, 0], radius: 8 },
+          },
+        ),
+      )
+
+      commit([lat, lng])
+      map.setCenter([lat, lng], LOCATION_ZOOM, { duration: FLY_DURATION_MS })
+    },
+    [commit],
+  )
+
+  const { errorKey, isLocating, locate } = useGeolocation({ onLocated: handleLocated })
 
   useEffect(() => {
     let cancelled = false
@@ -54,22 +103,23 @@ function ListingLocationPicker({ districtId, latitude, longitude, onChange }) {
           {
             center: [latitude, longitude],
             zoom: PICK_ZOOM,
-            controls: ['zoomControl'],
+            // No built-in controls: the page draws its own, so the picker's
+            // buttons match the Map page's rather than sitting beside them in
+            // a second visual language.
+            controls: [],
             type: getMapLayerById(layerId).type,
           },
           { suppressMapOpenBlock: true },
         )
 
         const placemark = new ymaps.Placemark([latitude, longitude], {}, { draggable: true })
-        const outline = new ymaps.GeoObjectCollection()
-        map.geoObjects.add(outline)
+        // Order matters: the focus overlay is added first so it renders under
+        // both markers.
+        const focus = new ymaps.GeoObjectCollection()
+        const location = new ymaps.GeoObjectCollection()
+        map.geoObjects.add(focus)
+        map.geoObjects.add(location)
         map.geoObjects.add(placemark)
-
-        const commit = (coords) => {
-          hasPickedRef.current = true
-          placemark.geometry.setCoordinates(coords)
-          onChangeRef.current({ latitude: coords[0], longitude: coords[1] })
-        }
 
         map.events.add('click', (event) => commit(event.get('coords')))
         placemark.events.add('dragend', () => commit(placemark.geometry.getCoordinates()))
@@ -77,7 +127,8 @@ function ListingLocationPicker({ districtId, latitude, longitude, onChange }) {
         ymapsRef.current = ymaps
         mapRef.current = map
         placemarkRef.current = placemark
-        outlineRef.current = outline
+        focusRef.current = focus
+        locationRef.current = location
         setStatus('ready')
       })
       .catch(() => {
@@ -90,7 +141,8 @@ function ListingLocationPicker({ districtId, latitude, longitude, onChange }) {
       ymapsRef.current = null
       mapRef.current = null
       placemarkRef.current = null
-      outlineRef.current = null
+      focusRef.current = null
+      locationRef.current = null
     }
     // Mount-only: later coordinate changes are pushed to the placemark below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,49 +154,34 @@ function ListingLocationPicker({ districtId, latitude, longitude, onChange }) {
     mapRef.current?.setType(getMapLayerById(layerId).type)
   }, [layerId, status])
 
-  // Choosing a district moves the map, not just the text field.
+  // Choosing a district moves the map and highlights it, rather than only
+  // changing the text field. Redrawing clears the previous district, so the
+  // highlight can never lag behind the dropdown.
   useEffect(() => {
     const ymaps = ymapsRef.current
     const map = mapRef.current
-    const outline = outlineRef.current
-    if (status !== 'ready' || !ymaps || !map || !outline) return
+    const collection = focusRef.current
+    if (status !== 'ready' || !ymaps || !map || !collection) return
 
-    outline.removeAll()
-    const feature = districtId ? getDistrictFeature(districtId) : null
-    if (!feature) return
-
-    const rings = outerRingsOf(feature.geometry)
-    const bounds = boundsOfRings(rings)
-
-    // The district's real outline, drawn thin and non-interactive so it frames
-    // the area without competing with the pin or swallowing map clicks.
-    rings.forEach((ring) => {
-      outline.add(
-        new ymaps.Polygon(
-          [ring],
-          {},
-          {
-            fill: false,
-            strokeColor: DISTRICT_BORDER_COLOR,
-            strokeWidth: 2,
-            strokeOpacity: 0.85,
-            interactivityModel: 'default#transparent',
-          },
-        ),
-      )
-    })
+    const focus = drawDistrictFocus(ymaps, collection, districtId, { fill: true })
+    if (!focus) return
 
     // An untouched pin follows the district, so a listing whose owner never
     // clicked the map is still somewhere in the right district rather than at
     // the centre of Tashkent.
     if (!hasPickedRef.current) {
-      const center = centerOfBounds(bounds)
-      placemarkRef.current?.geometry.setCoordinates(center)
-      onChangeRef.current({ latitude: center[0], longitude: center[1] })
+      placemarkRef.current?.geometry.setCoordinates(focus.center)
+      onChangeRef.current({ latitude: focus.center[0], longitude: focus.center[1] })
     }
 
+    // setBounds is asynchronous — clamp the zoom only after it settles, or the
+    // clamp would interrupt the animation instead of following it.
     Promise.resolve(
-      map.setBounds(bounds, { checkZoomRange: true, zoomMargin: 24, duration: FLY_DURATION_MS }),
+      map.setBounds(focus.bounds, {
+        checkZoomRange: true,
+        zoomMargin: 24,
+        duration: FLY_DURATION_MS,
+      }),
     )
       .then(() => {
         if (mapRef.current && map.getZoom() > DISTRICT_ZOOM) {
@@ -153,6 +190,11 @@ function ListingLocationPicker({ districtId, latitude, longitude, onChange }) {
       })
       .catch(() => {})
   }, [districtId, status])
+
+  const zoomBy = (delta) => {
+    const map = mapRef.current
+    map?.setZoom(map.getZoom() + delta, { duration: 200 })
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -165,12 +207,24 @@ function ListingLocationPicker({ districtId, latitude, longitude, onChange }) {
         <div ref={containerRef} className="size-full" />
 
         {status === 'ready' ? (
-          <div className="absolute bottom-3 right-3 z-10 rounded-full bg-white/80 p-1 shadow-[0_2px_8px_rgba(15,23,42,0.15)] backdrop-blur">
-            <MapLayerSelector
-              layerId={layerId}
-              onLayerChange={setLayerId}
-              layers={PICKER_LAYERS}
-            />
+          // Bottom-right, clear of the Yandex attribution strip and of the pin,
+          // which sits wherever the owner put it — usually mid-map. One glass
+          // container so layers, location and zoom read as a single group, the
+          // same arrangement the Map page uses.
+          <div className="pointer-events-none absolute bottom-0 right-0 z-10 flex justify-end p-2 pb-8 sm:p-3 sm:pb-9">
+            <div className="pointer-events-auto relative flex items-center gap-1 rounded-xl border border-white/25 bg-white/12 px-1.5 py-1 shadow-[0_2px_6px_rgba(15,23,42,0.06)] backdrop-blur-lg dark:bg-surface/20">
+              <MapLayerSelector
+                layerId={layerId}
+                onLayerChange={setLayerId}
+                layers={PICKER_LAYERS}
+              />
+              <MapControls
+                onLocate={locate}
+                locating={isLocating}
+                onZoomIn={() => zoomBy(1)}
+                onZoomOut={() => zoomBy(-1)}
+              />
+            </div>
           </div>
         ) : (
           <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-text-muted">
@@ -178,6 +232,14 @@ function ListingLocationPicker({ districtId, latitude, longitude, onChange }) {
           </p>
         )}
       </div>
+
+      {/* A refused or failed fix is reported here and nowhere else: the map
+          keeps working, so this is a note rather than a form error. */}
+      {errorKey ? (
+        <p role="status" className="text-xs text-warning">
+          {t(errorKey)}
+        </p>
+      ) : null}
 
       <p className="text-xs text-text-muted">
         {t('listing.coordinates', {
