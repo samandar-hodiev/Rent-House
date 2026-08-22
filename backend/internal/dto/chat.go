@@ -172,6 +172,11 @@ type ConversationResponse struct {
 	LastMessage *LastMessage     `json:"last_message,omitempty"`
 	UnreadCount int64            `json:"unread_count"`
 	UpdatedAt   time.Time        `json:"updated_at"`
+
+	// This caller's own view of the thread. Another participant reading the
+	// same conversation gets their own answers here.
+	IsPinned   bool `json:"is_pinned"`
+	IsArchived bool `json:"is_archived"`
 }
 
 // LastMessage is the preview line in the conversation list.
@@ -253,4 +258,21 @@ type AttachmentLimits struct {
 type AttachmentLimit struct {
 	MaxBytes  int64    `json:"max_bytes"`
 	MimeTypes []string `json:"mime_types"`
+}
+
+// ConversationDeletedEvent announces a thread withdrawn from both sides.
+type ConversationDeletedEvent struct {
+	ConversationID string `json:"conversation_id"`
+}
+
+// ConversationStateRequest is a pin or archive toggle. The conversation comes
+// from the path and the user from the token, so the body carries only the
+// intent.
+type ConversationStateRequest struct {
+	Value bool `json:"value"`
+}
+
+// DeleteConversationRequest chooses between hiding a thread and withdrawing it.
+type DeleteConversationRequest struct {
+	ForEveryone bool `json:"for_everyone"`
 }

@@ -322,6 +322,14 @@ func newRouter(
 		conversations.GET("/:id/messages", chatHandler.ListMessages)
 		conversations.POST("/:id/messages", chatHandler.SendMessage)
 		conversations.POST("/:id/read", chatHandler.MarkRead)
+
+		// One person's view of a thread: pinning and archiving write to the
+		// caller's own participant row, so neither can reach the other side.
+		conversations.PATCH("/:id/pin", chatHandler.SetPinned)
+		conversations.PATCH("/:id/archive", chatHandler.SetArchived)
+		// Hides the thread for the caller, or withdraws it from both — the
+		// body chooses, the token decides who is asking.
+		conversations.DELETE("/:id", chatHandler.DeleteConversation)
 	}
 
 	messages := v1.Group("/messages", middleware.Auth(tokens))

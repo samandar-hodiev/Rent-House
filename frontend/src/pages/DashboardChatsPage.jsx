@@ -11,14 +11,20 @@ import { useLocale } from '../context/LocaleContext'
 // time — the list, or the selected thread with a back button.
 function DashboardChatsPage() {
   const { t } = useLocale()
-  const { conversations } = useChat()
+  const { conversations, archivedConversations } = useChat()
   const [searchParams, setSearchParams] = useSearchParams()
 
   // The selection lives in the URL (`?c=<id>`) rather than in component state,
   // so the mobile back gesture, the browser back button and a shared/reloaded
   // link all behave the way the user expects.
   const requestedId = searchParams.get('c')
-  const selected = conversations.find((conversation) => conversation.id === requestedId) ?? null
+  // Both lists: opening an archived thread must work, and a thread the other
+  // side just withdrew leaves both — at which point `selected` becomes null and
+  // the panel closes on its own rather than showing a thread that is gone.
+  const selected =
+    [...conversations, ...archivedConversations].find(
+      (conversation) => conversation.id === requestedId,
+    ) ?? null
 
   const select = useCallback(
     (conversationId) => {

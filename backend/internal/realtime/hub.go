@@ -33,6 +33,9 @@ const (
 	// EventMessagesRead lists messages the other side has now read, so the
 	// sender's ticks can turn double without a refetch.
 	EventMessagesRead = "messages.read"
+	// EventConversationDeleted announces a thread withdrawn from both sides, so
+	// anyone with it open closes it instead of writing into something gone.
+	EventConversationDeleted = "conversation.deleted"
 	// EventPresence reports that a user came online or went offline.
 	EventPresence = "presence"
 )

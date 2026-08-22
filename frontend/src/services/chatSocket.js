@@ -13,6 +13,7 @@ export const CHAT_EVENTS = {
   messageEdited: 'message.edited',
   messageDeleted: 'message.deleted',
   messagesRead: 'messages.read',
+  conversationDeleted: 'conversation.deleted',
   presence: 'presence',
 }
 

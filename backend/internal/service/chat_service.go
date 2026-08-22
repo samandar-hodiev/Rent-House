@@ -139,10 +139,13 @@ func (s *ChatService) StartConversation(
 }
 
 // ListConversations returns the caller's threads for the dashboard sidebar.
+// `archived` picks the archive instead of the main list. The two are the same
+// query with one predicate flipped, so they cannot disagree about what a thread
+// looks like.
 func (s *ChatService) ListConversations(
-	ctx context.Context, actorID uuid.UUID,
+	ctx context.Context, actorID uuid.UUID, archived bool,
 ) (*dto.ConversationListResponse, error) {
-	summaries, err := s.chat.ListConversations(ctx, actorID)
+	summaries, err := s.chat.ListConversations(ctx, actorID, archived)
 	if err != nil {
 		return nil, err
 	}
@@ -446,13 +449,17 @@ func (s *ChatService) UnreadTotal(ctx context.Context, actorID uuid.UUID) (int64
 // presence change can be announced to the people it matters to rather than
 // broadcast to everyone connected.
 func (s *ChatService) CounterpartsOf(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
-	summaries, err := s.chat.ListConversations(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	others := make([]uuid.UUID, 0, len(summaries))
-	for _, summary := range summaries {
-		others = append(others, summary.OtherUserID)
+	others := []uuid.UUID{}
+	// Both lists: an archived thread is still a thread, and its other side
+	// still wants to know when this user comes online.
+	for _, archived := range []bool{false, true} {
+		summaries, err := s.chat.ListConversations(ctx, userID, archived)
+		if err != nil {
+			return nil, err
+		}
+		for _, summary := range summaries {
+			others = append(others, summary.OtherUserID)
+		}
 	}
 	return others, nil
 }
@@ -528,11 +535,17 @@ func (s *ChatService) broadcast(
 func (s *ChatService) describe(
 	ctx context.Context, conversationID, actorID uuid.UUID,
 ) (*dto.ConversationResponse, error) {
-	summaries, err := s.chat.ListConversations(ctx, actorID)
+	// Both lists: a thread can be described while it sits in the archive, and
+	// opening one from there must not report it missing.
+	summaries, err := s.chat.ListConversations(ctx, actorID, false)
 	if err != nil {
 		return nil, err
 	}
-	for _, summary := range summaries {
+	archived, err := s.chat.ListConversations(ctx, actorID, true)
+	if err != nil {
+		return nil, err
+	}
+	for _, summary := range append(summaries, archived...) {
 		if summary.ConversationID == conversationID {
 			response := conversationFrom(summary, s.hub.IsOnline(summary.OtherUserID))
 			return &response, nil
@@ -556,6 +569,8 @@ func conversationFrom(summary repository.ConversationSummary, online bool) dto.C
 		},
 		UnreadCount: summary.UnreadCount,
 		UpdatedAt:   summary.UpdatedAt,
+		IsPinned:    summary.PinnedAt != nil,
+		IsArchived:  summary.ArchivedAt != nil,
 	}
 	if summary.ApartmentImage != nil {
 		out.Apartment.Image = *summary.ApartmentImage
@@ -579,4 +594,66 @@ func conversationFrom(summary repository.ConversationSummary, online bool) dto.C
 	}
 
 	return out
+}
+
+// SetPinned pins or unpins a thread for the caller.
+//
+// Pinning is an opinion one person holds, so it is written to their own
+// participant row and nobody else's. The participant check is the same one
+// every other chat action runs: a stranger's request is indistinguishable from
+// a request about a thread that does not exist.
+func (s *ChatService) SetPinned(
+	ctx context.Context, conversationID, actorID uuid.UUID, pinned bool,
+) error {
+	if err := s.assertParticipant(ctx, conversationID, actorID); err != nil {
+		return err
+	}
+	return s.chat.SetPinned(ctx, conversationID, actorID, pinned)
+}
+
+// SetArchived moves a thread into or out of the caller's archive.
+//
+// The history is untouched and the other participant is unaffected: to them the
+// thread is still in their main list, and writing to it still works.
+func (s *ChatService) SetArchived(
+	ctx context.Context, conversationID, actorID uuid.UUID, archived bool,
+) error {
+	if err := s.assertParticipant(ctx, conversationID, actorID); err != nil {
+		return err
+	}
+	return s.chat.SetArchived(ctx, conversationID, actorID, archived)
+}
+
+// DeleteConversation removes a thread for the caller, or for everyone in it.
+//
+// "For me" hides it from this user only and leaves the other side whole. "For
+// everyone" withdraws it from both, which is why the other participant is told
+// over the socket — someone with the thread open should not keep typing into
+// something that no longer exists.
+func (s *ChatService) DeleteConversation(
+	ctx context.Context, conversationID, actorID uuid.UUID, forEveryone bool,
+) error {
+	if err := s.assertParticipant(ctx, conversationID, actorID); err != nil {
+		return err
+	}
+
+	if !forEveryone {
+		return s.chat.DeleteForUser(ctx, conversationID, actorID)
+	}
+
+	// Read the audience before the delete: afterwards the thread no longer
+	// resolves, and there would be nobody left to tell.
+	recipients, err := s.chat.ParticipantIDs(ctx, conversationID)
+	if err != nil {
+		return err
+	}
+	if err := s.chat.DeleteForEveryone(ctx, conversationID); err != nil {
+		return err
+	}
+
+	s.hub.Publish(recipients, realtime.Envelope{
+		Event:   realtime.EventConversationDeleted,
+		Payload: dto.ConversationDeletedEvent{ConversationID: conversationID.String()},
+	})
+	return nil
 }

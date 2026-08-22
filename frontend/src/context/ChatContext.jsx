@@ -9,7 +9,10 @@ import {
 } from 'react'
 import { useAuth } from './AuthContext'
 import {
+  deleteConversation as deleteConversationRequest,
   fetchConversations,
+  setConversationArchived,
+  setConversationPinned,
   startConversation as startConversationRequest,
 } from '../services/chatApi'
 import { CHAT_EVENTS, SOCKET_STATUS, openChatSocket } from '../services/chatSocket'
@@ -37,6 +40,10 @@ export function ChatProvider({ children }) {
   const myId = user?.id ?? null
 
   const [conversations, setConversations] = useState([])
+  // The archive is a separate list because it is a separate query: same shape,
+  // one predicate apart, so neither can disagree with the other about a thread.
+  const [archivedConversations, setArchivedConversations] = useState([])
+  const [archivedStatus, setArchivedStatus] = useState('idle')
   const [unreadTotal, setUnreadTotal] = useState(0)
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
   const [socketStatus, setSocketStatus] = useState(SOCKET_STATUS.closed)
@@ -55,19 +62,30 @@ export function ChatProvider({ children }) {
     async (signal) => {
       if (!token) {
         setConversations([])
+        setArchivedConversations([])
         setUnreadTotal(0)
         setStatus('idle')
+        setArchivedStatus('idle')
         return
       }
       setStatus('loading')
+      setArchivedStatus('loading')
       try {
-        const page = await fetchConversations({ token, signal })
-        setConversations(page.items)
-        setUnreadTotal(page.unreadTotal)
+        // Both lists together: archiving moves a thread from one to the other,
+        // and refetching only the one in view would leave the other stale.
+        const [inbox, archive] = await Promise.all([
+          fetchConversations({ token, signal }),
+          fetchConversations({ token, signal, archived: true }),
+        ])
+        setConversations(inbox.items)
+        setArchivedConversations(archive.items)
+        setUnreadTotal(inbox.unreadTotal)
         setStatus('ready')
+        setArchivedStatus('ready')
       } catch (error) {
         if (error?.name === 'AbortError') return
         setStatus('error')
+        setArchivedStatus('error')
       }
     },
     [token],
@@ -138,6 +156,18 @@ export function ChatProvider({ children }) {
       return
     }
 
+    if (event === CHAT_EVENTS.conversationDeleted) {
+      // Withdrawn from both sides by the other participant. It is gone on the
+      // server, so it goes from here too rather than waiting for a reload to
+      // reveal that it never came back.
+      const id = payload?.conversation_id ?? conversationId
+      setConversations((current) => current.filter((conversation) => conversation.id !== id))
+      setArchivedConversations((current) =>
+        current.filter((conversation) => conversation.id !== id),
+      )
+      return
+    }
+
     if (event === CHAT_EVENTS.messagesRead) {
       // Somebody read messages. If it was this user, their badge drops.
       setConversations((current) =>
@@ -192,6 +222,39 @@ export function ChatProvider({ children }) {
     [token],
   )
 
+  /**
+   * Pin, archive and delete.
+   *
+   * Each waits for the server and then refetches rather than editing the array
+   * in place: pinning reorders the list, archiving removes a row from one list
+   * and adds it to another, and deleting can revive a thread later. Re-reading
+   * is one request and cannot drift; reproducing those rules in the client
+   * would be a second copy of the ordering logic.
+   */
+  const setPinned = useCallback(
+    async (conversationId, pinned) => {
+      await setConversationPinned(conversationId, pinned, { token })
+      await reloadRef.current()
+    },
+    [token],
+  )
+
+  const setArchived = useCallback(
+    async (conversationId, archived) => {
+      await setConversationArchived(conversationId, archived, { token })
+      await reloadRef.current()
+    },
+    [token],
+  )
+
+  const removeConversation = useCallback(
+    async (conversationId, { forEveryone = false } = {}) => {
+      await deleteConversationRequest(conversationId, { forEveryone, token })
+      await reloadRef.current()
+    },
+    [token],
+  )
+
   /** Clears a thread's badge locally; the server call lives in the thread view. */
   const markRead = useCallback((conversationId) => {
     setConversations((current) =>
@@ -204,6 +267,8 @@ export function ChatProvider({ children }) {
   const value = useMemo(
     () => ({
       conversations,
+      archivedConversations,
+      archivedStatus,
       unreadTotal,
       status,
       isLoading: status === 'loading',
@@ -212,10 +277,15 @@ export function ChatProvider({ children }) {
       subscribe,
       startConversation,
       markRead,
+      setPinned,
+      setArchived,
+      removeConversation,
       reload: () => reload(),
     }),
     [
       conversations,
+      archivedConversations,
+      archivedStatus,
       unreadTotal,
       status,
       socketStatus,
@@ -223,6 +293,9 @@ export function ChatProvider({ children }) {
       subscribe,
       startConversation,
       markRead,
+      setPinned,
+      setArchived,
+      removeConversation,
       reload,
     ],
   )

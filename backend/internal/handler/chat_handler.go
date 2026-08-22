@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -66,7 +67,11 @@ func (h *ChatHandler) ListConversations(c *gin.Context) {
 		return
 	}
 
-	list, err := h.chat.ListConversations(c.Request.Context(), actorID)
+	// ?archived=true switches to the archive. Anything else is the main list,
+	// so a malformed value cannot produce a third kind of listing.
+	archived := c.Query("archived") == "true"
+
+	list, err := h.chat.ListConversations(c.Request.Context(), actorID, archived)
 	if err != nil {
 		h.writeError(c, err, "list conversations")
 		return
@@ -444,4 +449,80 @@ func parseMessageID(c *gin.Context) (uuid.UUID, bool) {
 		return uuid.Nil, false
 	}
 	return id, true
+}
+
+// SetPinned handles PATCH /api/v1/conversations/:id/pin.
+func (h *ChatHandler) SetPinned(c *gin.Context) {
+	h.setConversationState(c, "pin", func(ctx context.Context, id, actor uuid.UUID, value bool) error {
+		return h.chat.SetPinned(ctx, id, actor, value)
+	})
+}
+
+// SetArchived handles PATCH /api/v1/conversations/:id/archive.
+func (h *ChatHandler) SetArchived(c *gin.Context) {
+	h.setConversationState(c, "archive", func(ctx context.Context, id, actor uuid.UUID, value bool) error {
+		return h.chat.SetArchived(ctx, id, actor, value)
+	})
+}
+
+// setConversationState is the shared shape of pin and archive: same binding,
+// same authorization, same error mapping, one boolean apart.
+func (h *ChatHandler) setConversationState(
+	c *gin.Context,
+	operation string,
+	apply func(ctx context.Context, conversationID, actorID uuid.UUID, value bool) error,
+) {
+	actorID, ok := h.actor(c)
+	if !ok {
+		return
+	}
+	conversationID, ok := parseUUIDParam(c, "id")
+	if !ok {
+		return
+	}
+
+	var req dto.ConversationStateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+
+	if err := apply(c.Request.Context(), conversationID, actorID, req.Value); err != nil {
+		h.writeError(c, err, operation+" conversation")
+		return
+	}
+	response.OK(c, "", gin.H{"value": req.Value})
+}
+
+// DeleteConversation handles DELETE /api/v1/conversations/:id.
+//
+// The body chooses between hiding the thread and withdrawing it from both
+// sides; the caller is the token's user either way, so neither choice can be
+// aimed at somebody else's copy.
+func (h *ChatHandler) DeleteConversation(c *gin.Context) {
+	actorID, ok := h.actor(c)
+	if !ok {
+		return
+	}
+	conversationID, ok := parseUUIDParam(c, "id")
+	if !ok {
+		return
+	}
+
+	// An absent body means "for me": the safer of the two, so a malformed
+	// request cannot escalate into withdrawing a thread from both people.
+	var req dto.DeleteConversationRequest
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+			return
+		}
+	}
+
+	err := h.chat.DeleteConversation(c.Request.Context(), conversationID, actorID, req.ForEveryone)
+	if err != nil {
+		h.writeError(c, err, "delete conversation")
+		return
+	}
+	response.OK(c, "", gin.H{"for_everyone": req.ForEveryone})
 }

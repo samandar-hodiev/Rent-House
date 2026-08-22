@@ -63,6 +63,10 @@ export function toConversation(item) {
       : null,
     unreadCount: item.unread_count ?? 0,
     updatedAt: item.updated_at,
+    // This user's own view of the thread. The other participant's copy has
+    // its own answers, which is the whole point of these two.
+    isPinned: Boolean(item.is_pinned),
+    isArchived: Boolean(item.is_archived),
   }
 }
 
@@ -82,9 +86,16 @@ export async function startConversation(apartmentId, { token, signal } = {}) {
   return toConversation(data)
 }
 
-/** The signed-in user's threads, plus the badge total. */
-export async function fetchConversations({ token, signal } = {}) {
-  const data = await request('/conversations', { token, signal })
+/**
+ * The signed-in user's threads, plus the badge total.
+ *
+ * `archived` switches to the archive. Same endpoint and same shape — one
+ * predicate apart on the server — so the two lists cannot disagree about what
+ * a thread looks like.
+ */
+export async function fetchConversations({ token, signal, archived = false } = {}) {
+  const path = archived ? '/conversations?archived=true' : '/conversations'
+  const data = await request(path, { token, signal })
   return {
     items: (data.items ?? []).map(toConversation),
     unreadTotal: data.unread_total ?? 0,
@@ -232,4 +243,33 @@ export function attachmentSrc(url, token) {
 /** What the server accepts: sizes and MIME types, read rather than restated. */
 export function fetchAttachmentLimits({ signal } = {}) {
   return request('/attachments/limits', { signal })
+}
+
+/** Pins or unpins a thread, for this user only. */
+export function setConversationPinned(id, pinned, { token } = {}) {
+  return request(`/conversations/${id}/pin`, { method: 'PATCH', body: { value: pinned }, token })
+}
+
+/** Moves a thread into or out of this user's archive. */
+export function setConversationArchived(id, archived, { token } = {}) {
+  return request(`/conversations/${id}/archive`, {
+    method: 'PATCH',
+    body: { value: archived },
+    token,
+  })
+}
+
+/**
+ * Removes a thread.
+ *
+ * `forEveryone` withdraws it from both participants; without it the thread is
+ * hidden from this user and the other side keeps everything. The server decides
+ * who is asking from the token, so neither form can be aimed at someone else.
+ */
+export function deleteConversation(id, { forEveryone = false, token } = {}) {
+  return request(`/conversations/${id}`, {
+    method: 'DELETE',
+    body: { for_everyone: forEveryone },
+    token,
+  })
 }

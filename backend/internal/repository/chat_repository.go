@@ -45,6 +45,11 @@ type ConversationSummary struct {
 
 	UnreadCount int64
 	UpdatedAt   time.Time
+
+	// This user's own view of the thread. Nil means they have not pinned or
+	// archived it; another participant's row is untouched either way.
+	PinnedAt   *time.Time
+	ArchivedAt *time.Time
 }
 
 // MessagePage is a slice of a thread plus whether more exist behind it.
@@ -92,6 +97,39 @@ func (r *ChatRepository) FindOrCreateConversation(
 				"apartment_id = ? AND buyer_id = ?", apartmentID, buyerID).Error; err != nil {
 				return err
 			}
+
+			// The pair already had a thread about this listing and withdrew it
+			// from both sides. UNIQUE (apartment_id, buyer_id) means a second
+			// row cannot be inserted, so without this the two of them could
+			// never speak about the listing again — the button would keep
+			// returning a thread neither of them is allowed to see.
+			//
+			// Reopening it starts genuinely empty. The old messages were
+			// already unreachable by both participants — that is what the
+			// withdrawal did — so they are removed rather than left behind a
+			// cutoff, which keeps the reopened thread indistinguishable from a
+			// brand new one and spares every read a special case.
+			if conversation.DeletedAt != nil {
+				if err := tx.Where("conversation_id = ?", conversation.ID).
+					Delete(&models.Message{}).Error; err != nil {
+					return err
+				}
+				if err := tx.Model(&models.ConversationParticipant{}).
+					Where("conversation_id = ?", conversation.ID).
+					UpdateColumns(map[string]any{
+						"deleted_at":  nil,
+						"archived_at": nil,
+						"pinned_at":   nil,
+					}).Error; err != nil {
+					return err
+				}
+				if err := tx.Model(&models.Conversation{}).
+					Where("id = ?", conversation.ID).
+					UpdateColumn("deleted_at", nil).Error; err != nil {
+					return err
+				}
+				conversation.DeletedAt = nil
+			}
 			return nil
 		}
 
@@ -116,7 +154,9 @@ func (r *ChatRepository) FindConversation(
 	var conversation models.Conversation
 	err := r.db.WithContext(ctx).
 		Preload("Apartment").
-		First(&conversation, "id = ?", id).Error
+		// Withdrawn from both sides: it no longer resolves for anybody, which
+		// is what stops a stale client reopening it by id.
+		First(&conversation, "id = ? AND deleted_at IS NULL", id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrConversationNotFound
@@ -132,8 +172,13 @@ func (r *ChatRepository) IsParticipant(
 ) (bool, error) {
 	var count int64
 	err := r.db.WithContext(ctx).
-		Model(&models.ConversationParticipant{}).
-		Where("conversation_id = ? AND user_id = ?", conversationID, userID).
+		Table("conversation_participants AS cp").
+		Joins("JOIN conversations AS c ON c.id = cp.conversation_id").
+		// Membership of a withdrawn thread is not membership of anything. This
+		// is the one check every chat route runs, so excluding it here closes
+		// every route at once.
+		Where("cp.conversation_id = ? AND cp.user_id = ? AND c.deleted_at IS NULL",
+			conversationID, userID).
 		Count(&count).Error
 	if err != nil {
 		return false, fmt.Errorf("check participant: %w", err)
@@ -170,11 +215,13 @@ func (r *ChatRepository) ParticipantIDs(
 // sidebar is the kind of thing that only shows up once real accounts have real
 // histories.
 func (r *ChatRepository) ListConversations(
-	ctx context.Context, userID uuid.UUID,
+	ctx context.Context, userID uuid.UUID, archived bool,
 ) ([]ConversationSummary, error) {
 	const query = `
 SELECT
     c.id                AS conversation_id,
+    cp.pinned_at        AS pinned_at,
+    cp.archived_at      AS archived_at,
     c.apartment_id      AS apartment_id,
     a.title             AS apartment_title,
     img.url             AS apartment_image,
@@ -210,6 +257,9 @@ LEFT JOIN LATERAL (
     SELECT m.body, m.created_at, m.sender_id, m.deleted_at
     FROM messages m
     WHERE m.conversation_id = c.id
+      -- Everything before this user deleted the thread is no longer theirs to
+      -- read, so it is not their last message either.
+      AND (cp.deleted_at IS NULL OR m.created_at > cp.deleted_at)
       -- A message this user hid is not their last message.
       AND NOT EXISTS (
           SELECT 1 FROM message_deletions d
@@ -222,6 +272,7 @@ LEFT JOIN LATERAL (
     SELECT count(*) AS count
     FROM messages m
     WHERE m.conversation_id = c.id
+      AND (cp.deleted_at IS NULL OR m.created_at > cp.deleted_at)
       AND m.sender_id <> @user_id
       AND NOT m.is_read
       AND m.deleted_at IS NULL
@@ -230,11 +281,25 @@ LEFT JOIN LATERAL (
           WHERE d.message_id = m.id AND d.user_id = @user_id
       )
 ) unread ON true
--- Threads that have never been written in sort by when they were opened.
-ORDER BY COALESCE(last.created_at, c.created_at) DESC`
+WHERE
+    -- Withdrawn from both sides: gone for everyone, enforced here rather than
+    -- left to the client to hide.
+    c.deleted_at IS NULL
+    -- Deleted by this user, and nothing has been said since. A later message
+    -- brings the thread back, carrying only what arrived after the deletion.
+    AND (cp.deleted_at IS NULL OR last.created_at IS NOT NULL)
+    -- One list or the other, never both.
+    AND (CASE WHEN @archived THEN cp.archived_at IS NOT NULL ELSE cp.archived_at IS NULL END)
+-- Pinned first, most recently pinned at the top of that group; everything else
+-- by activity. Threads never written in sort by when they were opened.
+ORDER BY
+    cp.pinned_at DESC NULLS LAST,
+    COALESCE(last.created_at, c.created_at) DESC`
 
 	summaries := []ConversationSummary{}
-	err := r.db.WithContext(ctx).Raw(query, map[string]any{"user_id": userID}).Scan(&summaries).Error
+	err := r.db.WithContext(ctx).
+		Raw(query, map[string]any{"user_id": userID, "archived": archived}).
+		Scan(&summaries).Error
 	if err != nil {
 		return nil, fmt.Errorf("list conversations: %w", err)
 	}
@@ -252,6 +317,16 @@ func (r *ChatRepository) ListMessages(
 	query := r.db.WithContext(ctx).
 		Model(&models.Message{}).
 		Where("messages.conversation_id = ?", conversationID).
+		// A thread this reader deleted starts again from that moment: what was
+		// said before is no longer theirs to read, even though the other side
+		// still has all of it.
+		Where(`NOT EXISTS (
+			SELECT 1 FROM conversation_participants cp
+			WHERE cp.conversation_id = messages.conversation_id
+			  AND cp.user_id = ?
+			  AND cp.deleted_at IS NOT NULL
+			  AND messages.created_at <= cp.deleted_at
+		)`, viewerID).
 		// Messages this reader hid are invisible to them and to nobody else.
 		Where(`NOT EXISTS (
 			SELECT 1 FROM message_deletions d
@@ -450,7 +525,12 @@ func (r *ChatRepository) UnreadTotal(ctx context.Context, userID uuid.UUID) (int
 	err := r.db.WithContext(ctx).
 		Model(&models.Message{}).
 		Joins("JOIN conversation_participants cp ON cp.conversation_id = messages.conversation_id").
+		Joins("JOIN conversations c ON c.id = messages.conversation_id").
 		Where("cp.user_id = ?", userID).
+		// The badge counts what the user can actually open: not a withdrawn
+		// thread, and not messages from before they deleted it themselves.
+		Where("c.deleted_at IS NULL").
+		Where("cp.deleted_at IS NULL OR messages.created_at > cp.deleted_at").
 		Where("messages.sender_id <> ?", userID).
 		Where("NOT messages.is_read").
 		Where("messages.deleted_at IS NULL").
@@ -463,4 +543,103 @@ func (r *ChatRepository) UnreadTotal(ctx context.Context, userID uuid.UUID) (int
 		return 0, fmt.Errorf("count unread: %w", err)
 	}
 	return count, nil
+}
+
+// SetPinned pins or unpins a thread for one person.
+//
+// The WHERE names both the conversation and the user, so the statement can only
+// ever touch the caller's own row — there is no way to spell "somebody else's
+// pin" with it, whatever the caller sends.
+func (r *ChatRepository) SetPinned(
+	ctx context.Context, conversationID, userID uuid.UUID, pinned bool,
+) error {
+	var value any
+	if pinned {
+		value = time.Now()
+	}
+	err := r.db.WithContext(ctx).
+		Model(&models.ConversationParticipant{}).
+		Where("conversation_id = ? AND user_id = ?", conversationID, userID).
+		UpdateColumn("pinned_at", value).Error
+	if err != nil {
+		return fmt.Errorf("set pinned: %w", err)
+	}
+	return nil
+}
+
+// SetArchived moves a thread into or out of one person's archive.
+//
+// Archiving does not touch the messages: the thread keeps its history and the
+// other participant keeps seeing it in their main list.
+func (r *ChatRepository) SetArchived(
+	ctx context.Context, conversationID, userID uuid.UUID, archived bool,
+) error {
+	var value any
+	if archived {
+		value = time.Now()
+	}
+	err := r.db.WithContext(ctx).
+		Model(&models.ConversationParticipant{}).
+		Where("conversation_id = ? AND user_id = ?", conversationID, userID).
+		UpdateColumn("archived_at", value).Error
+	if err != nil {
+		return fmt.Errorf("set archived: %w", err)
+	}
+	return nil
+}
+
+// DeleteForUser hides a thread from one person, from now on.
+//
+// A cutoff rather than a flag: everything already said stops being theirs to
+// read, and a message arriving later brings the thread back carrying only what
+// came after. That is what makes this survivable — the other participant can
+// still write, and their message is not swallowed by a thread that no longer
+// exists on one side.
+//
+// Un-archiving at the same time is deliberate: a revived thread belongs in the
+// main list, not in an archive the user has probably forgotten.
+func (r *ChatRepository) DeleteForUser(
+	ctx context.Context, conversationID, userID uuid.UUID,
+) error {
+	err := r.db.WithContext(ctx).
+		Model(&models.ConversationParticipant{}).
+		Where("conversation_id = ? AND user_id = ?", conversationID, userID).
+		UpdateColumns(map[string]any{"deleted_at": time.Now(), "archived_at": nil}).Error
+	if err != nil {
+		return fmt.Errorf("delete conversation for user: %w", err)
+	}
+	return nil
+}
+
+// DeleteForEveryone withdraws a thread from both sides.
+//
+// Soft, and on the conversation rather than on either participant: it is a fact
+// about the thread, so every read excludes it for everybody without either
+// client being asked to cooperate.
+func (r *ChatRepository) DeleteForEveryone(ctx context.Context, conversationID uuid.UUID) error {
+	err := r.db.WithContext(ctx).
+		Model(&models.Conversation{}).
+		Where("id = ? AND deleted_at IS NULL", conversationID).
+		UpdateColumn("deleted_at", time.Now()).Error
+	if err != nil {
+		return fmt.Errorf("delete conversation for everyone: %w", err)
+	}
+	return nil
+}
+
+// DeletedCutoff is when this user deleted the thread, or nil if they have not.
+// Reads use it to stop serving messages from before that moment.
+func (r *ChatRepository) DeletedCutoff(
+	ctx context.Context, conversationID, userID uuid.UUID,
+) (*time.Time, error) {
+	var cutoff *time.Time
+	err := r.db.WithContext(ctx).
+		Model(&models.ConversationParticipant{}).
+		Where("conversation_id = ? AND user_id = ?", conversationID, userID).
+		Select("deleted_at").
+		Row().Scan(&cutoff)
+	if err != nil {
+		return nil, fmt.Errorf("read deletion cutoff: %w", err)
+	}
+	return cutoff, nil
 }

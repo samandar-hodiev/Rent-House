@@ -1,6 +1,10 @@
 package models
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // Conversation is a thread about one apartment.
 //
@@ -13,6 +17,11 @@ type Conversation struct {
 	Base
 	ApartmentID uuid.UUID `gorm:"column:apartment_id;type:uuid;not null;index:idx_conversations_apartment_id" json:"apartment_id"`
 	BuyerID     uuid.UUID `gorm:"column:buyer_id;type:uuid;not null" json:"buyer_id"`
+
+	// DeletedAt is set when the thread is withdrawn from both sides. Soft, so
+	// the removal is a state every read enforces rather than an absence the
+	// client has to be trusted to respect.
+	DeletedAt *time.Time `gorm:"column:deleted_at" json:"deleted_at,omitempty"`
 
 	Timestamps
 
