@@ -10,6 +10,7 @@ export const ROUTES = {
   dashboard: '/dashboard',
   dashboardProfile: '/dashboard/profile',
   dashboardListings: '/dashboard/listings',
+  dashboardSaved: '/dashboard/saved',
   dashboardChats: '/dashboard/chats',
   dashboardEditProfile: '/dashboard/edit-profile',
   createListing: '/create-listing',

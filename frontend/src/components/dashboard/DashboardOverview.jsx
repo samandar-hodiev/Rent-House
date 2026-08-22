@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Building2, Loader2, MessageSquare } from 'lucide-react'
+import { ArrowRight, Building2, Heart, Loader2, MessageSquare } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useChat } from '../../context/ChatContext'
-import { useListings } from '../../context/ListingsContext'
-import { LISTING_STATUS } from '../../data/listingStatus'
+import { useDashboardSummary } from '../../hooks/useDashboardSummary'
 import { useViewsAnalytics } from '../../hooks/useViewsAnalytics'
 import { formatCount } from '../../utils/formatPeriod'
 import { ROUTES } from '../../routes/paths'
+import ApartmentCard from '../ApartmentCard'
+import MyListingCard from './MyListingCard'
 import ViewsChart from './ViewsChart'
 
 // Reading the colours from the stylesheet rather than hard-coding hexes is what
@@ -54,6 +55,51 @@ function StatCard({ icon, label, value, hint, to, hintClass = 'text-text-muted' 
   )
 }
 
+/**
+ * A section heading with the way out of it.
+ *
+ * Both lists below show three rows and then hand over to the page that owns
+ * the full set, so both need the same header — and it should look the same in
+ * both places.
+ */
+function SectionHeader({ title, to, linkLabel }) {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-3">
+      <h2 className="text-base font-semibold text-text-primary">{title}</h2>
+      <Link
+        to={to}
+        className="flex shrink-0 items-center gap-1 text-sm font-medium text-primary hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        {linkLabel}
+        <ArrowRight aria-hidden="true" size={14} />
+      </Link>
+    </div>
+  )
+}
+
+/**
+ * What a section says when it has nothing in it.
+ *
+ * Deliberately light — a border, a sentence and one way forward. An empty
+ * dashboard is a new account, and burying it under illustration would make the
+ * emptiest state the heaviest thing on the page.
+ */
+function EmptySection({ title, hint, to, actionLabel, icon }) {
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-4 py-8 text-center">
+      <span className="text-text-muted">{icon}</span>
+      <p className="text-sm font-medium text-text-secondary">{title}</p>
+      <p className="max-w-sm text-xs text-text-muted">{hint}</p>
+      <Link
+        to={to}
+        className="mt-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        {actionLabel}
+      </Link>
+    </div>
+  )
+}
+
 // A legend entry. It names a line and nothing else — selecting a series is the
 // filter's job, so these carry no press affordance.
 function LegendItem({ color, label }) {
@@ -78,16 +124,18 @@ function LegendItem({ color, label }) {
  */
 function DashboardOverview() {
   const { t } = useLocale()
-  const { listings } = useListings()
+  // The chat context is the live one: a message arriving over the socket moves
+  // this badge without waiting for the summary to be refetched.
   const { unreadTotal } = useChat()
   const [filter, setFilter] = useState('all')
 
-  // Real: the same array "Mening e'lonlarim" renders, so publishing or closing
-  // a listing moves this number with it.
-  const activeListings = useMemo(
-    () => listings.filter((listing) => listing.status === LISTING_STATUS.active).length,
-    [listings],
-  )
+  // Three counters and two short lists, in one request. Every figure is
+  // counted by the database against the signed-in user — nothing here is
+  // derived from whatever the client happens to be holding.
+  const { summary, status: summaryStatus } = useDashboardSummary()
+  const counts = summary?.counts
+  const recentListings = summary?.recentListings ?? []
+  const recentSaved = summary?.recentSaved ?? []
 
   // Real view events, aggregated by PostgreSQL. Refetched when the tab regains
   // focus, so opening a listing in another tab and coming back shows the view.
@@ -106,14 +154,15 @@ function DashboardOverview() {
         {t('dashboard.overviewTitle')}
       </h1>
 
-      {/* Two equal figures. They stack below `sm:` so neither is squeezed on a
-          narrow screen. */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* Three equal figures: what you have published, what is waiting to be
+          read, and what you saved. Two columns on a tablet and one on a phone,
+          so none of them is squeezed. */}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           icon={<Building2 aria-hidden="true" size={18} />}
           label={t('dashboard.statActiveListings')}
-          value={activeListings}
-          hint={t('dashboard.statListingsHint', { count: listings.length })}
+          value={counts?.activeListings ?? 0}
+          hint={t('dashboard.statListingsHint', { count: counts?.totalListings ?? 0 })}
           to={ROUTES.dashboardListings}
         />
         <StatCard
@@ -124,13 +173,26 @@ function DashboardOverview() {
           // plainly in the muted colour rather than flagged.
           hint={
             unreadTotal > 0
-              ? t('dashboard.unreadCount', { count: unreadTotal })
+              ? t('dashboard.newMessages', { count: unreadTotal })
               : t('dashboard.noUnread')
           }
           hintClass={unreadTotal > 0 ? 'text-primary' : 'text-text-muted'}
           to={ROUTES.dashboardChats}
         />
+        <StatCard
+          icon={<Heart aria-hidden="true" size={18} />}
+          label={t('dashboard.statSaved')}
+          value={counts?.savedApartments ?? 0}
+          hint={t('dashboard.statSavedHint')}
+          to={ROUTES.dashboardSaved}
+        />
       </section>
+
+      {summaryStatus === 'error' ? (
+        <p role="alert" className="text-sm text-error">
+          {t('dashboard.summaryFailed')}
+        </p>
+      ) : null}
 
       {/* The dominant card: it holds the most information, so it gets the width
           and the height, and the two figures above stay small. */}
@@ -214,6 +276,67 @@ function DashboardOverview() {
             <ViewsChart points={points} series={visibleSeries} t={t} />
           )}
         </div>
+      </section>
+
+      {/* Your own listings. Three of them — enough to recognise what is live,
+          and "Barchasini ko'rish" for the rest. Deleting is not offered here:
+          that is management, and management belongs on the page that manages. */}
+      <section>
+        <SectionHeader
+          title={t('dashboard.recentListings')}
+          to={ROUTES.dashboardListings}
+          linkLabel={t('dashboard.viewAll')}
+        />
+        {summaryStatus === 'loading' ? (
+          <p className="flex items-center gap-2 py-6 text-sm text-text-muted">
+            <Loader2 aria-hidden="true" size={16} className="animate-spin" />
+            {t('dashboard.viewsLoading')}
+          </p>
+        ) : recentListings.length === 0 ? (
+          <EmptySection
+            icon={<Building2 aria-hidden="true" size={22} />}
+            title={t('dashboard.noListings')}
+            hint={t('dashboard.noListingsHint')}
+            to={ROUTES.createListing}
+            actionLabel={t('dashboard.postListing')}
+          />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {recentListings.map((listing) => (
+              <MyListingCard key={listing.id} listing={listing} compact />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Saved apartments. The same card the search results use, so a listing
+          looks the same wherever it is met. */}
+      <section>
+        <SectionHeader
+          title={t('dashboard.recentSaved')}
+          to={ROUTES.dashboardSaved}
+          linkLabel={t('dashboard.viewAll')}
+        />
+        {summaryStatus === 'loading' ? (
+          <p className="flex items-center gap-2 py-6 text-sm text-text-muted">
+            <Loader2 aria-hidden="true" size={16} className="animate-spin" />
+            {t('dashboard.viewsLoading')}
+          </p>
+        ) : recentSaved.length === 0 ? (
+          <EmptySection
+            icon={<Heart aria-hidden="true" size={22} />}
+            title={t('dashboard.noSaved')}
+            hint={t('dashboard.noSavedHint')}
+            to={ROUTES.home}
+            actionLabel={t('dashboard.findHomes')}
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {recentSaved.map((apartment) => (
+              <ApartmentCard key={apartment.id} apartment={apartment} />
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )

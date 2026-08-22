@@ -6,8 +6,9 @@ import FilterBar from '../components/FilterBar'
 import SortDropdown, { DEFAULT_SORT_OPTIONS } from '../components/SortDropdown'
 import ApartmentGrid from '../components/ApartmentGrid'
 import { useWishlist } from '../context/WishlistContext'
+import { useAuth } from '../context/AuthContext'
 import { useLocale } from '../context/LocaleContext'
-import { fetchApartment } from '../services/apartmentsApi'
+import { fetchFavorites } from '../services/favoritesApi'
 import { filterApartments } from '../utils/filterApartments'
 import { sortApartments } from '../utils/sortApartments'
 import { ROUTES } from '../routes/paths'
@@ -31,7 +32,8 @@ const SAVED_SORT_OPTIONS = [
 function WishlistPage() {
   const { t } = useLocale()
   const navigate = useNavigate()
-  const { savedItems } = useWishlist()
+  const { savedCount } = useWishlist()
+  const { token } = useAuth()
   const [filters, setFiltersState] = useState(EMPTY_FILTERS)
   const [sort, setSort] = useState('newest')
 
@@ -43,48 +45,37 @@ function WishlistPage() {
     [filters],
   )
 
-  // The wishlist stores ids; the listings themselves come from the database.
-  // Each saved id is fetched on its own because a listing may since have been
-  // deleted or unpublished — those simply drop out rather than failing the
-  // whole page.
-  const [catalog, setCatalog] = useState([])
+  // One request for the whole list, ordered by when each was saved. This used
+  // to be one fetch per saved id, which meant twenty listings were twenty
+  // round trips; the server joins them now and returns only listings that are
+  // still published.
+  const [savedApartments, setSavedApartments] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const savedIds = useMemo(() => [...savedItems.keys()], [savedItems])
-
   useEffect(() => {
-    if (savedIds.length === 0) {
-      setCatalog([])
+    if (!token) {
+      setSavedApartments([])
       setLoading(false)
       return undefined
     }
 
     const controller = new AbortController()
     setLoading(true)
-    Promise.all(
-      savedIds.map((id) =>
-        fetchApartment(id, { signal: controller.signal }).catch(() => null),
-      ),
-    )
-      .then((results) => {
-        if (controller.signal.aborted) return
-        setCatalog(results.filter(Boolean))
+    fetchFavorites({ token, signal: controller.signal })
+      .then((saved) => {
+        if (!controller.signal.aborted) setSavedApartments(saved.items)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setSavedApartments([])
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false)
       })
 
     return () => controller.abort()
-  }, [savedIds])
-
-  const savedApartments = useMemo(
-    () =>
-      catalog.map((apartment) => ({
-        ...apartment,
-        savedAt: savedItems.get(apartment.id),
-      })),
-    [catalog, savedItems],
-  )
+    // `savedCount` re-runs this after a heart is toggled elsewhere on the page,
+    // so unsaving a listing removes its card rather than leaving it behind.
+  }, [token, savedCount])
 
   const filteredApartments = useMemo(
     () =>
@@ -101,7 +92,7 @@ function WishlistPage() {
     [filteredApartments, sort],
   )
 
-  if (savedApartments.length === 0) {
+  if (!loading && savedApartments.length === 0) {
     return (
       <Container className="pt-10 pb-12 lg:pt-12">
         <h1 className="mb-6 text-2xl font-semibold text-text-primary">

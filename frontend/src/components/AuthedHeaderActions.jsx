@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { Building2, LogOut, MessageSquare } from 'lucide-react'
+import { Building2, LayoutDashboard, LogOut, MessageSquare } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useChat } from '../context/ChatContext'
 import { useLocale } from '../context/LocaleContext'
@@ -36,6 +36,18 @@ function AuthedHeaderActions({ variant = 'desktop', onNavigate }) {
     // leads into the dashboard, and it should be named the same in both places.
     return (
       <>
+        {/* The dashboard itself, which this menu did not offer — leaving the
+            account sidebar, and everything only it links to, unreachable on a
+            phone. */}
+        <Link
+          to={ROUTES.dashboard}
+          onClick={onNavigate}
+          className={mobileNavLinkClass({ isActive: false })}
+        >
+          <LayoutDashboard aria-hidden="true" size={MOBILE_ICON_SIZE} className="shrink-0" />
+          <span className="truncate">{t('dashboard.overview')}</span>
+        </Link>
+
         <Link
           to={ROUTES.dashboardChats}
           onClick={onNavigate}

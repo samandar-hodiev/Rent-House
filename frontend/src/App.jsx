@@ -53,7 +53,10 @@ function App() {
                             server-side and lands with those endpoints; this
                             check is UX, not a security boundary. */}
                         <Route element={<RequireAuth />}>
-                          <Route path={ROUTES.wishlist} element={<WishlistPage />} />
+                          <Route
+                            path={ROUTES.wishlist}
+                            element={<Navigate to={ROUTES.dashboardSaved} replace />}
+                          />
                           <Route path={ROUTES.profile} element={<ProfilePage />} />
                           <Route path={ROUTES.owner} element={<OwnerDashboardPage />} />
                           <Route path={ROUTES.admin} element={<AdminPage />} />
@@ -86,6 +89,9 @@ function App() {
                               element={<Navigate to={ROUTES.dashboard} replace />}
                             />
                             <Route path="listings" element={<DashboardListingsPage />} />
+                            {/* Saved apartments live in the account area now,
+                                not the public header. */}
+                            <Route path="saved" element={<WishlistPage />} />
                             <Route path="chats" element={<DashboardChatsPage />} />
                             <Route path="edit-profile" element={<DashboardEditProfilePage />} />
                           </Route>

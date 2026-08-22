@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { Heart, Map } from 'lucide-react'
+import { Map } from 'lucide-react'
 import { ROUTES } from '../routes/paths'
 import { useLocale } from '../context/LocaleContext'
 import { useAuth } from '../context/AuthContext'
@@ -56,7 +56,10 @@ function Header() {
     <header className="sticky top-0 z-30 border-b border-border bg-surface">
       <Container>
         {/* Desktop: single row, approved order and functionality unchanged */}
-        <div className="hidden h-20 items-center gap-10 xl:flex">
+        {/* Saved apartments moved to the account sidebar, so the row carries one
+            link fewer and the search field takes the space back — it is the
+            control people actually came to the header to use. */}
+        <div className="hidden h-20 items-center gap-8 xl:flex">
           <Link
             to={ROUTES.home}
             className="shrink-0 text-lg font-semibold tracking-tight text-text-primary"
@@ -67,9 +70,6 @@ function Header() {
           <SearchBar />
 
           <nav aria-label="Asosiy navigatsiya" className="flex shrink-0 items-center gap-7">
-            <NavLink to={ROUTES.wishlist} className={navLinkClass}>
-              {t('header.wishlistNav')}
-            </NavLink>
             <NavLink to={ROUTES.map} className={navLinkClass}>
               {t('header.mapNav')}
             </NavLink>
@@ -129,17 +129,12 @@ function Header() {
               aria-label="Asosiy navigatsiya"
               className="flex flex-col gap-1 border-t border-border py-3"
             >
-              {/* Where you can go. Wishlist sits behind RequireAuth, so a
-                  signed-out tap lands on the login page with this destination
-                  attached — the route guard already owns that rule and there is
-                  no second copy of it here. */}
+              {/* Where you can go. Saved apartments are no longer here: they
+                  belong to the account, and the account area's own navigation
+                  owns them. */}
               <NavLink to={ROUTES.map} className={mobileNavLinkClass} onClick={closeMenu}>
                 <Map aria-hidden="true" size={MOBILE_ICON_SIZE} className="shrink-0" />
                 <span className="truncate">{t('header.mapNav')}</span>
-              </NavLink>
-              <NavLink to={ROUTES.wishlist} className={mobileNavLinkClass} onClick={closeMenu}>
-                <Heart aria-hidden="true" size={MOBILE_ICON_SIZE} className="shrink-0" />
-                <span className="truncate">{t('header.wishlistNav')}</span>
               </NavLink>
 
               {/* What you can do about your account, set apart by a hairline so

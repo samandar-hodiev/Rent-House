@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Building2, LayoutDashboard, LogOut, MessageSquare, PlusCircle } from 'lucide-react'
+import { Building2, Heart, LayoutDashboard, LogOut, MessageSquare, PlusCircle } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useAuth } from '../../context/AuthContext'
 import { useChat } from '../../context/ChatContext'
@@ -47,6 +47,12 @@ export function DashboardNavList({ onNavigate }) {
         to={ROUTES.dashboardListings}
         icon={<Building2 aria-hidden="true" size={ICON_SIZE} />}
         label={t('dashboard.listings')}
+        onNavigate={onNavigate}
+      />
+      <DashboardNavItem
+        to={ROUTES.dashboardSaved}
+        icon={<Heart aria-hidden="true" size={ICON_SIZE} />}
+        label={t('dashboard.saved')}
         onNavigate={onNavigate}
       />
       <DashboardNavItem

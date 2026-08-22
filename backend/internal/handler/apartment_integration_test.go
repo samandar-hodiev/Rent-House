@@ -63,6 +63,14 @@ func newListingHarness(t *testing.T) *listingHarness {
 	me.GET("/apartments/stats", apartmentHandler.Stats)
 	me.GET("/analytics/views", analyticsHandler.OwnerViews)
 
+	favoriteHandler := NewFavoriteHandler(service.NewFavoriteService(
+		repository.NewFavoriteRepository(h.db), apartments, repository.NewChatRepository(h.db),
+	))
+	me.GET("/favorites", favoriteHandler.List)
+	me.POST("/favorites/:apartmentId", favoriteHandler.Save)
+	me.DELETE("/favorites/:apartmentId", favoriteHandler.Unsave)
+	me.GET("/dashboard/summary", favoriteHandler.Summary)
+
 	// Each test starts from a known table. Listings are the subject here, so
 	// leftovers from a previous run would make counts meaningless.
 	if err := h.db.Exec("DELETE FROM apartments").Error; err != nil {

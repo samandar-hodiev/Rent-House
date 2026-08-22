@@ -241,6 +241,14 @@ func newRouter(
 		service.NewApartmentService(apartments), analyticsService,
 	)
 
+	// One chat repository, shared: the chat service publishes messages through
+	// it and the dashboard reads its unread total from it. Two instances would
+	// be two connections to the same rows for no reason.
+	chats := repository.NewChatRepository(db)
+	favoriteHandler := handler.NewFavoriteHandler(
+		service.NewFavoriteService(repository.NewFavoriteRepository(db), apartments, chats),
+	)
+
 	// Reference data the owner form needs before it can submit anything.
 	v1.GET("/districts", apartmentHandler.Districts)
 
@@ -273,6 +281,13 @@ func newRouter(
 		// timeline. Aggregated by PostgreSQL — the client receives totals, never
 		// the underlying events.
 		me.GET("/analytics/views", analyticsHandler.OwnerViews)
+
+		// Saved apartments and the dashboard's first paint. The user is always
+		// the one the token names, so there is no id here to tamper with.
+		me.GET("/favorites", favoriteHandler.List)
+		me.POST("/favorites/:apartmentId", favoriteHandler.Save)
+		me.DELETE("/favorites/:apartmentId", favoriteHandler.Unsave)
+		me.GET("/dashboard/summary", favoriteHandler.Summary)
 	}
 
 	// Uploaded files: listing photographs and chat attachments share one store.
@@ -286,7 +301,7 @@ func newRouter(
 	// handler that accepts connections.
 	hub := realtime.NewHub()
 	chatService := service.NewChatService(
-		repository.NewChatRepository(db), apartments, users, hub, files,
+		chats, apartments, users, hub, files,
 		// Chat attachments are served through an authorized endpoint, never as
 		// static files: they are as private as the conversation they were sent
 		// in. Listing photographs remain public, which is what a listing is.

@@ -13,7 +13,11 @@ import ListingGalleryModal from './ListingGalleryModal'
 
 // One row in "Mening e'lonlarim": image left, details right on `sm:` and up,
 // stacked below that.
-function MyListingCard({ listing }) {
+//
+// `compact` drops the delete button, for the dashboard's three-listing preview.
+// Deleting is management, and management belongs on the page that manages —
+// the summary offers viewing and editing and sends you there for the rest.
+function MyListingCard({ listing, compact = false }) {
   const { t } = useLocale()
   const { removeListing } = useListings()
   const [deleting, setDeleting] = useState(false)
@@ -123,15 +127,17 @@ function MyListingCard({ listing }) {
               while the request runs — a second click must not fire a second
               delete. Styled as the lightest action on the row, not a red
               button competing with Edit. */}
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={deleting}
-            className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-error/40 hover:bg-error/10 hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Trash2 aria-hidden="true" size={14} />
-            {deleting ? t('listing.deleting') : t('listing.delete')}
-          </button>
+          {compact ? null : (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-error/40 hover:bg-error/10 hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Trash2 aria-hidden="true" size={14} />
+              {deleting ? t('listing.deleting') : t('listing.delete')}
+            </button>
+          )}
         </div>
 
         {deleteError ? (
