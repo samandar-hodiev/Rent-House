@@ -4,7 +4,7 @@ import { useLocale } from '../context/LocaleContext'
 import { listingTitle } from '../utils/listingText'
 import { getDistrictById, districtNameKey } from '../data/districts'
 import { apartmentDetailsPath } from '../routes/paths'
-import { formatUzsAmount } from '../utils/formatPrice'
+import { formatListingPrice } from '../utils/formatPrice'
 
 const CONTAINER_CLASS = {
   floating: 'rounded-xl',
@@ -36,7 +36,7 @@ function MapApartmentPreview({ apartment, onClose, variant = 'floating' }) {
 
       <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto p-4">
         <p className="text-lg font-bold text-text-primary">
-          {formatUzsAmount(apartment.price)} {t('currency.somPerMonth')}
+          {formatListingPrice(t, apartment)}
         </p>
         <p className="text-sm font-medium text-text-primary">{title}</p>
         <p className="text-sm text-text-muted">

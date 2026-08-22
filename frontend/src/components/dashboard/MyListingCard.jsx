@@ -6,7 +6,7 @@ import { useLocale } from '../../context/LocaleContext'
 import { districtNameKey, getDistrictById } from '../../data/districts'
 import { LISTING_STATUS_CLASS } from '../../data/listingStatus'
 import { apartmentDetailsPath, editListingPath } from '../../routes/paths'
-import { formatUzsAmount } from '../../utils/formatPrice'
+import { formatListingPrice } from '../../utils/formatPrice'
 import { formatPostedAt } from '../../utils/formatRelativeTime'
 import { listingTitle } from '../../utils/listingText'
 import ListingGalleryModal from './ListingGalleryModal'
@@ -79,7 +79,7 @@ function MyListingCard({ listing }) {
             {district ? t(districtNameKey(district.id)) : ''}, {t('city.tashkent')}
           </p>
           <p className="text-base font-semibold text-text-primary">
-            {formatUzsAmount(listing.price)} {t('currency.somPerMonth')}
+            {formatListingPrice(t, listing)}
           </p>
           <p className="truncate text-sm text-text-muted">
             {t('apartmentCard.specs', {

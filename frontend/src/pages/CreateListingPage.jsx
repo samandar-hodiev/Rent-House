@@ -22,9 +22,13 @@ import {
   MAX_DESCRIPTION,
   RENTAL_PERIODS,
   RENTAL_RULES,
+  ROOMS_CUSTOM,
+  ROOMS_MAX,
+  ROOMS_MIN,
   ROOM_OPTIONS,
   UTILITIES,
   createEmptyListing,
+  isCustomRoomCount,
   listingToFormValues,
   validateListing,
 } from '../data/listingForm'
@@ -58,6 +62,11 @@ function ListingForm({ id, isEditMode, existing }) {
   // while a request is in flight, so a double click cannot create two listings.
   const [saving, setSaving] = useState(false)
   const [submitError, setSubmitError] = useState(null)
+
+  // Which of the two room controls is showing. Seeded from the value being
+  // edited, so a listing with seven rooms reopens on the manual input rather
+  // than on a quick-pick row where seven does not appear.
+  const [roomsCustom, setRoomsCustom] = useState(() => isCustomRoomCount(listing.rooms))
 
   // Clearing the field's error as it is edited keeps messages from lingering
   // after the user has already fixed them.
@@ -175,10 +184,31 @@ function ListingForm({ id, isEditMode, existing }) {
     [t],
   )
   const optionsOf = (items) => items.map((item) => ({ id: item.id, label: t(item.labelKey) }))
-  const roomOptions = ROOM_OPTIONS.map((value) => ({ id: value, label: value }))
+  const roomOptions = [
+    ...ROOM_OPTIONS.map((value) => ({ id: value, label: value })),
+    { id: ROOMS_CUSTOM, label: t('listing.roomsOther') },
+  ]
+
+  // "Boshqa" clears the count so the manual input starts empty rather than
+  // inheriting whichever quick pick was highlighted a moment ago.
+  const handleRoomsChange = (value) => {
+    if (value === ROOMS_CUSTOM) {
+      setRoomsCustom(true)
+      setField('rooms', '')
+      return
+    }
+    setRoomsCustom(false)
+    setField('rooms', value)
+  }
   const amenityOptions = AMENITIES.map((id) => ({ id, label: t(`amenity.${id}`) }))
   const ruleOptions = RENTAL_RULES.map((id) => ({ id, label: t(`listing.rule${id}`) }))
-  const errorText = (field) => (errors[field] ? t(errors[field]) : undefined)
+  // A couple of messages name the bound they enforce, so they read the same
+  // constant the validator does instead of repeating the number in prose.
+  const errorParams = { 'listing.errorRoomsRange': { min: ROOMS_MIN, max: ROOMS_MAX } }
+  const errorText = (field) => {
+    const key = errors[field]
+    return key ? t(key, errorParams[key]) : undefined
+  }
 
   return (
     <section className="flex flex-col gap-5">
@@ -234,13 +264,28 @@ function ListingForm({ id, isEditMode, existing }) {
           </FormSection>
 
           <FormSection title={t('listing.sectionApartment')}>
-            <SegmentedField
-              label={t('listing.rooms')}
-              options={roomOptions}
-              value={listing.rooms}
-              onChange={(value) => setField('rooms', value)}
-              error={errorText('rooms')}
-            />
+            <div className="flex flex-col gap-3">
+              <SegmentedField
+                label={t('listing.rooms')}
+                options={roomOptions}
+                value={roomsCustom ? ROOMS_CUSTOM : listing.rooms}
+                onChange={handleRoomsChange}
+                error={roomsCustom ? undefined : errorText('rooms')}
+              />
+
+              {roomsCustom ? (
+                <div className="max-w-40">
+                  <FormField
+                    label={t('listing.roomsCustomLabel')}
+                    value={listing.rooms}
+                    onChange={(value) => setField('rooms', value.replace(/[^\d]/g, ''))}
+                    error={errorText('rooms')}
+                    placeholder="8"
+                    inputMode="numeric"
+                  />
+                </div>
+              ) : null}
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
               <FormField
@@ -332,6 +377,7 @@ function ListingForm({ id, isEditMode, existing }) {
             </div>
 
             <ListingLocationPicker
+              districtId={listing.location.district}
               latitude={listing.location.latitude}
               longitude={listing.location.longitude}
               onChange={handleCoordinates}

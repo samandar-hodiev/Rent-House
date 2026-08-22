@@ -6,7 +6,7 @@ import { useRequireAuth } from '../hooks/useRequireAuth'
 import { getDistrictById, districtNameKey } from '../data/districts'
 import { listingTitle } from '../utils/listingText'
 import { apartmentDetailsPath } from '../routes/paths'
-import { formatUzsAmount } from '../utils/formatPrice'
+import { formatListingPrice } from '../utils/formatPrice'
 import { formatPostedAt } from '../utils/formatRelativeTime'
 
 function HeartIcon({ filled }) {
@@ -107,7 +107,7 @@ function ApartmentCard({ apartment, title: titleOverride, interactive = true }) 
 
       <div className="flex flex-1 flex-col gap-2 p-5">
         <p className="text-xl font-bold text-text-primary">
-          {formatUzsAmount(apartment.price)} {t('currency.somPerMonth')}
+          {formatListingPrice(t, apartment)}
         </p>
 
         <h3 className="line-clamp-2 min-h-12 text-base font-medium text-text-primary">{title}</h3>

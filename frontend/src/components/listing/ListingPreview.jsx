@@ -14,9 +14,13 @@ function ListingPreview({ listing }) {
     () => ({
       id: 'preview',
       price: Number(listing.price) || 0,
+      // Carried through so the preview prices the listing the way the public
+      // card will. Without these the card fell back to so'm and a dollar
+      // listing previewed as "300 so'm / oy".
+      currency: listing.currency,
+      rentalPeriod: listing.rentalPeriod,
       districtId: listing.location.district,
-      // "5+" is a display value; the card shows the number it was given.
-      rooms: listing.rooms.replace('+', '') || 0,
+      rooms: Number(listing.rooms) || 0,
       area: Number(listing.area) || 0,
       floor: Number(listing.floor) || 0,
       totalFloors: Number(listing.totalFloors) || 0,

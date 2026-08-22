@@ -16,7 +16,22 @@ export const FLOOR_MAX = 200
 export const NEIGHBORHOOD_MAX = 120
 export const MIN_MONTHS_MAX = 60
 
-export const ROOM_OPTIONS = ['1', '2', '3', '4', '5+']
+// Quick picks for the common cases. Anything else — a seven-room house, a
+// large family flat — is typed in, so the column stores the number the owner
+// actually has. "5+" used to be the top option and was stored as a flat 5,
+// which made an eight-room listing unrepresentable and "5+ xonali" a lie.
+export const ROOM_OPTIONS = ['1', '2', '3', '4', '5']
+export const ROOMS_CUSTOM = 'other'
+export const ROOMS_MIN = 1
+// Matches the API's `binding:"min=1,max=20"`, so the form rejects what the
+// server would reject rather than letting the owner find out after Publish.
+export const ROOMS_MAX = 20
+
+/** Whether a stored room count needs the manual input rather than a quick pick. */
+export function isCustomRoomCount(rooms) {
+  const value = String(rooms ?? '')
+  return value !== '' && !ROOM_OPTIONS.includes(value)
+}
 
 export const CURRENCIES = [
   { id: 'UZS', labelKey: 'listing.currencyUzs' },
@@ -39,7 +54,11 @@ export const AMENITIES = [
   'wifi',
   'ac',
   'heating',
-  'hotWater',
+  // Kebab-case, because these ids are the amenity slugs stored in the database
+  // and echoed back by the API — not private frontend labels. A camelCase
+  // "hotWater" here matched nothing server-side and made the whole listing
+  // fail to publish with "one of the selected amenities does not exist".
+  'hot-water',
   'gas',
   'fridge',
   'washer',
@@ -113,7 +132,12 @@ export function validateListing(listing) {
   else if (title.length > TITLE_MAX) errors.title = 'listing.errorTitleLong'
 
   if (!isPositiveNumber(listing.price)) errors.price = 'listing.errorPrice'
-  if (!listing.rooms) errors.rooms = 'listing.errorRooms'
+
+  // Rooms is a count, so a fraction is not a smaller apartment — it is a typo.
+  const rooms = Number(listing.rooms)
+  if (listing.rooms === '') errors.rooms = 'listing.errorRooms'
+  else if (!Number.isInteger(rooms)) errors.rooms = 'listing.errorRoomsInteger'
+  else if (rooms < ROOMS_MIN || rooms > ROOMS_MAX) errors.rooms = 'listing.errorRoomsRange'
 
   if (!isPositiveNumber(listing.area)) errors.area = 'listing.errorArea'
   else if (!inRange(listing.area, 1, AREA_MAX)) errors.area = 'listing.errorAreaRange'
@@ -173,15 +197,16 @@ export function listingToFormValues(listing, title, description) {
     }
   })
 
-  const rooms = String(listing.rooms ?? '')
   return {
     title,
     description,
     price: String(listing.price ?? ''),
     currency: listing.currency ?? CURRENCIES[0].id,
     rentalPeriod: listing.rentalPeriod ?? RENTAL_PERIODS[0].id,
-    // The catalog stores a number; the form offers "5+" as the top option.
-    rooms: ROOM_OPTIONS.includes(rooms) ? rooms : Number(rooms) >= 5 ? '5+' : '',
+    // The stored count is carried through as-is; the form picks the quick
+    // button or the manual input to match, so editing an eight-room listing
+    // reopens showing eight rather than snapping back to five.
+    rooms: String(listing.rooms ?? ''),
     area: String(listing.area ?? ''),
     floor: String(listing.floor ?? ''),
     totalFloors: String(listing.totalFloors ?? ''),
@@ -219,7 +244,7 @@ export function formValuesToListing(values) {
     price: Number(values.price) || 0,
     currency: values.currency,
     rentalPeriod: values.rentalPeriod,
-    rooms: Number(values.rooms.replace('+', '')) || 0,
+    rooms: Number(values.rooms) || 0,
     area: Number(values.area) || 0,
     floor: Number(values.floor) || 0,
     totalFloors: Number(values.totalFloors) || 0,

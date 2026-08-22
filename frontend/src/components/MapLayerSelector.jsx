@@ -58,7 +58,10 @@ function LayerThumb({ layerId, className = '' }) {
 // Google-Maps-style layer picker: a compact preview card that expands into a
 // horizontal row of layer cards. Kept separate from MapControls so the
 // location/zoom buttons stay a plain icon row.
-function MapLayerSelector({ layerId, onLayerChange }) {
+// `layers` narrows the choices for a caller that has no use for all of them —
+// the listing form's location picker offers street and satellite but not
+// traffic. Defaults to the full set, so the Map page passes nothing.
+function MapLayerSelector({ layerId, onLayerChange, layers = MAP_LAYERS }) {
   const { t } = useLocale()
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef(null)
@@ -80,7 +83,7 @@ function MapLayerSelector({ layerId, onLayerChange }) {
           className="absolute bottom-full right-0 mb-3 max-w-[calc(100vw-1.5rem)] overflow-x-auto rounded-xl border border-border bg-surface p-2 shadow-[0_4px_16px_rgba(15,23,42,0.12)] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           <ul className="flex items-stretch gap-2">
-            {MAP_LAYERS.map((layer) => {
+            {layers.map((layer) => {
               const isActive = layer.id === layerId
               return (
                 <li key={layer.id}>

@@ -1,6 +1,9 @@
 package seed
 
 import (
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -58,21 +61,49 @@ func TestEveryFrontendDistrictIsSeeded(t *testing.T) {
 	}
 }
 
+// amenitiesPattern lifts the `AMENITIES = [...]` array out of the frontend's
+// listing-form module, and quotedPattern reads the ids inside it.
+var (
+	amenitiesPattern = regexp.MustCompile(`(?s)export const AMENITIES = \[(.*?)\]`)
+	quotedPattern    = regexp.MustCompile(`'([^']+)'`)
+)
+
+// The frontend sends amenity *slugs*, so slugs are what has to match.
+//
+// This used to compare display names, which are never sent anywhere, and so it
+// passed happily while the form submitted "hotWater" against a seeded
+// "hot-water" — every listing with hot water ticked failed to publish with
+// "one of the selected amenities does not exist". Reading the real file is the
+// only version of this test that could have caught that.
 func TestEveryFrontendAmenityIsSeeded(t *testing.T) {
-	required := []string{
-		"Wi-Fi", "Konditsioner", "Isitish tizimi", "Issiq suv", "Gaz",
-		"Muzlatgich", "Kir yuvish mashinasi", "Televizor", "Oshxona jihozlari",
-		"Balkon", "Lift", "Avtoturargoh", "Qo'riqlash",
+	path := filepath.Join("..", "..", "..", "frontend", "src", "data", "listingForm.js")
+	source, err := os.ReadFile(path)
+	if err != nil {
+		// A backend-only checkout has no frontend to compare against. Skipping
+		// is honest; failing would report a problem that does not exist.
+		t.Skipf("frontend source not available: %v", err)
 	}
 
-	present := map[string]bool{}
-	for _, a := range Amenities {
-		present[a.Name] = true
+	match := amenitiesPattern.FindSubmatch(source)
+	if match == nil {
+		t.Fatalf("could not find the AMENITIES array in %s", path)
 	}
-	for _, name := range required {
-		if !present[name] {
-			t.Errorf("amenity %q is missing from the seed", name)
+
+	seeded := map[string]bool{}
+	for _, a := range Amenities {
+		seeded[a.Slug] = true
+	}
+
+	found := 0
+	for _, id := range quotedPattern.FindAllSubmatch(match[1], -1) {
+		slug := string(id[1])
+		found++
+		if !seeded[slug] {
+			t.Errorf("frontend offers amenity %q, which is not seeded", slug)
 		}
+	}
+	if found == 0 {
+		t.Fatal("parsed the AMENITIES array but found no ids in it")
 	}
 }
 

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { TASHKENT_CENTER } from '../data/districts'
 import { getDistrictFeature } from '../data/districtBoundaries'
+import { boundsOfRings, outerRingsOf } from '../utils/districtGeometry'
 import { DEFAULT_MAP_LAYER_ID, getMapLayerById } from '../data/mapLayers'
-import { formatUzsShort } from '../utils/formatPrice'
+import { formatListingPriceShort } from '../utils/formatPrice'
 import { loadYandexMaps } from '../utils/yandexMaps'
 
 const DEFAULT_ZOOM = 12
@@ -49,38 +50,6 @@ const LOCATION_TEMPLATE = `
     </span>
   </div>
 `
-
-// A district boundary is a Polygon or a MultiPolygon (a district with a
-// disjoint exclave). Either way we only need its outer ring(s) — none of the
-// source districts have holes — converted to Yandex's [lat, lng] order.
-function outerRingsOf(geometry) {
-  const rings =
-    geometry.type === 'Polygon'
-      ? [geometry.coordinates[0]]
-      : geometry.type === 'MultiPolygon'
-        ? geometry.coordinates.map((polygon) => polygon[0])
-        : []
-  return rings.map((ring) => ring.map(([lng, lat]) => [lat, lng]))
-}
-
-function boundsOfRings(rings) {
-  let minLat = Infinity
-  let minLng = Infinity
-  let maxLat = -Infinity
-  let maxLng = -Infinity
-  rings.forEach((ring) =>
-    ring.forEach(([lat, lng]) => {
-      if (lat < minLat) minLat = lat
-      if (lat > maxLat) maxLat = lat
-      if (lng < minLng) minLng = lng
-      if (lng > maxLng) maxLng = lng
-    }),
-  )
-  return [
-    [minLat, minLng],
-    [maxLat, maxLng],
-  ]
-}
 
 function ApartmentMap({
   apartments,
@@ -203,7 +172,7 @@ function ApartmentMap({
       const placemark = new ymaps.Placemark(
         [apartment.latitude, apartment.longitude],
         {
-          priceLabel: formatUzsShort(apartment.price),
+          priceLabel: formatListingPriceShort(apartment),
           accentClass: isNearby
             ? 'ring-2 ring-blue-400 hover:ring-blue-500'
             : 'hover:border-primary hover:text-primary',

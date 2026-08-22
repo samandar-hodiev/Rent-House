@@ -91,8 +91,7 @@ export function toApartmentPayload(values, { publish }) {
     // lower-case vocabulary.
     rental_period: values.rentalPeriod.toLowerCase(),
 
-    // The form's top option is "5+", which the column stores as plain 5.
-    rooms: Number(String(values.rooms).replace('+', '')),
+    rooms: Number(values.rooms),
     area: Number(values.area),
     floor: Number(values.floor),
     total_floors: Number(values.totalFloors),

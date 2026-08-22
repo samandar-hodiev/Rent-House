@@ -5,7 +5,11 @@ import {
   BedDouble,
   Building2,
   ChevronRight,
+  Droplets,
   Flame,
+  Refrigerator,
+  Tv,
+  WashingMachine,
   Map,
   MapPin,
   MessageCircle,
@@ -36,9 +40,12 @@ import { getDistrictById, districtNameKey } from '../data/districts'
 import { fetchApartment, fetchApartments } from '../services/apartmentsApi'
 import { ROUTES, editListingPath } from '../routes/paths'
 import { listingDescription, listingTitle } from '../utils/listingText'
-import { formatUzsAmount } from '../utils/formatPrice'
+import { formatListingPrice } from '../utils/formatPrice'
 import { formatPostedAt } from '../utils/formatRelativeTime'
 
+// Keyed by amenity slug — the same ids the API returns and the listing form
+// submits. Every seeded amenity has an entry, so none of them render as a
+// label floating without an icon beside its neighbours.
 const AMENITY_ICONS = {
   wifi: Wifi,
   parking: ParkingCircle,
@@ -49,6 +56,11 @@ const AMENITY_ICONS = {
   kitchen: Utensils,
   heating: Flame,
   security: ShieldCheck,
+  'hot-water': Droplets,
+  gas: Flame,
+  fridge: Refrigerator,
+  washer: WashingMachine,
+  tv: Tv,
 }
 
 function HeartIcon({ filled }) {
@@ -249,7 +261,7 @@ function ApartmentDetailsPage() {
           ) : null}
 
           <p className="mt-3 text-2xl font-bold text-text-primary">
-            {formatUzsAmount(apartment.price)} {t('currency.somPerMonth')}
+            {formatListingPrice(t, apartment)}
           </p>
 
           <p className="mt-2 flex items-center gap-1 text-sm text-text-secondary">
