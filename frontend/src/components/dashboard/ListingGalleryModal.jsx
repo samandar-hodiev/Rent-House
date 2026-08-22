@@ -91,8 +91,15 @@ function ListingGalleryModal({ images, title, startIndex = 0, onClose }) {
         className="flex w-full flex-1 justify-center overflow-y-auto overscroll-contain py-2"
       >
         {/* The one element that fixes the width. It does not depend on the
-            image, so switching photos cannot move anything horizontally. */}
-        <div className="h-fit w-full max-w-3xl px-12 sm:px-14">
+            image, so switching photos cannot move anything horizontally.
+
+            `my-auto` centres it vertically when the photo is shorter than the
+            viewer, and collapses to nothing when it is taller — so a tall photo
+            still starts at its top edge and scrolls. `items-center` would have
+            centred it too, but it also clips the overflowing top in a
+            scrolling flex container, which puts the top of a tall photo out of
+            reach. */}
+        <div className="my-auto h-fit w-full max-w-3xl px-12 sm:px-14">
           <img
             src={images[index]}
             alt={t('apartmentDetails.gallery.thumbnailLabel', { index: index + 1, title })}
