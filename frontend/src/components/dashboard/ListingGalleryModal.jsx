@@ -12,6 +12,7 @@ function ListingGalleryModal({ images, title, startIndex = 0, onClose }) {
   const { t } = useLocale()
   const [index, setIndex] = useState(startIndex)
   const touchStartX = useRef(null)
+  const scrollRef = useRef(null)
 
   const hasMany = images.length > 1
   const goPrev = () => setIndex((current) => (current === 0 ? images.length - 1 : current - 1))
@@ -28,6 +29,12 @@ function ListingGalleryModal({ images, title, startIndex = 0, onClose }) {
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   })
+
+  // A new photo starts at its top. Without this, paging from a tall image
+  // scrolled halfway down lands you halfway down the next one.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 })
+  }, [index])
 
   // Freeze the page behind the viewer, restoring whatever was set before.
   useEffect(() => {
@@ -57,7 +64,7 @@ function ListingGalleryModal({ images, title, startIndex = 0, onClose }) {
       aria-modal="true"
       aria-label={title}
       onClick={onClose}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/90 p-4"
+      className="fixed inset-0 z-50 flex flex-col items-center bg-slate-900/90 px-2 pb-4 pt-16 sm:px-4"
     >
       <button
         type="button"
@@ -68,42 +75,65 @@ function ListingGalleryModal({ images, title, startIndex = 0, onClose }) {
         <X aria-hidden="true" size={20} />
       </button>
 
-      {/* Clicks inside the image area must not fall through to the backdrop. */}
+      {/* The scroll area. Every photo is shown at the same width, so a portrait
+          shot is not squeezed into a narrow column beside its landscape
+          neighbours — which is what happened when the image was sized by
+          height and left to work out its own width.
+
+          A tall photo at full width can be taller than the screen, so this
+          scrolls rather than shrinking the image back down. The controls sit
+          outside it and stay where they are. */}
       <div
+        ref={scrollRef}
         onClick={(event) => event.stopPropagation()}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        className="relative flex w-full max-w-4xl items-center justify-center"
+        className="flex w-full flex-1 justify-center overflow-y-auto overscroll-contain py-2"
       >
-        <img
-          src={images[index]}
-          alt={t('apartmentDetails.gallery.thumbnailLabel', { index: index + 1, title })}
-          className="max-h-[75vh] w-auto max-w-full rounded-lg object-contain"
-        />
-
-        {hasMany ? (
-          <>
-            <button
-              type="button"
-              onClick={goPrev}
-              aria-label={t('apartmentDetails.gallery.prev')}
-              className="absolute left-2 flex size-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:left-3"
-            >
-              <ChevronLeft aria-hidden="true" size={22} />
-            </button>
-            <button
-              type="button"
-              onClick={goNext}
-              aria-label={t('apartmentDetails.gallery.next')}
-              className="absolute right-2 flex size-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:right-3"
-            >
-              <ChevronRight aria-hidden="true" size={22} />
-            </button>
-          </>
-        ) : null}
+        {/* The one element that fixes the width. It does not depend on the
+            image, so switching photos cannot move anything horizontally. */}
+        <div className="h-fit w-full max-w-3xl px-12 sm:px-14">
+          <img
+            src={images[index]}
+            alt={t('apartmentDetails.gallery.thumbnailLabel', { index: index + 1, title })}
+            // `w-full h-auto`: fill the fixed width, take whatever height the
+            // aspect ratio asks for. No cropping and no distortion, because
+            // nothing is constraining the other axis.
+            className="w-full rounded-lg"
+          />
+        </div>
       </div>
 
-      <p className="mt-4 text-sm font-medium text-white/80">
+      {hasMany ? (
+        <>
+          {/* Anchored to the backdrop rather than to the image, so they hold
+              one position whatever the current photo's shape is. */}
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              goPrev()
+            }}
+            aria-label={t('apartmentDetails.gallery.prev')}
+            className="absolute left-2 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:left-4"
+          >
+            <ChevronLeft aria-hidden="true" size={22} />
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              goNext()
+            }}
+            aria-label={t('apartmentDetails.gallery.next')}
+            className="absolute right-2 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:right-4"
+          >
+            <ChevronRight aria-hidden="true" size={22} />
+          </button>
+        </>
+      ) : null}
+
+      <p className="mt-3 shrink-0 text-sm font-medium text-white/80">
         {index + 1} / {images.length}
       </p>
     </div>,

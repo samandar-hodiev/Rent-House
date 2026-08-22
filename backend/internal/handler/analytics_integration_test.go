@@ -454,3 +454,63 @@ func tashkent(t *testing.T) *time.Location {
 	}
 	return loc
 }
+
+// The card and the chart must never disagree.
+//
+// "N ta ko'rish" on a listing card reads apartments.views_count; the dashboard
+// chart reads apartment_views. They are written in one transaction so they
+// cannot drift — this is the test that says so, because before 0006 they were
+// two independent numbers and a listing could show 14 views with no events
+// behind them.
+func TestTheListingCounterMatchesTheRecordedEvents(t *testing.T) {
+	h := newListingHarness(t)
+	ownerToken, _ := h.signUp(t)
+	id := h.publish(t, ownerToken)
+
+	// A freshly published listing starts at nothing.
+	if got := h.viewsCount(t, id, ownerToken); got != 0 {
+		t.Fatalf("a new listing shows %d views, want 0", got)
+	}
+
+	// The owner's own visits change neither figure.
+	for i := 0; i < 3; i++ {
+		h.view(t, id, ownerToken, "owner-agent")
+	}
+	if got := h.viewsCount(t, id, ownerToken); got != 0 {
+		t.Errorf("the owner's visits pushed the card to %d", got)
+	}
+
+	// Three other people, one each.
+	for i, agent := range []string{"visitor-1", "visitor-2", "visitor-3"} {
+		if code := h.view(t, id, "", agent); code != http.StatusOK {
+			t.Fatalf("visitor %d got status %d", i, code)
+		}
+	}
+
+	card := h.viewsCount(t, id, ownerToken)
+	_, analytics := h.apartmentAnalytics(t, id, ownerToken)
+
+	if card != 3 {
+		t.Errorf("the card shows %d views, want 3", card)
+	}
+	if analytics.TotalViews != int64(card) {
+		t.Errorf("the card says %d and the chart says %d", card, analytics.TotalViews)
+	}
+	if sum := sumDaily(analytics.Daily); sum != int64(card) {
+		t.Errorf("the daily series sums to %d but the card says %d", sum, card)
+	}
+}
+
+// viewsCount reads the number a listing card renders.
+func (h *listingHarness) viewsCount(t *testing.T, id, token string) int64 {
+	t.Helper()
+	rec := h.do(t, http.MethodGet, "/api/v1/apartments/"+id, nil, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get apartment got status %d", rec.Code)
+	}
+	var out dto.ApartmentResponse
+	if err := json.Unmarshal(decode(t, rec).Data, &out); err != nil {
+		t.Fatalf("decode apartment: %v", err)
+	}
+	return out.ViewsCount
+}
