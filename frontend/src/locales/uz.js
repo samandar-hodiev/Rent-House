@@ -208,6 +208,8 @@ export default {
   'chat.blockedByYou': "Siz bu foydalanuvchini bloklagansiz.",
   'chat.blockedYou': "Bu suhbatda xabar yubora olmaysiz.",
   'chat.blockFailed': "Amalni bajarib bo'lmadi. Qaytadan urinib ko'ring.",
+  'auth.logoutConfirmTitle': "Hisobdan chiqasizmi?",
+  'auth.logoutConfirmHint': "Keyingi safar yana kirishingiz kerak bo'ladi. Ma'lumotlaringiz saqlanib qoladi.",
   'chat.attach': 'Fayl biriktirish',
   'chat.record': 'Ovozli xabar',
   'chat.recording': 'Yozilmoqda',

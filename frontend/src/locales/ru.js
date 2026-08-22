@@ -208,6 +208,8 @@ export default {
   'chat.blockedByYou': "Вы заблокировали этого пользователя.",
   'chat.blockedYou': "Вы не можете писать в этом диалоге.",
   'chat.blockFailed': "Не удалось выполнить действие. Попробуйте ещё раз.",
+  'auth.logoutConfirmTitle': "Выйти из аккаунта?",
+  'auth.logoutConfirmHint': "В следующий раз придётся войти снова. Ваши данные сохранятся.",
   'chat.attach': 'Прикрепить файл',
   'chat.record': 'Голосовое сообщение',
   'chat.recording': 'Запись',

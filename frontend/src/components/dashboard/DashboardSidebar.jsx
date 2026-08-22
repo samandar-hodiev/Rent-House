@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { Building2, Heart, LayoutDashboard, LogOut, MessageSquare, PlusCircle } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useAuth } from '../../context/AuthContext'
@@ -6,6 +6,7 @@ import { useChat } from '../../context/ChatContext'
 import { ROUTES } from '../../routes/paths'
 import DashboardNavItem from './DashboardNavItem'
 import DashboardSettingsMenu from './DashboardSettingsMenu'
+import LogoutDialog from '../LogoutDialog'
 
 const ICON_SIZE = 18
 
@@ -13,17 +14,30 @@ const ICON_SIZE = 18
 // same entries. `onNavigate` lets the drawer close itself after a tap.
 export function DashboardNavList({ onNavigate }) {
   const { t } = useLocale()
-  const navigate = useNavigate()
   const { signOut } = useAuth()
   // Same source as the public header's chat icon, so opening a conversation
   // clears the badge in both places at once.
   const { unreadTotal } = useChat()
 
+  // Asked first: Log out is the last item under a column of navigation, and a
+  // slipped tap on it ends the session.
+  const [confirmLogout, setConfirmLogout] = useState(false)
+
   const handleLogout = () => {
+    setConfirmLogout(false)
     onNavigate?.()
-    // Clears the UI-only session flag; there is still no token or API call.
     signOut()
-    navigate(ROUTES.home)
+    // A full navigation rather than the router's.
+    //
+    // `navigate()` runs inside a transition, so the location change is deferred
+    // while clearing the session is urgent: RequireAuth re-renders at the old,
+    // protected path with no session and wins the race, landing the user on
+    // /login?redirect=… — inviting somebody who just deliberately left to sign
+    // in again and come back.
+    //
+    // Reloading also tears down the socket and every cached context rather than
+    // trusting each to clear itself, which is what signing out should mean.
+    window.location.assign(ROUTES.home)
   }
 
   return (
@@ -71,13 +85,17 @@ export function DashboardNavList({ onNavigate }) {
 
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => setConfirmLogout(true)}
           className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-secondary hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <LogOut aria-hidden="true" size={ICON_SIZE} />
           {t('dashboard.logout')}
         </button>
       </div>
+
+      {confirmLogout ? (
+        <LogoutDialog onCancel={() => setConfirmLogout(false)} onConfirm={handleLogout} />
+      ) : null}
     </nav>
   )
 }

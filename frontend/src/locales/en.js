@@ -208,6 +208,8 @@ export default {
   'chat.blockedByYou': "You have blocked this user.",
   'chat.blockedYou': "You cannot send messages in this conversation.",
   'chat.blockFailed': "The action could not be completed. Please try again.",
+  'auth.logoutConfirmTitle': "Sign out?",
+  'auth.logoutConfirmHint': "You will need to sign in again next time. Nothing is lost.",
   'chat.attach': 'Attach a file',
   'chat.record': 'Voice message',
   'chat.recording': 'Recording',

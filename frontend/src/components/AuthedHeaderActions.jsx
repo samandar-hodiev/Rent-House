@@ -1,4 +1,5 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Building2, LayoutDashboard, LogOut, MessageSquare } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useChat } from '../context/ChatContext'
@@ -10,6 +11,7 @@ import {
   mobileMenuGroupClass,
   mobileNavLinkClass,
 } from './headerMenuStyles'
+import LogoutDialog from './LogoutDialog'
 import UserAvatar from './dashboard/UserAvatar'
 
 // Signed-in replacement for the public header's Kirish / Ro'yxatdan o'tish
@@ -17,16 +19,30 @@ import UserAvatar from './dashboard/UserAvatar'
 function AuthedHeaderActions({ variant = 'desktop', onNavigate }) {
   const { t } = useLocale()
   const { user, signOut } = useAuth()
-  const navigate = useNavigate()
   // Shared with the dashboard sidebar badge — see ChatContext.
   const { unreadTotal: unread } = useChat()
 
   // Same order as the dashboard sidebar's own log out, so the two behave
   // identically wherever the user reaches for it.
+  // Same confirmation as the sidebar's, so reaching for Chiqish behaves
+  // identically wherever it is found.
+  const [confirmLogout, setConfirmLogout] = useState(false)
+
   const handleLogout = () => {
+    setConfirmLogout(false)
     onNavigate?.()
     signOut()
-    navigate(ROUTES.home)
+    // A full navigation rather than the router's.
+    //
+    // `navigate()` runs inside a transition, so the location change is deferred
+    // while clearing the session is urgent: RequireAuth re-renders at the old,
+    // protected path with no session and wins the race, landing the user on
+    // /login?redirect=… — inviting somebody who just deliberately left to sign
+    // in again and come back.
+    //
+    // Reloading also tears down the socket and every cached context rather than
+    // trusting each to clear itself, which is what signing out should mean.
+    window.location.assign(ROUTES.home)
   }
 
   if (variant === 'mobile') {
@@ -85,11 +101,15 @@ function AuthedHeaderActions({ variant = 'desktop', onNavigate }) {
         {/* Separated exactly like the signed-out button group, so the menu has
             the same two-part shape in both states. */}
         <div className={mobileMenuGroupClass}>
-          <button type="button" onClick={handleLogout} className={mobileLogoutButtonClass}>
+          <button type="button" onClick={() => setConfirmLogout(true)} className={mobileLogoutButtonClass}>
             <LogOut aria-hidden="true" size={16} className="shrink-0" />
             {t('dashboard.logout')}
           </button>
         </div>
+
+        {confirmLogout ? (
+          <LogoutDialog onCancel={() => setConfirmLogout(false)} onConfirm={handleLogout} />
+        ) : null}
       </>
     )
   }
