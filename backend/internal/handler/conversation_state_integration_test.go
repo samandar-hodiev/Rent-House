@@ -36,6 +36,7 @@ func newChatHarness(t *testing.T) *chatHarness {
 		repository.NewChatRepository(h.db),
 		repository.NewApartmentRepository(h.db),
 		repository.NewUserRepository(h.db),
+		repository.NewBlockRepository(h.db),
 		hub,
 		nil,
 		func(id uuid.UUID) string { return "http://test/attachments/" + id.String() },
@@ -54,6 +55,12 @@ func newChatHarness(t *testing.T) *chatHarness {
 	conversations.PATCH("/:id/pin", chatHandler.SetPinned)
 	conversations.PATCH("/:id/archive", chatHandler.SetArchived)
 	conversations.DELETE("/:id", chatHandler.DeleteConversation)
+
+	blockHandler := NewBlockHandler(chatService)
+	me := v1.Group("/me", middleware.Auth(h.tokens))
+	me.GET("/blocks/:userId", blockHandler.State)
+	me.POST("/blocks/:userId", blockHandler.Block)
+	me.DELETE("/blocks/:userId", blockHandler.Unblock)
 
 	return &chatHarness{listingHarness: h, hub: hub}
 }

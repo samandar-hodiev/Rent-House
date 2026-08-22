@@ -196,6 +196,12 @@ type ConversationResponse struct {
 	// same conversation gets their own answers here.
 	IsPinned   bool `json:"is_pinned"`
 	IsArchived bool `json:"is_archived"`
+
+	// Whether messages are barred, and which way round. The two mean different
+	// things to the interface: one offers a way to undo it, the other only
+	// explains why sending fails.
+	IsBlocked   bool `json:"is_blocked"`
+	IsBlockedBy bool `json:"is_blocked_by"`
 }
 
 // LastMessage is the preview line in the conversation list.
@@ -294,4 +300,19 @@ type ConversationStateRequest struct {
 // DeleteConversationRequest chooses between hiding a thread and withdrawing it.
 type DeleteConversationRequest struct {
 	ForEveryone bool `json:"for_everyone"`
+}
+
+// BlockUserRequest is the body of POST /api/v1/me/blocks/:userId.
+//
+// Both fields are optional: blocking someone must not require explaining
+// yourself, and a mandatory reason would only produce noise.
+type BlockUserRequest struct {
+	Reason     string `json:"reason"      binding:"omitempty,oneof=spam fake_listing harassment abuse suspicious other"`
+	ReasonText string `json:"reason_text" binding:"omitempty,max=500"`
+}
+
+// BlockStateResponse is one person's standing with another.
+type BlockStateResponse struct {
+	IsBlocked   bool `json:"is_blocked"`
+	IsBlockedBy bool `json:"is_blocked_by"`
 }

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Ban, Loader2 } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useChat } from '../../context/ChatContext'
 import { useConversation } from '../../hooks/useConversation'
@@ -7,7 +7,9 @@ import { SOCKET_STATUS } from '../../services/chatSocket'
 import UserAvatar from '../dashboard/UserAvatar'
 import { fetchAttachmentLimits } from '../../services/chatApi'
 import ApartmentContextBar from './ApartmentContextBar'
+import BlockUserDialog from './BlockUserDialog'
 import ChatComposer from './ChatComposer'
+import ChatHeaderMenu from './ChatHeaderMenu'
 import ChatMessage from './ChatMessage'
 import ImageLightbox from './ImageLightbox'
 import DeleteMessageDialog from './DeleteMessageDialog'
@@ -28,7 +30,29 @@ import DeleteMessageDialog from './DeleteMessageDialog'
  */
 function ChatThread({ conversation, apartmentId = null, className = '' }) {
   const { t } = useLocale()
-  const { socketStatus, setActiveConversation } = useChat()
+  const { socketStatus, setActiveConversation, setBlocked } = useChat()
+
+  // Two different facts. `isBlocked` is this reader's own decision and offers a
+  // way back; `isBlockedBy` is the other party's, and only explains why the
+  // composer is closed.
+  const isBlocked = Boolean(conversation?.isBlocked)
+  const isBlockedBy = Boolean(conversation?.isBlockedBy)
+  const [blockDialog, setBlockDialog] = useState(false)
+  const [blockBusy, setBlockBusy] = useState(false)
+  const [blockError, setBlockError] = useState(null)
+
+  const changeBlock = async (blocked, reason) => {
+    setBlockBusy(true)
+    setBlockError(null)
+    try {
+      await setBlocked(conversation.other.id, blocked, reason)
+      setBlockDialog(false)
+    } catch {
+      setBlockError(t('chat.blockFailed'))
+    } finally {
+      setBlockBusy(false)
+    }
+  }
 
   // While this thread is on screen its messages need no notification — the
   // reader is looking at them. Cleared on unmount so closing the panel starts
@@ -123,6 +147,15 @@ function ChatThread({ conversation, apartmentId = null, className = '' }) {
             {other.online ? t('chat.online') : t('chat.offline')}
           </p>
         </div>
+
+        <ChatHeaderMenu
+          isBlocked={isBlocked}
+          onBlock={() => {
+            setBlockError(null)
+            setBlockDialog(true)
+          }}
+          onUnblock={() => changeBlock(false)}
+        />
       </div>
 
       {/* What the pair are discussing now. Absent when the listing has been
@@ -220,12 +253,50 @@ function ChatThread({ conversation, apartmentId = null, className = '' }) {
         </p>
       ) : null}
 
-      <ChatComposer
-        onSendText={handleSendText}
-        onSendFile={handleSendFile}
-        sending={sending}
-        limits={limits}
-      />
+      {isBlocked || isBlockedBy ? (
+        // Not a disabled input: an apparently active composer that refuses
+        // every message is worse than none. This says why, and — when the
+        // block is this reader's own — offers the way back.
+        <div className="flex shrink-0 flex-col items-center gap-2 border-t border-border bg-surface-secondary px-4 py-4 text-center">
+          <p className="flex items-center gap-2 text-sm text-text-secondary">
+            <Ban aria-hidden="true" size={15} className="shrink-0 text-error" />
+            {isBlocked ? t('chat.blockedByYou') : t('chat.blockedYou')}
+          </p>
+          {isBlocked ? (
+            <button
+              type="button"
+              onClick={() => changeBlock(false)}
+              disabled={blockBusy}
+              className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
+            >
+              {blockBusy ? <Loader2 aria-hidden="true" size={13} className="animate-spin" /> : null}
+              {t('chat.unblock')}
+            </button>
+          ) : null}
+          {blockError ? (
+            <p role="alert" className="text-xs text-error">
+              {blockError}
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <ChatComposer
+          onSendText={handleSendText}
+          onSendFile={handleSendFile}
+          sending={sending}
+          limits={limits}
+        />
+      )}
+
+      {blockDialog ? (
+        <BlockUserDialog
+          name={other.name}
+          busy={blockBusy}
+          error={blockError}
+          onCancel={() => (blockBusy ? undefined : setBlockDialog(false))}
+          onConfirm={(reason) => changeBlock(true, reason)}
+        />
+      ) : null}
 
       {lightbox ? <ImageLightbox image={lightbox} onClose={() => setLightbox(null)} /> : null}
 

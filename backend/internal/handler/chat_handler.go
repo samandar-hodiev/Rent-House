@@ -416,6 +416,13 @@ func (h *ChatHandler) writeError(c *gin.Context, err error, operation string) {
 	case errors.Is(err, service.ErrMessageDeleted):
 		response.Error(c, http.StatusConflict, "message_deleted",
 			"This message has been deleted")
+	case errors.Is(err, service.ErrBlocked):
+		// 403 rather than 404: the thread is there and readable, and only
+		// writing is refused. The message says which of the two situations it
+		// is without naming the other party's decision — the client already
+		// knows its own block state from the conversation.
+		response.Error(c, http.StatusForbidden, "blocked",
+			"Messages cannot be sent in this conversation")
 	case errors.Is(err, service.ErrEmptyMessage):
 		response.Error(c, http.StatusBadRequest, "validation_failed", "The message is empty")
 	case errors.Is(err, service.ErrUnsupportedAttachment):

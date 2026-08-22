@@ -79,6 +79,10 @@ export function toConversation(item) {
     // its own answers, which is the whole point of these two.
     isPinned: Boolean(item.is_pinned),
     isArchived: Boolean(item.is_archived),
+    // Two different facts. `isBlocked` offers a way to undo it; `isBlockedBy`
+    // only explains why sending fails.
+    isBlocked: Boolean(item.is_blocked),
+    isBlockedBy: Boolean(item.is_blocked_by),
   }
 }
 
@@ -297,4 +301,23 @@ export function deleteConversation(id, { forEveryone = false, token } = {}) {
     body: { for_everyone: forEveryone },
     token,
   })
+}
+
+/**
+ * Blocks a user.
+ *
+ * The blocker is the token's owner, so this names only who is being blocked.
+ * Both parts of the reason are optional — blocking somebody must not require
+ * explaining yourself.
+ */
+export function blockUser(userId, { reason, reasonText, token } = {}) {
+  const body = {}
+  if (reason) body.reason = reason
+  if (reasonText) body.reason_text = reasonText
+  return request(`/me/blocks/${userId}`, { method: 'POST', body, token })
+}
+
+/** Lifts this user's own block. Somebody else's block is not theirs to lift. */
+export function unblockUser(userId, { token } = {}) {
+  return request(`/me/blocks/${userId}`, { method: 'DELETE', token })
 }

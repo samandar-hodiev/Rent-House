@@ -32,6 +32,15 @@ var (
 	// "this is not yours" is the accurate answer and reveals nothing new.
 	ErrNotMessageAuthor = errors.New("message belongs to another user")
 
+	// ErrBlocked is a message between two people where one has blocked the
+	// other. Which direction is deliberately not distinguished here: the send
+	// path treats both the same, and the handler is what decides how much to
+	// say to whom.
+	ErrBlocked = errors.New("messages are blocked between these users")
+
+	// ErrCannotBlockSelf is exactly what it says. The database refuses it too.
+	ErrCannotBlockSelf = errors.New("cannot block yourself")
+
 	// ErrCannotMessageSelf is an owner opening a thread with themselves about
 	// their own listing.
 	ErrCannotMessageSelf = errors.New("cannot start a conversation with yourself")
@@ -80,6 +89,7 @@ type ChatService struct {
 	chat       *repository.ChatRepository
 	apartments *repository.ApartmentRepository
 	users      *repository.UserRepository
+	blocks     *repository.BlockRepository
 	hub        *realtime.Hub
 	files      storage.Storage
 	// attachmentURL builds the protected download URL for an attachment id.
@@ -92,13 +102,14 @@ func NewChatService(
 	chat *repository.ChatRepository,
 	apartments *repository.ApartmentRepository,
 	users *repository.UserRepository,
+	blocks *repository.BlockRepository,
 	hub *realtime.Hub,
 	files storage.Storage,
 	attachmentURL func(id uuid.UUID) string,
 ) *ChatService {
 	return &ChatService{
-		chat: chat, apartments: apartments, users: users, hub: hub,
-		files: files, attachmentURL: attachmentURL, now: time.Now,
+		chat: chat, apartments: apartments, users: users, blocks: blocks,
+		hub: hub, files: files, attachmentURL: attachmentURL, now: time.Now,
 	}
 }
 
@@ -162,10 +173,23 @@ func (s *ChatService) ListConversations(
 	}
 	online := s.hub.OnlineAmong(others)
 
+	// And so are blocks: one query for the whole list rather than one per row.
+	blocked := map[uuid.UUID]repository.BlockState{}
+	if s.blocks != nil {
+		var err error
+		if blocked, err = s.blocks.BlockedEither(ctx, actorID); err != nil {
+			return nil, err
+		}
+	}
+
 	items := make([]dto.ConversationResponse, 0, len(summaries))
 	var unreadTotal int64
 	for _, summary := range summaries {
-		items = append(items, conversationFrom(summary, online[summary.OtherUserID]))
+		item := conversationFrom(summary, online[summary.OtherUserID])
+		state := blocked[summary.OtherUserID]
+		item.IsBlocked = state.IBlockedThem
+		item.IsBlockedBy = state.TheyBlockedMe
+		items = append(items, item)
 		unreadTotal += summary.UnreadCount
 	}
 
@@ -232,6 +256,18 @@ func (s *ChatService) SendMessage(
 ) (*dto.MessageResponse, error) {
 	if err := s.assertParticipant(ctx, conversationID, actorID); err != nil {
 		return nil, err
+	}
+
+	// Blocked in either direction: nothing is written, and no realtime event is
+	// published, because none is produced. This is the check that matters —
+	// the composer being disabled is a courtesy to the person using the app,
+	// not a control, and a direct API call has to meet the same refusal.
+	blocked, err := s.blockedInConversation(ctx, conversationID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if blocked {
+		return nil, ErrBlocked
 	}
 
 	body = strings.TrimSpace(body)
@@ -546,7 +582,45 @@ func (s *ChatService) broadcast(
 		// failure of the request.
 		return
 	}
-	s.hub.Publish(participants, realtime.Envelope{
+
+	// Nothing is delivered to someone who has blocked another participant.
+	//
+	// The send path already refuses a blocked pair, so in practice there is no
+	// such event to carry. This is the second lock on the same door: the socket
+	// is the one path that reaches a user without their asking, and it should
+	// not be the one place the rule is assumed rather than applied.
+	audience := participants
+	if s.blocks != nil {
+		audience = audience[:0:0]
+		for _, participant := range participants {
+			barred := false
+			for _, other := range participants {
+				if other == participant {
+					continue
+				}
+				state, err := s.blocks.StateBetween(ctx, participant, other)
+				if err != nil {
+					// Failing open here would deliver to someone who blocked
+					// the sender; failing closed only loses an announcement the
+					// next page load recovers.
+					barred = true
+					break
+				}
+				if state.Any() {
+					barred = true
+					break
+				}
+			}
+			if !barred {
+				audience = append(audience, participant)
+			}
+		}
+	}
+	if len(audience) == 0 {
+		return
+	}
+
+	s.hub.Publish(audience, realtime.Envelope{
 		Event:          event,
 		ConversationID: conversationID.String(),
 		Payload:        payload,
@@ -570,10 +644,21 @@ func (s *ChatService) describe(
 		return nil, err
 	}
 	for _, summary := range append(summaries, archived...) {
-		if summary.ConversationID == conversationID {
-			response := conversationFrom(summary, s.hub.IsOnline(summary.OtherUserID))
-			return &response, nil
+		if summary.ConversationID != conversationID {
+			continue
 		}
+		response := conversationFrom(summary, s.hub.IsOnline(summary.OtherUserID))
+		// The single-thread view needs the block state as much as the list
+		// does: this is what the composer reads to know it is disabled.
+		if s.blocks != nil {
+			state, err := s.blocks.StateBetween(ctx, actorID, summary.OtherUserID)
+			if err != nil {
+				return nil, err
+			}
+			response.IsBlocked = state.IBlockedThem
+			response.IsBlockedBy = state.TheyBlockedMe
+		}
+		return &response, nil
 	}
 	return nil, ErrConversationNotFound
 }
@@ -695,4 +780,77 @@ func (s *ChatService) DeleteConversation(
 		Payload: dto.ConversationDeletedEvent{ConversationID: conversationID.String()},
 	})
 	return nil
+}
+
+// blockedInConversation reports whether the caller is barred from writing in a
+// thread, in either direction.
+//
+// The other participant is read from the conversation rather than taken from
+// the request, so there is nothing here a client could aim elsewhere.
+func (s *ChatService) blockedInConversation(
+	ctx context.Context, conversationID, actorID uuid.UUID,
+) (bool, error) {
+	if s.blocks == nil {
+		return false, nil
+	}
+
+	participants, err := s.chat.ParticipantIDs(ctx, conversationID)
+	if err != nil {
+		return false, err
+	}
+	for _, participant := range participants {
+		if participant == actorID {
+			continue
+		}
+		state, err := s.blocks.StateBetween(ctx, actorID, participant)
+		if err != nil {
+			return false, err
+		}
+		if state.Any() {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// Block records that the caller has blocked another user.
+//
+// The blocker is always the authenticated caller, so there is no way to spell
+// "block on somebody else's behalf". Blocking is idempotent: asking twice is
+// the same block, with the reason updated to the more recent statement.
+func (s *ChatService) Block(
+	ctx context.Context, actorID, targetID uuid.UUID, reason, reasonText *string,
+) error {
+	if actorID == targetID {
+		return ErrCannotBlockSelf
+	}
+	// Blocking somebody who does not exist is a mistake worth reporting, not a
+	// row worth writing. ErrUserNotFound is the auth service's, reused rather
+	// than duplicated.
+	if _, err := s.users.FindByID(ctx, targetID); err != nil {
+		return ErrUserNotFound
+	}
+
+	return s.blocks.Block(ctx, &models.UserBlock{
+		BlockerID:  actorID,
+		BlockedID:  targetID,
+		Reason:     reason,
+		ReasonText: reasonText,
+	})
+}
+
+// Unblock lifts the caller's own block. Somebody else's block on the same pair
+// is untouched — it is not this caller's to lift.
+func (s *ChatService) Unblock(ctx context.Context, actorID, targetID uuid.UUID) error {
+	return s.blocks.Unblock(ctx, actorID, targetID)
+}
+
+// BlockState reports the caller's standing with another user.
+func (s *ChatService) BlockState(
+	ctx context.Context, actorID, targetID uuid.UUID,
+) (repository.BlockState, error) {
+	if actorID == targetID {
+		return repository.BlockState{}, nil
+	}
+	return s.blocks.StateBetween(ctx, actorID, targetID)
 }

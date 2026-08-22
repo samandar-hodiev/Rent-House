@@ -74,6 +74,12 @@ function MessageNotifications() {
       if (activeConversationRef.current === conversationId && !document.hidden) return
 
       const conversation = conversationsRef.current.find((item) => item.id === conversationId)
+
+      // Blocked either way: the server does not publish these, and this is the
+      // second lock — a frame that arrived before the block was applied must
+      // not announce itself afterwards.
+      if (conversation?.isBlocked || conversation?.isBlockedBy) return
+
       const from = conversation?.other?.name ?? t('chat.newMessage')
       // A withdrawn message has no text to preview.
       const preview = payload?.is_deleted ? t('chat.messageDeleted') : (payload?.body ?? '')

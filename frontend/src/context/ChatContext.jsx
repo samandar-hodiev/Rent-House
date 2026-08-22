@@ -9,11 +9,13 @@ import {
 } from 'react'
 import { useAuth } from './AuthContext'
 import {
+  blockUser,
   deleteConversation as deleteConversationRequest,
   fetchConversations,
   setConversationArchived,
   setConversationPinned,
   startConversation as startConversationRequest,
+  unblockUser,
 } from '../services/chatApi'
 import { CHAT_EVENTS, SOCKET_STATUS, openChatSocket } from '../services/chatSocket'
 
@@ -264,6 +266,23 @@ export function ChatProvider({ children }) {
     [token],
   )
 
+  /**
+   * Blocks or unblocks the other person in a thread.
+   *
+   * Refetches afterwards rather than editing in place: the block changes what
+   * the composer may do and what the list reports, and both read it from the
+   * same server response.
+   */
+  const setBlocked = useCallback(
+    async (userId, blocked, { reason, reasonText } = {}) => {
+      await (blocked
+        ? blockUser(userId, { reason, reasonText, token })
+        : unblockUser(userId, { token }))
+      await reloadRef.current()
+    },
+    [token],
+  )
+
   /** Clears a thread's badge locally; the server call lives in the thread view. */
   const markRead = useCallback((conversationId) => {
     setConversations((current) =>
@@ -291,6 +310,7 @@ export function ChatProvider({ children }) {
       setPinned,
       setArchived,
       removeConversation,
+      setBlocked,
       reload: () => reload(),
     }),
     [
@@ -308,6 +328,7 @@ export function ChatProvider({ children }) {
       setPinned,
       setArchived,
       removeConversation,
+      setBlocked,
       reload,
     ],
   )

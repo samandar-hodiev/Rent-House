@@ -245,6 +245,9 @@ func newRouter(
 	// it and the dashboard reads its unread total from it. Two instances would
 	// be two connections to the same rows for no reason.
 	chats := repository.NewChatRepository(db)
+	// Who has blocked whom. Read by the send path and surfaced on every
+	// conversation, so it is built once and shared.
+	blocks := repository.NewBlockRepository(db)
 	favoriteHandler := handler.NewFavoriteHandler(
 		service.NewFavoriteService(repository.NewFavoriteRepository(db), apartments, chats),
 	)
@@ -301,7 +304,7 @@ func newRouter(
 	// handler that accepts connections.
 	hub := realtime.NewHub()
 	chatService := service.NewChatService(
-		chats, apartments, users, hub, files,
+		chats, apartments, users, blocks, hub, files,
 		// Chat attachments are served through an authorized endpoint, never as
 		// static files: they are as private as the conversation they were sent
 		// in. Listing photographs remain public, which is what a listing is.
@@ -310,6 +313,14 @@ func newRouter(
 		},
 	)
 	chatHandler := handler.NewChatHandler(chatService)
+
+	// Blocking, on the /me group built above: the blocker is always the token's
+	// user, so none of these routes names who is doing the blocking — only who
+	// is being blocked.
+	blockHandler := handler.NewBlockHandler(chatService)
+	me.GET("/blocks/:userId", blockHandler.State)
+	me.POST("/blocks/:userId", blockHandler.Block)
+	me.DELETE("/blocks/:userId", blockHandler.Unblock)
 
 	conversations := v1.Group("/conversations", middleware.Auth(tokens))
 	{
