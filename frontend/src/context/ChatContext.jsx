@@ -48,6 +48,15 @@ export function ChatProvider({ children }) {
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
   const [socketStatus, setSocketStatus] = useState(SOCKET_STATUS.closed)
 
+  // Which thread is open on screen, if any. A message arriving in the thread
+  // the reader is already looking at needs no notification — they can see it.
+  // A ref rather than state: it is read inside the socket handler, and making
+  // it state would rebuild that handler on every navigation.
+  const activeConversationRef = useRef(null)
+  const setActiveConversation = useCallback((conversationId) => {
+    activeConversationRef.current = conversationId
+  }, [])
+
   // Screens subscribe to raw events so a thread can apply the ones for the
   // conversation it is showing. A ref rather than state: adding a listener must
   // not re-render every consumer.
@@ -275,6 +284,8 @@ export function ChatProvider({ children }) {
       socketStatus,
       isAuthenticated,
       subscribe,
+      activeConversationRef,
+      setActiveConversation,
       startConversation,
       markRead,
       setPinned,
@@ -291,6 +302,7 @@ export function ChatProvider({ children }) {
       socketStatus,
       isAuthenticated,
       subscribe,
+      setActiveConversation,
       startConversation,
       markRead,
       setPinned,

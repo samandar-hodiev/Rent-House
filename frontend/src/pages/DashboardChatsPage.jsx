@@ -1,8 +1,9 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ArrowLeft, MessageSquare } from 'lucide-react'
 import ChatConversationList from '../components/chat/ChatConversationList'
 import ChatThread from '../components/chat/ChatThread'
+import { requestNotificationPermission } from '../components/chat/MessageNotifications'
 import EmptyState from '../components/EmptyState'
 import { useChat } from '../context/ChatContext'
 import { useLocale } from '../context/LocaleContext'
@@ -13,6 +14,12 @@ function DashboardChatsPage() {
   const { t } = useLocale()
   const { conversations, archivedConversations } = useChat()
   const [searchParams, setSearchParams] = useSearchParams()
+
+  // Asked here rather than on load: a permission prompt that arrives before
+  // the reader has touched chat is the one everybody blocks. Asked once.
+  useEffect(() => {
+    requestNotificationPermission()
+  }, [])
 
   // The selection lives in the URL (`?c=<id>`) rather than in component state,
   // so the mobile back gesture, the browser back button and a shared/reloaded

@@ -21,7 +21,15 @@ import DeleteMessageDialog from './DeleteMessageDialog'
  */
 function ChatThread({ conversation, className = '' }) {
   const { t } = useLocale()
-  const { socketStatus } = useChat()
+  const { socketStatus, setActiveConversation } = useChat()
+
+  // While this thread is on screen its messages need no notification — the
+  // reader is looking at them. Cleared on unmount so closing the panel starts
+  // notifying again.
+  useEffect(() => {
+    setActiveConversation(conversation?.id ?? null)
+    return () => setActiveConversation(null)
+  }, [conversation?.id, setActiveConversation])
   const {
     messages,
     myId,

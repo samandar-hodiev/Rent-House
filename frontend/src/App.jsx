@@ -14,6 +14,7 @@ import SearchPage from './pages/SearchPage'
 import ApartmentDetailsPage from './pages/ApartmentDetailsPage'
 import MapPage from './pages/MapPage'
 import WishlistPage from './pages/WishlistPage'
+import MessageNotifications from './components/chat/MessageNotifications'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ProfilePage from './pages/ProfilePage'
@@ -37,6 +38,9 @@ function App() {
               <SearchProvider>
                 <WishlistProvider>
                   <BrowserRouter>
+                    {/* Mounted above the routes so a message arriving while
+                        the reader is anywhere in the app still reaches them. */}
+                    <MessageNotifications />
                     <Routes>
                       <Route element={<RootLayout />}>
                         <Route path={ROUTES.home} element={<HomePage />} />
