@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -64,6 +65,12 @@ func (s *ApartmentService) Create(
 
 	apartment.OwnerID = ownerID
 	apartment.Status = statusFor(req.Publish)
+	// Publishing stamps the moment the listing went live. Analytics read this,
+	// and the schema requires it to agree with the status.
+	if apartment.Status == models.ApartmentStatusActive {
+		now := time.Now()
+		apartment.PublishedAt = &now
+	}
 
 	if err := s.apartments.Create(ctx, apartment, amenityIDs); err != nil {
 		if errors.Is(err, repository.ErrDistrictNotFound) {
@@ -97,13 +104,10 @@ func (s *ApartmentService) Get(
 		return nil, ErrApartmentNotFound
 	}
 
-	// Counting a view is a side effect of reading, not the point of it: a
-	// failure here must not stop the page from rendering, and the owner
-	// refreshing their own listing must not inflate the number.
-	if !isOwner {
-		_ = s.apartments.IncrementViews(ctx, id)
-		apartment.ViewsCount++
-	}
+	// Counting the view is no longer done here. It is a recorded event now, not
+	// a counter bump — see AnalyticsService.RecordView, which the handler calls
+	// before this so the count below is already current. Keeping it out of the
+	// read path also means a failure to count cannot stop the page rendering.
 
 	response := dto.NewApartmentResponse(apartment, true)
 	return &response, nil

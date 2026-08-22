@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Building2, MessageSquare } from 'lucide-react'
+import { Building2, Loader2, MessageSquare } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useChat } from '../../context/ChatContext'
 import { useListings } from '../../context/ListingsContext'
 import { LISTING_STATUS } from '../../data/listingStatus'
-import { getTotalViews, getViewsAnalytics } from '../../data/viewsAnalytics'
+import { useViewsAnalytics } from '../../hooks/useViewsAnalytics'
 import { formatCount } from '../../utils/formatPeriod'
 import { ROUTES } from '../../routes/paths'
 import ViewsChart from './ViewsChart'
@@ -72,9 +72,9 @@ function LegendItem({ color, label }) {
 /**
  * The account landing page: what happened, at a glance.
  *
- * Listing count and unread messages come from live application state. Only the
- * views series is mocked, and it is isolated in `data/viewsAnalytics.js` — see
- * the note there about the endpoint that replaces it.
+ * Every figure on it is real: the listing count and unread messages come from
+ * live application state, and the views series from recorded view events that
+ * PostgreSQL aggregates into daily, weekly and monthly totals.
  */
 function DashboardOverview() {
   const { t } = useLocale()
@@ -89,8 +89,9 @@ function DashboardOverview() {
     [listings],
   )
 
-  const analytics = useMemo(() => getViewsAnalytics(), [])
-  const totalViews = useMemo(() => getTotalViews(analytics), [analytics])
+  // Real view events, aggregated by PostgreSQL. Refetched when the tab regains
+  // focus, so opening a listing in another tab and coming back shows the view.
+  const { points, status, totalViews, isEmpty } = useViewsAnalytics()
 
   // The filter picks which series are drawn; it never touches the data, so the
   // chart and the tooltip keep reading the same rows whatever is selected.
@@ -187,8 +188,31 @@ function DashboardOverview() {
           })}
         </div>
 
+        {/* The chart is drawn only when there is something to draw. A listing
+            nobody has opened yet gets a sentence saying so, because a flat line
+            at zero looks like a broken chart and an invented one would be a
+            lie. */}
         <div className="mt-4">
-          <ViewsChart points={analytics.points} series={visibleSeries} t={t} />
+          {status === 'loading' ? (
+            <p className="flex h-[260px] items-center justify-center gap-2 text-sm text-text-muted">
+              <Loader2 aria-hidden="true" size={16} className="animate-spin" />
+              {t('dashboard.viewsLoading')}
+            </p>
+          ) : status === 'error' ? (
+            <p
+              role="alert"
+              className="flex h-[260px] items-center justify-center text-sm text-error"
+            >
+              {t('dashboard.viewsFailed')}
+            </p>
+          ) : isEmpty ? (
+            <div className="flex h-[260px] flex-col items-center justify-center gap-1 px-4 text-center">
+              <p className="text-sm font-medium text-text-secondary">{t('dashboard.viewsEmpty')}</p>
+              <p className="text-xs text-text-muted">{t('dashboard.viewsEmptyHint')}</p>
+            </div>
+          ) : (
+            <ViewsChart points={points} series={visibleSeries} t={t} />
+          )}
         </div>
       </section>
     </div>

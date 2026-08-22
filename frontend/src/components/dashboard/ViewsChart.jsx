@@ -52,8 +52,15 @@ function niceCeiling(value) {
 // Catmull-Rom converted to cubic Béziers: a curve that passes through every
 // data point, unlike a plain smoothing spline. Tension is low, so the line
 // stays calm and never overshoots into a value the data does not contain.
+//
+// A single point is a real case now that the range starts at publication: a
+// listing published today has exactly one day of history. It becomes a
+// zero-length segment, which renders as the dot drawn on top of it — and, more
+// to the point, is a valid path. Returning "" here left the area fill starting
+// with "L", which is not a path at all.
 function smoothPath(coords) {
-  if (coords.length < 2) return ''
+  if (coords.length === 0) return ''
+  if (coords.length === 1) return `M ${coords[0].x} ${coords[0].y} L ${coords[0].x} ${coords[0].y}`
   let path = `M ${coords[0].x} ${coords[0].y}`
   for (let i = 0; i < coords.length - 1; i += 1) {
     const p0 = coords[i - 1] ?? coords[i]

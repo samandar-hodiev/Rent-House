@@ -18,6 +18,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -100,12 +101,17 @@ func seedApartment(t *testing.T, tx *gorm.DB) (*models.User, *models.Apartment) 
 		t.Fatalf("create district: %v", err)
 	}
 
+	// Since 0006 a live listing carries the moment it went live, and a CHECK
+	// requires the two to agree — an active row with no published_at is exactly
+	// the state analytics could not make sense of.
+	publishedAt := time.Now()
 	apartment := &models.Apartment{
 		OwnerID: owner.ID, DistrictID: district.ID,
 		Title: "Test apartment", Price: decimal.NewFromInt(4500000),
 		Currency: models.CurrencyUZS, RentalPeriod: models.RentalPeriodMonthly,
 		Rooms: 2, Area: 68, Floor: 4, TotalFloors: 9,
-		Status: models.ApartmentStatusActive, Address: "Test street 1",
+		Status: models.ApartmentStatusActive, PublishedAt: &publishedAt,
+		Address:  "Test street 1",
 		Latitude: 41.3, Longitude: 69.2,
 	}
 	if err := tx.Create(apartment).Error; err != nil {

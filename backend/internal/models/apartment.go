@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
@@ -74,6 +76,12 @@ type Apartment struct {
 	Furnished   bool  `gorm:"column:furnished;not null;default:false" json:"furnished"`
 
 	Status string `gorm:"column:status;type:varchar(10);not null;default:draft;index:idx_apartments_status" json:"status"`
+
+	// PublishedAt is when the listing went live, and nil while it has not.
+	// Analytics start here rather than at CreatedAt: a listing drafted in June
+	// and published in August was visible to nobody in between, and charting
+	// those weeks would show empty days that were never live.
+	PublishedAt *time.Time `gorm:"column:published_at" json:"published_at,omitempty"`
 
 	Address   string  `gorm:"column:address;type:varchar(255);not null" json:"address"`
 	Latitude  float64 `gorm:"column:latitude;type:double precision;not null" json:"latitude"`

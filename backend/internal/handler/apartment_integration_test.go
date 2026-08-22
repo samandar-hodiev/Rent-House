@@ -35,7 +35,17 @@ func newListingHarness(t *testing.T) *listingHarness {
 	h := newHarness(t)
 
 	apartments := repository.NewApartmentRepository(h.db)
-	apartmentHandler := NewApartmentHandler(service.NewApartmentService(apartments))
+
+	// The real analytics service, not a stub: recording a view is part of what
+	// GET /apartments/:id does, and these tests are here to exercise it.
+	analyticsService, err := service.NewAnalyticsService(
+		repository.NewAnalyticsRepository(h.db), apartments, integrationSecret,
+	)
+	if err != nil {
+		t.Fatalf("analytics service: %v", err)
+	}
+	analyticsHandler := NewAnalyticsHandler(analyticsService)
+	apartmentHandler := NewApartmentHandler(service.NewApartmentService(apartments), analyticsService)
 
 	v1 := h.router.Group("/api/v1")
 	v1.GET("/districts", apartmentHandler.Districts)
@@ -46,10 +56,12 @@ func newListingHarness(t *testing.T) *listingHarness {
 	listings.POST("", middleware.Auth(h.tokens), apartmentHandler.Create)
 	listings.PUT("/:id", middleware.Auth(h.tokens), apartmentHandler.Update)
 	listings.DELETE("/:id", middleware.Auth(h.tokens), apartmentHandler.Delete)
+	listings.GET("/:id/analytics", middleware.Auth(h.tokens), analyticsHandler.ApartmentViews)
 
 	me := v1.Group("/me", middleware.Auth(h.tokens))
 	me.GET("/apartments", apartmentHandler.ListMine)
 	me.GET("/apartments/stats", apartmentHandler.Stats)
+	me.GET("/analytics/views", analyticsHandler.OwnerViews)
 
 	// Each test starts from a known table. Listings are the subject here, so
 	// leftovers from a previous run would make counts meaningless.

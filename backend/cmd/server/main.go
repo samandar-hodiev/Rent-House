@@ -225,7 +225,21 @@ func newRouter(
 
 	// Listings. Same layering as auth: handler -> service -> repository -> db.
 	apartments := repository.NewApartmentRepository(db)
-	apartmentHandler := handler.NewApartmentHandler(service.NewApartmentService(apartments))
+
+	// View events and the timelines built from them. The secret is used only to
+	// derive the key that tells two anonymous visitors apart — see
+	// NewAnalyticsService.
+	analyticsService, err := service.NewAnalyticsService(
+		repository.NewAnalyticsRepository(db), apartments, cfg.JWT.Secret,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("analytics: %w", err)
+	}
+	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
+
+	apartmentHandler := handler.NewApartmentHandler(
+		service.NewApartmentService(apartments), analyticsService,
+	)
 
 	// Reference data the owner form needs before it can submit anything.
 	v1.GET("/districts", apartmentHandler.Districts)
@@ -243,6 +257,10 @@ func newRouter(
 		listings.POST("", middleware.Auth(tokens), apartmentHandler.Create)
 		listings.PUT("/:id", middleware.Auth(tokens), apartmentHandler.Update)
 		listings.DELETE("/:id", middleware.Auth(tokens), apartmentHandler.Delete)
+
+		// How many people looked at a listing is its owner's business, so this
+		// one is authenticated even though the listing beside it is public.
+		listings.GET("/:id/analytics", middleware.Auth(tokens), analyticsHandler.ApartmentViews)
 	}
 
 	// The signed-in user's own listings, in every status — this is the
@@ -251,6 +269,10 @@ func newRouter(
 	{
 		me.GET("/apartments", apartmentHandler.ListMine)
 		me.GET("/apartments/stats", apartmentHandler.Stats)
+		// The dashboard chart: every published listing this user owns, as one
+		// timeline. Aggregated by PostgreSQL — the client receives totals, never
+		// the underlying events.
+		me.GET("/analytics/views", analyticsHandler.OwnerViews)
 	}
 
 	// Uploaded files: listing photographs and chat attachments share one store.

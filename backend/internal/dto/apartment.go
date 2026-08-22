@@ -192,6 +192,9 @@ type ApartmentResponse struct {
 	Furnished   bool  `json:"furnished"`
 
 	Status string `json:"status"`
+	// PublishedAt is when the listing went live, and absent while it has not.
+	// It is where its analytics timeline starts.
+	PublishedAt *time.Time `json:"published_at,omitempty"`
 
 	District     *DistrictResponse `json:"district,omitempty"`
 	Neighborhood string            `json:"neighborhood,omitempty"`
@@ -244,6 +247,7 @@ func NewApartmentResponse(apartment *models.Apartment, includeOwnerContact bool)
 		TotalFloors:   apartment.TotalFloors,
 		Furnished:     apartment.Furnished,
 		Status:        apartment.Status,
+		PublishedAt:   apartment.PublishedAt,
 		Address:       apartment.Address,
 		Latitude:      apartment.Latitude,
 		Longitude:     apartment.Longitude,

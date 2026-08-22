@@ -216,6 +216,7 @@ func (r *ApartmentRepository) Update(
 ) error {
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if len(fields) > 0 {
+			applyPublishedAt(fields)
 			result := tx.Model(&models.Apartment{}).Where("id = ?", id).Updates(fields)
 			if result.Error != nil {
 				return result.Error
@@ -308,17 +309,24 @@ func (r *ApartmentRepository) CountByOwner(
 	return count, nil
 }
 
-// IncrementViews bumps the counter without loading the row, so two concurrent
-// views cannot read the same number and both write it back plus one.
-func (r *ApartmentRepository) IncrementViews(ctx context.Context, id uuid.UUID) error {
-	err := r.db.WithContext(ctx).
-		Model(&models.Apartment{}).
-		Where("id = ?", id).
-		UpdateColumn("views_count", gorm.Expr("views_count + 1")).Error
-	if err != nil {
-		return fmt.Errorf("increment views: %w", err)
+// applyPublishedAt keeps published_at in step with status, which the schema
+// requires them to be (see ck_apartments_published_at).
+//
+// It lives here rather than in the service because it is an invariant of the
+// row, not a decision: any write that moves the status has to satisfy it. The
+// COALESCE is the important part — republishing an already-live listing must
+// not reset the date its analytics start from.
+func applyPublishedAt(fields map[string]any) {
+	status, ok := fields["status"].(string)
+	if !ok {
+		return
 	}
-	return nil
+	if status == models.ApartmentStatusActive {
+		fields["published_at"] = gorm.Expr("COALESCE(published_at, now())")
+		return
+	}
+	// Unpublished: the listing is not live, so it has no publication date.
+	fields["published_at"] = nil
 }
 
 // FindDistrictBySlug resolves the slug the frontend uses to the district's id.

@@ -18,10 +18,16 @@ import (
 // status code. Every rule about who may do what lives in the service.
 type ApartmentHandler struct {
 	apartments *service.ApartmentService
+	// analytics records the view a detail request represents. Optional: the
+	// integration tests build the handler without it, and a listing page that
+	// does not count its readers is still a working listing page.
+	analytics *service.AnalyticsService
 }
 
-func NewApartmentHandler(apartments *service.ApartmentService) *ApartmentHandler {
-	return &ApartmentHandler{apartments: apartments}
+func NewApartmentHandler(
+	apartments *service.ApartmentService, analytics *service.AnalyticsService,
+) *ApartmentHandler {
+	return &ApartmentHandler{apartments: apartments, analytics: analytics}
 }
 
 // Create handles POST /api/v1/apartments.
@@ -81,6 +87,24 @@ func (h *ApartmentHandler) Get(c *gin.Context) {
 	var viewerID *uuid.UUID
 	if userID, authenticated := middleware.UserIDFrom(c); authenticated {
 		viewerID = &userID
+	}
+
+	// Count the view before reading, so the number this response carries
+	// already includes it. Everything about whether it *should* count — the
+	// listing is published, the viewer is not its owner, this visitor has not
+	// been counted in the last hour — is decided inside RecordView.
+	//
+	// A failure is logged and dropped: analytics are a side effect of someone
+	// reading a page, and must never be the reason the page fails to load.
+	if h.analytics != nil {
+		if _, err := h.analytics.RecordView(c.Request.Context(), service.ViewRequest{
+			ApartmentID: id,
+			ViewerID:    viewerID,
+			RemoteAddr:  c.ClientIP(),
+			UserAgent:   c.Request.UserAgent(),
+		}); err != nil {
+			logger.Errorf("record apartment view: %v", err)
+		}
 	}
 
 	apartment, err := h.apartments.Get(c.Request.Context(), id, viewerID)
