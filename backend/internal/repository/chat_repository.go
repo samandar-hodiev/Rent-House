@@ -119,6 +119,19 @@ func (r *ChatRepository) FindOrCreateConversation(
 			}
 			conversation.ApartmentID = &apartmentID
 
+			// Asking to open a thread is asking to see it. Somebody who
+			// deleted it for themselves and then pressed "Xabar yozish" is
+			// deliberately coming back, so their own row is un-hidden — without
+			// this the thread stays out of their list and `describe` cannot
+			// find it, and the button reports that the conversation does not
+			// exist. The history cutoff is left alone: they asked for the
+			// thread back, not for what they cleared.
+			if err := tx.Model(&models.ConversationParticipant{}).
+				Where("conversation_id = ? AND user_id = ?", conversation.ID, buyerID).
+				UpdateColumn("hidden_at", nil).Error; err != nil {
+				return err
+			}
+
 			// Withdrawn from both sides and now being reopened. The pair cannot
 			// get a second row, so this one is revived.
 			//

@@ -869,3 +869,52 @@ func TestSeveralListingsFromOneSellerCountOnce(t *testing.T) {
 		t.Errorf("the message count is %d, want 3", got)
 	}
 }
+
+// Deleting a thread for yourself and then pressing "Xabar yozish" again must
+// bring it back. Without this the thread stays out of the caller's list, the
+// lookup that builds the response cannot find it, and the button reports that
+// the conversation does not exist — for a thread they are looking straight at.
+func TestReopeningAThreadYouHidReturnsIt(t *testing.T) {
+	h := newChatHarness(t)
+	ownerToken, _ := h.signUp(t)
+	buyerToken, _ := h.signUp(t)
+	apartmentID := h.publish(t, ownerToken)
+
+	id := h.startAbout(t, buyerToken, apartmentID)
+	h.sayAbout(t, id, buyerToken, "Birinchi savol", apartmentID)
+
+	h.do(t, http.MethodDelete, "/api/v1/conversations/"+id,
+		map[string]any{"for_everyone": false}, buyerToken)
+	if h.find(t, buyerToken, id, false) != nil {
+		t.Fatal("the thread did not go away")
+	}
+
+	// Asking again from the listing brings it back, and returns the same one.
+	again := h.startAbout(t, buyerToken, apartmentID)
+	if again != id {
+		t.Fatalf("reopening produced a different conversation (%s vs %s)", again, id)
+	}
+	if h.find(t, buyerToken, again, false) == nil {
+		t.Error("the reopened thread is still missing from the list")
+	}
+
+	// Writing in it works, and reaches the other side.
+	h.sayAbout(t, id, buyerToken, "Qaytadan salom", apartmentID)
+	if got := h.find(t, ownerToken, id, false); got == nil ||
+		got.LastMessage == nil || got.LastMessage.Body != "Qaytadan salom" {
+		t.Error("the other participant did not receive the message")
+	}
+
+	// What was cleared stays cleared: they asked for the thread back, not for
+	// the messages they removed from their own view.
+	rec := h.do(t, http.MethodGet, "/api/v1/conversations/"+id+"/messages?limit=50", nil, buyerToken)
+	var page dto.MessagePageResponse
+	if err := json.Unmarshal(decode(t, rec).Data, &page); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	for _, message := range page.Items {
+		if message.Body == "Birinchi savol" {
+			t.Error("a message from before the deletion came back with the thread")
+		}
+	}
+}

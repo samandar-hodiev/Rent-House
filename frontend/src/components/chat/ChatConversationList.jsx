@@ -4,6 +4,7 @@ import { useLocale } from '../../context/LocaleContext'
 import { useChat } from '../../context/ChatContext'
 import { formatMessageTime } from '../../utils/formatChatTime'
 import UserAvatar from '../dashboard/UserAvatar'
+import BlockUserDialog from './BlockUserDialog'
 import ConversationMenu from './ConversationMenu'
 import { ArchiveConversationDialog, DeleteConversationDialog } from './ConversationDialogs'
 
@@ -24,6 +25,7 @@ function ChatConversationList({ activeId, onSelect }) {
     setPinned,
     setArchived,
     removeConversation,
+    setBlocked,
   } = useChat()
 
   const [query, setQuery] = useState('')
@@ -243,6 +245,15 @@ function ChatConversationList({ activeId, onSelect }) {
                   setActionError(null)
                   setPending({ conversation, kind: 'archive' })
                 }}
+                onBlock={() => {
+                  setActionError(null)
+                  setPending({ conversation, kind: 'block' })
+                }}
+                onUnblock={() =>
+                  // Like un-archiving: it undoes something and destroys
+                  // nothing, so it needs no confirmation.
+                  act(() => setBlocked(conversation.other.id, false))
+                }
                 onDelete={() => {
                   setActionError(null)
                   setPending({ conversation, kind: 'delete' })
@@ -266,6 +277,20 @@ function ChatConversationList({ activeId, onSelect }) {
           error={actionError}
           onCancel={() => (busy ? undefined : setPending(null))}
           onConfirm={() => act(() => setArchived(pending.conversation.id, true))}
+        />
+      ) : null}
+
+      {/* The chat header's own block dialog, opened from here rather than
+          reproduced: same reasons, same wording, same request. */}
+      {pending?.kind === 'block' ? (
+        <BlockUserDialog
+          name={pending.conversation.other.name}
+          busy={busy}
+          error={actionError}
+          onCancel={() => (busy ? undefined : setPending(null))}
+          onConfirm={(reason) =>
+            act(() => setBlocked(pending.conversation.other.id, true, reason))
+          }
         />
       ) : null}
 
