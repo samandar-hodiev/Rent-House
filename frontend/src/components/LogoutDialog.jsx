@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocale } from '../context/LocaleContext'
 
 /**
@@ -14,6 +15,12 @@ import { useLocale } from '../context/LocaleContext'
  * the red reserved for actions that take something away.
  *
  * Same shell as the chat's confirmations: backdrop, Escape, click outside.
+ *
+ * Portalled to <body>, following the gallery and the mobile drawer. It is
+ * opened from the sidebar, whose scroll container is `sticky` with
+ * `overflow-y-auto` — a stacking context that also clips. Rendered in place,
+ * the dialog was both trapped behind the page and cut off by that container,
+ * however high its z-index went.
  */
 function LogoutDialog({ onCancel, onConfirm }) {
   const { t } = useLocale()
@@ -33,7 +40,7 @@ function LogoutDialog({ onCancel, onConfirm }) {
     dialogRef.current?.focus()
   }, [])
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/50 p-4"
       onClick={onCancel}
@@ -69,7 +76,8 @@ function LogoutDialog({ onCancel, onConfirm }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
