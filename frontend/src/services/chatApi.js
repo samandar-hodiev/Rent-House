@@ -324,3 +324,21 @@ export function blockUser(userId, { reason, reasonText, token } = {}) {
 export function unblockUser(userId, { token } = {}) {
   return request(`/me/blocks/${userId}`, { method: 'DELETE', token })
 }
+
+/**
+ * Everyone this user has blocked, most recent first.
+ *
+ * Only their own blocks: somebody who blocked *them* is not on this list, and
+ * is not theirs to lift.
+ */
+export async function fetchBlockedUsers({ token, signal } = {}) {
+  const data = await request('/me/blocks', { token, signal })
+  return (data.items ?? []).map((item) => ({
+    userId: item.user_id,
+    name: item.name,
+    avatar: item.avatar ?? null,
+    reason: item.reason ?? null,
+    reasonText: item.reason_text ?? null,
+    createdAt: item.created_at,
+  }))
+}

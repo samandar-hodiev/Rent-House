@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -124,4 +125,38 @@ func (r *BlockRepository) BlockedEither(
 		states[row.BlockerID] = state
 	}
 	return states, nil
+}
+
+// BlockedUser is one row of the blocked-users list: who they are, when they
+// were blocked, and why — if a reason was given.
+type BlockedUser struct {
+	UserID     uuid.UUID
+	FirstName  string
+	LastName   string
+	AvatarURL  *string
+	Reason     *string
+	ReasonText *string
+	CreatedAt  time.Time
+}
+
+// ListBlocked returns everyone this user has blocked, most recent first.
+//
+// Only blocks this user made: somebody who blocked *them* does not appear, and
+// is not theirs to lift.
+func (r *BlockRepository) ListBlocked(
+	ctx context.Context, userID uuid.UUID,
+) ([]BlockedUser, error) {
+	rows := []BlockedUser{}
+	err := r.db.WithContext(ctx).
+		Table("user_blocks AS b").
+		Select(`u.id AS user_id, u.first_name, u.last_name, u.avatar_url,
+		        b.reason, b.reason_text, b.created_at`).
+		Joins("JOIN users AS u ON u.id = b.blocked_id").
+		Where("b.blocker_id = ?", userID).
+		Order("b.created_at DESC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("list blocked users: %w", err)
+	}
+	return rows, nil
 }

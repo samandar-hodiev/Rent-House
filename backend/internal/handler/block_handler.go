@@ -26,6 +26,23 @@ func NewBlockHandler(chat *service.ChatService) *BlockHandler {
 	return &BlockHandler{chat: chat}
 }
 
+// List handles GET /api/v1/me/blocks — everyone the caller has blocked.
+func (h *BlockHandler) List(c *gin.Context) {
+	actorID, ok := middleware.UserIDFrom(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
+		return
+	}
+
+	blocked, err := h.chat.ListBlocked(c.Request.Context(), actorID)
+	if err != nil {
+		logger.Errorf("list blocked users: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error", "Something went wrong")
+		return
+	}
+	response.OK(c, "", blocked)
+}
+
 // Block handles POST /api/v1/me/blocks/:userId.
 func (h *BlockHandler) Block(c *gin.Context) {
 	actorID, ok := middleware.UserIDFrom(c)

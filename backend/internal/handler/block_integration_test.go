@@ -289,3 +289,114 @@ func TestABlockTouchesOnlyThatPair(t *testing.T) {
 		t.Error("an unrelated conversation reports a block")
 	}
 }
+
+// --- the blocked-users list ------------------------------------------------
+
+func (h *chatHarness) blockedList(t *testing.T, token string) dto.BlockedUserListResponse {
+	t.Helper()
+	rec := h.do(t, http.MethodGet, "/api/v1/me/blocks", nil, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("blocked list got status %d: %s", rec.Code, rec.Body.String())
+	}
+	var out dto.BlockedUserListResponse
+	if err := json.Unmarshal(decode(t, rec).Data, &out); err != nil {
+		t.Fatalf("decode blocked list: %v", err)
+	}
+	return out
+}
+
+func TestTheBlockedListRemembersWhoAndWhy(t *testing.T) {
+	h := newChatHarness(t)
+	_, _, ownerID, buyerToken, _ := h.blockPair(t)
+
+	if got := h.blockedList(t, buyerToken); got.Total != 0 {
+		t.Fatalf("a new account already lists %d blocked users", got.Total)
+	}
+
+	h.block(t, buyerToken, ownerID, map[string]any{
+		"reason": "spam", "reason_text": "Qayta-qayta yubordi",
+	})
+
+	list := h.blockedList(t, buyerToken)
+	if list.Total != 1 || len(list.Items) != 1 {
+		t.Fatalf("the list holds %d entries, want 1", list.Total)
+	}
+	entry := list.Items[0]
+	if entry.UserID != ownerID {
+		t.Errorf("the list names %s, want %s", entry.UserID, ownerID)
+	}
+	if entry.Name == "" {
+		t.Error("the entry has no name to show")
+	}
+	if entry.Reason == nil || *entry.Reason != "spam" {
+		t.Errorf("the reason is %v, want spam", entry.Reason)
+	}
+	if entry.ReasonText == nil || *entry.ReasonText != "Qayta-qayta yubordi" {
+		t.Errorf("the note is %v", entry.ReasonText)
+	}
+	if entry.CreatedAt.IsZero() {
+		t.Error("the entry has no date")
+	}
+}
+
+// Blocking without a reason must still produce a usable row: the fields are
+// optional, and the list has to render one that gave nothing.
+func TestTheBlockedListHandlesAMissingReason(t *testing.T) {
+	h := newChatHarness(t)
+	_, _, ownerID, buyerToken, _ := h.blockPair(t)
+
+	h.block(t, buyerToken, ownerID, nil)
+
+	list := h.blockedList(t, buyerToken)
+	if list.Total != 1 {
+		t.Fatalf("the list holds %d entries, want 1", list.Total)
+	}
+	if list.Items[0].Reason != nil || list.Items[0].ReasonText != nil {
+		t.Errorf("a reasonless block reports %v / %v",
+			list.Items[0].Reason, list.Items[0].ReasonText)
+	}
+}
+
+// The list is one person's own decisions. Being blocked does not put the other
+// party on your list, because their block is not yours to lift.
+func TestTheBlockedListShowsOnlyYourOwnBlocks(t *testing.T) {
+	h := newChatHarness(t)
+	_, ownerToken, ownerID, buyerToken, buyerID := h.blockPair(t)
+
+	h.block(t, buyerToken, ownerID, map[string]any{"reason": "abuse"})
+
+	if got := h.blockedList(t, buyerToken); got.Total != 1 {
+		t.Errorf("the blocker's list holds %d, want 1", got.Total)
+	}
+	// The blocked party's own list is empty — they blocked nobody.
+	if got := h.blockedList(t, ownerToken); got.Total != 0 {
+		t.Errorf("the blocked user's list holds %d, want 0", got.Total)
+	}
+	// And they cannot lift it from their side.
+	h.unblock(t, ownerToken, buyerID)
+	if got := h.blockedList(t, buyerToken); got.Total != 1 {
+		t.Error("the blocked party removed somebody else's block")
+	}
+}
+
+func TestUnblockingRemovesTheListEntry(t *testing.T) {
+	h := newChatHarness(t)
+	_, _, ownerID, buyerToken, _ := h.blockPair(t)
+
+	h.block(t, buyerToken, ownerID, map[string]any{"reason": "harassment"})
+	if got := h.blockedList(t, buyerToken); got.Total != 1 {
+		t.Fatalf("the block did not take")
+	}
+
+	h.unblock(t, buyerToken, ownerID)
+	if got := h.blockedList(t, buyerToken); got.Total != 0 {
+		t.Errorf("the entry survived unblocking (%d left)", got.Total)
+	}
+}
+
+func TestTheBlockedListNeedsAToken(t *testing.T) {
+	h := newChatHarness(t)
+	if rec := h.do(t, http.MethodGet, "/api/v1/me/blocks", nil, ""); rec.Code != http.StatusUnauthorized {
+		t.Errorf("the list without a token got %d, want 401", rec.Code)
+	}
+}

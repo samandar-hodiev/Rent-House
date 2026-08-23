@@ -59,6 +59,7 @@ func newChatHarness(t *testing.T) *chatHarness {
 
 	blockHandler := NewBlockHandler(chatService)
 	me := v1.Group("/me", middleware.Auth(h.tokens))
+	me.GET("/blocks", blockHandler.List)
 	me.GET("/blocks/:userId", blockHandler.State)
 	me.POST("/blocks/:userId", blockHandler.Block)
 	me.DELETE("/blocks/:userId", blockHandler.Unblock)

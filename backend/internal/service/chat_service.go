@@ -867,3 +867,32 @@ func (s *ChatService) BlockState(
 	}
 	return s.blocks.StateBetween(ctx, actorID, targetID)
 }
+
+// ListBlocked returns everyone the caller has blocked, most recent first.
+//
+// Only their own blocks: somebody who blocked *them* is not on this list, and
+// is not theirs to lift.
+func (s *ChatService) ListBlocked(
+	ctx context.Context, actorID uuid.UUID,
+) (*dto.BlockedUserListResponse, error) {
+	rows, err := s.blocks.ListBlocked(ctx, actorID)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]dto.BlockedUserResponse, 0, len(rows))
+	for _, row := range rows {
+		item := dto.BlockedUserResponse{
+			UserID:     row.UserID.String(),
+			Name:       strings.TrimSpace(row.FirstName + " " + row.LastName),
+			Reason:     row.Reason,
+			ReasonText: row.ReasonText,
+			CreatedAt:  row.CreatedAt,
+		}
+		if row.AvatarURL != nil {
+			item.Avatar = *row.AvatarURL
+		}
+		items = append(items, item)
+	}
+	return &dto.BlockedUserListResponse{Items: items, Total: len(items)}, nil
+}

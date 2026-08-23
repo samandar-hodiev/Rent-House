@@ -1,5 +1,13 @@
 import { useState } from 'react'
-import { Building2, Heart, LayoutDashboard, LogOut, MessageSquare, PlusCircle } from 'lucide-react'
+import {
+  Building2,
+  Heart,
+  LayoutDashboard,
+  LogOut,
+  MessageSquare,
+  PlusCircle,
+  ShieldOff,
+} from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useAuth } from '../../context/AuthContext'
 import { useChat } from '../../context/ChatContext'
@@ -75,6 +83,14 @@ export function DashboardNavList({ onNavigate }) {
         icon={<MessageSquare aria-hidden="true" size={ICON_SIZE} />}
         label={t('dashboard.chats')}
         badge={unreadConversations > 0 ? unreadConversations : null}
+        onNavigate={onNavigate}
+      />
+      {/* Directly under the conversations it applies to, which is where
+          somebody looking for "who did I block" will look first. */}
+      <DashboardNavItem
+        to={ROUTES.dashboardBlocked}
+        icon={<ShieldOff aria-hidden="true" size={ICON_SIZE} />}
+        label={t('blocked.title')}
         onNavigate={onNavigate}
       />
       {/* `mt-auto` keeps Settings and Log out pinned to the very bottom of the

@@ -320,3 +320,27 @@ type BlockStateResponse struct {
 	IsBlocked   bool `json:"is_blocked"`
 	IsBlockedBy bool `json:"is_blocked_by"`
 }
+
+// BlockedUserResponse is one row of the blocked-users list.
+//
+// Enough to recognise the person and remember why, and nothing more: the list
+// exists to be reviewed and undone, not to be studied.
+type BlockedUserResponse struct {
+	UserID string `json:"user_id"`
+	Name   string `json:"name"`
+	Avatar string `json:"avatar,omitempty"`
+
+	// Reason is one of the accepted categories, absent when none was given —
+	// blocking somebody never required explaining yourself.
+	Reason *string `json:"reason,omitempty"`
+	// ReasonText is what they typed alongside it, if anything.
+	ReasonText *string `json:"reason_text,omitempty"`
+
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// BlockedUserListResponse is the whole list.
+type BlockedUserListResponse struct {
+	Items []BlockedUserResponse `json:"items"`
+	Total int                   `json:"total"`
+}

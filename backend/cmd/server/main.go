@@ -318,6 +318,9 @@ func newRouter(
 	// user, so none of these routes names who is doing the blocking — only who
 	// is being blocked.
 	blockHandler := handler.NewBlockHandler(chatService)
+	// Registered before "/:userId" so the literal path is not swallowed by the
+	// parameter.
+	me.GET("/blocks", blockHandler.List)
 	me.GET("/blocks/:userId", blockHandler.State)
 	me.POST("/blocks/:userId", blockHandler.Block)
 	me.DELETE("/blocks/:userId", blockHandler.Unblock)

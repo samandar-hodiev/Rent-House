@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { Ban, Loader2 } from 'lucide-react'
+import { AlertTriangle, Ban, Loader2 } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useChat } from '../../context/ChatContext'
 import { useConversation } from '../../hooks/useConversation'
@@ -169,15 +169,26 @@ function ChatThread({
         <UserAvatar name={other.name} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-text-primary">{other.name}</p>
-          <p className="flex items-center gap-1.5 text-xs text-text-muted">
-            <span
-              aria-hidden="true"
-              className={`size-2 shrink-0 rounded-full ${
-                other.online ? 'bg-primary' : 'bg-text-muted/40'
-              }`}
-            />
-            {other.online ? t('chat.online') : t('chat.offline')}
-          </p>
+          {/* Somebody who has been blocked is told so here, in place of a
+              presence line they cannot act on — and which would otherwise keep
+              reporting the other person as available while every message they
+              send is refused. Red, because it explains a restriction. */}
+          {isBlockedBy ? (
+            <p className="flex items-center gap-1.5 text-xs font-medium text-error">
+              <AlertTriangle aria-hidden="true" size={12} className="shrink-0" />
+              {t('chat.blockedYouStatus')}
+            </p>
+          ) : (
+            <p className="flex items-center gap-1.5 text-xs text-text-muted">
+              <span
+                aria-hidden="true"
+                className={`size-2 shrink-0 rounded-full ${
+                  other.online ? 'bg-primary' : 'bg-text-muted/40'
+                }`}
+              />
+              {other.online ? t('chat.online') : t('chat.offline')}
+            </p>
+          )}
         </div>
 
         <ChatHeaderMenu

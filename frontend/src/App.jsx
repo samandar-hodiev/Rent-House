@@ -14,6 +14,7 @@ import SearchPage from './pages/SearchPage'
 import ApartmentDetailsPage from './pages/ApartmentDetailsPage'
 import MapPage from './pages/MapPage'
 import WishlistPage from './pages/WishlistPage'
+import BlockedUsersPage from './pages/BlockedUsersPage'
 import MessageNotifications from './components/chat/MessageNotifications'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -97,6 +98,9 @@ function App() {
                                 not the public header. */}
                             <Route path="saved" element={<WishlistPage />} />
                             <Route path="chats" element={<DashboardChatsPage />} />
+                            {/* Blocks are easy to make and easy to forget;
+                                this is where they can be reviewed. */}
+                            <Route path="blocked" element={<BlockedUsersPage />} />
                             <Route path="edit-profile" element={<DashboardEditProfilePage />} />
                           </Route>
                           <Route path={ROUTES.createListing} element={<CreateListingPage />} />
