@@ -184,6 +184,9 @@ func (s *ChatService) ListConversations(
 
 	items := make([]dto.ConversationResponse, 0, len(summaries))
 	var unreadTotal int64
+	// How many threads are waiting, not how many messages: one person who sent
+	// thirty is one thread to open.
+	var unreadConversations int64
 	for _, summary := range summaries {
 		item := conversationFrom(summary, online[summary.OtherUserID])
 		state := blocked[summary.OtherUserID]
@@ -191,9 +194,16 @@ func (s *ChatService) ListConversations(
 		item.IsBlockedBy = state.TheyBlockedMe
 		items = append(items, item)
 		unreadTotal += summary.UnreadCount
+		if summary.UnreadCount > 0 {
+			unreadConversations++
+		}
 	}
 
-	return &dto.ConversationListResponse{Items: items, UnreadTotal: unreadTotal}, nil
+	return &dto.ConversationListResponse{
+		Items:               items,
+		UnreadTotal:         unreadTotal,
+		UnreadConversations: unreadConversations,
+	}, nil
 }
 
 // GetConversation returns one thread, for the chat header.
@@ -500,9 +510,12 @@ func (s *ChatService) MarkRead(
 	return receipt, nil
 }
 
-// UnreadTotal is the badge figure for the header and the sidebar.
-func (s *ChatService) UnreadTotal(ctx context.Context, actorID uuid.UUID) (int64, error) {
-	return s.chat.UnreadTotal(ctx, actorID)
+// UnreadCounts is what the badges read: how many messages are waiting, and how
+// many people are waiting. The header shows the second.
+func (s *ChatService) UnreadCounts(
+	ctx context.Context, actorID uuid.UUID,
+) (messages int64, conversations int64, err error) {
+	return s.chat.UnreadCounts(ctx, actorID)
 }
 
 // ConversationsOf lists the users the given user shares a thread with, so a

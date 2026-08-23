@@ -17,7 +17,8 @@ export function DashboardNavList({ onNavigate }) {
   const { signOut } = useAuth()
   // Same source as the public header's chat icon, so opening a conversation
   // clears the badge in both places at once.
-  const { unreadTotal } = useChat()
+  // The same figure the header shows, so the two badges never disagree.
+  const { unreadConversations } = useChat()
 
   // Asked first: Log out is the last item under a column of navigation, and a
   // slipped tap on it ends the session.
@@ -73,7 +74,7 @@ export function DashboardNavList({ onNavigate }) {
         to={ROUTES.dashboardChats}
         icon={<MessageSquare aria-hidden="true" size={ICON_SIZE} />}
         label={t('dashboard.chats')}
-        badge={unreadTotal > 0 ? unreadTotal : null}
+        badge={unreadConversations > 0 ? unreadConversations : null}
         onNavigate={onNavigate}
       />
       {/* `mt-auto` keeps Settings and Log out pinned to the very bottom of the

@@ -46,7 +46,11 @@ export function ChatProvider({ children }) {
   // one predicate apart, so neither can disagree with the other about a thread.
   const [archivedConversations, setArchivedConversations] = useState([])
   const [archivedStatus, setArchivedStatus] = useState('idle')
+  // Two figures, kept apart because they answer different questions. The
+  // badges show how many people are waiting; the dashboard's card is labelled
+  // "unread messages" and shows how many messages.
   const [unreadTotal, setUnreadTotal] = useState(0)
+  const [unreadConversations, setUnreadConversations] = useState(0)
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
   const [socketStatus, setSocketStatus] = useState(SOCKET_STATUS.closed)
 
@@ -75,6 +79,7 @@ export function ChatProvider({ children }) {
         setConversations([])
         setArchivedConversations([])
         setUnreadTotal(0)
+        setUnreadConversations(0)
         setStatus('idle')
         setArchivedStatus('idle')
         return
@@ -91,6 +96,7 @@ export function ChatProvider({ children }) {
         setConversations(inbox.items)
         setArchivedConversations(archive.items)
         setUnreadTotal(inbox.unreadTotal)
+        setUnreadConversations(inbox.unreadConversations)
         setStatus('ready')
         setArchivedStatus('ready')
       } catch (error) {
@@ -214,9 +220,23 @@ export function ChatProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
-  // The badge is derived, so it can never disagree with the rows above it.
+  // Both figures are derived from the rows on screen, so neither can disagree
+  // with the list — and a message arriving over the socket moves them without
+  // a request.
+  //
+  // The conversation count is how many rows have anything unread, not how many
+  // messages are unread: twenty more messages from someone already waiting
+  // leaves the badge where it was, because it is still one person to reply to.
   useEffect(() => {
-    setUnreadTotal(conversations.reduce((total, item) => total + item.unreadCount, 0))
+    let messages = 0
+    let threads = 0
+    for (const conversation of conversations) {
+      if (conversation.unreadCount <= 0) continue
+      messages += conversation.unreadCount
+      threads += 1
+    }
+    setUnreadTotal(messages)
+    setUnreadConversations(threads)
   }, [conversations])
 
   /** Opens the thread about a listing, or returns the one already open. */
@@ -298,6 +318,7 @@ export function ChatProvider({ children }) {
       archivedConversations,
       archivedStatus,
       unreadTotal,
+      unreadConversations,
       status,
       isLoading: status === 'loading',
       socketStatus,
@@ -318,6 +339,7 @@ export function ChatProvider({ children }) {
       archivedConversations,
       archivedStatus,
       unreadTotal,
+      unreadConversations,
       status,
       socketStatus,
       isAuthenticated,

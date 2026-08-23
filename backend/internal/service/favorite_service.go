@@ -111,7 +111,9 @@ func (s *FavoriteService) Summary(
 	if err != nil {
 		return nil, err
 	}
-	unread, err := s.chat.UnreadTotal(ctx, userID)
+	// The dashboard's card is labelled "unread messages", so it gets the
+	// message count rather than the thread count the badges use.
+	unread, _, err := s.chat.UnreadCounts(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

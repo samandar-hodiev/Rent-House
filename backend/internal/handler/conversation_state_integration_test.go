@@ -10,6 +10,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -687,5 +688,184 @@ func (h *chatHarness) sayAbout(t *testing.T, conversationID, token, body, apartm
 		map[string]any{"body": body, "apartment_id": apartmentID}, token)
 	if rec.Code != http.StatusCreated && rec.Code != http.StatusOK {
 		t.Fatalf("send got status %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// --- what the badges count ------------------------------------------------
+
+// unreadConversations is the figure the header badge shows.
+func (h *chatHarness) unreadConversations(t *testing.T, token string) int64 {
+	t.Helper()
+	rec := h.do(t, http.MethodGet, "/api/v1/conversations/unread", nil, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unread got status %d", rec.Code)
+	}
+	var out struct {
+		UnreadConversations int64 `json:"unread_conversations"`
+	}
+	if err := json.Unmarshal(decode(t, rec).Data, &out); err != nil {
+		t.Fatalf("decode unread: %v", err)
+	}
+	return out.UnreadConversations
+}
+
+// The distinction the badge exists for: thirty messages from one person is one
+// person to reply to, and a badge reading thirty says nothing to act on.
+func TestManyMessagesFromOnePersonAreOneUnreadConversation(t *testing.T) {
+	h := newChatHarness(t)
+	id, ownerToken, buyerToken := h.thread(t)
+
+	for i := 0; i < 30; i++ {
+		h.say(t, id, buyerToken, fmt.Sprintf("Xabar %d", i))
+	}
+
+	if got := h.unreadConversations(t, ownerToken); got != 1 {
+		t.Errorf("thirty messages counted as %d conversations, want 1", got)
+	}
+	// The message count is still thirty — the two figures describe the same
+	// messages and must not be confused for one another.
+	if got := h.unread(t, ownerToken); got != 30 {
+		t.Errorf("the message count is %d, want 30", got)
+	}
+	// And the row itself still reports thirty, which is what the list renders.
+	if row := h.find(t, ownerToken, id, false); row == nil || row.UnreadCount != 30 {
+		t.Errorf("the conversation row reports %v, want 30", row)
+	}
+}
+
+func TestEachWaitingPersonCountsOnce(t *testing.T) {
+	h := newChatHarness(t)
+	ownerToken, _ := h.signUp(t)
+
+	// Five people write to the same owner, ten messages each.
+	for person := 0; person < 5; person++ {
+		apartmentID := h.publish(t, ownerToken)
+		buyerToken, _ := h.signUp(t)
+		rec := h.do(t, http.MethodPost, "/api/v1/conversations",
+			map[string]any{"apartment_id": apartmentID}, buyerToken)
+		var conversation dto.ConversationResponse
+		if err := json.Unmarshal(decode(t, rec).Data, &conversation); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		for i := 0; i < 10; i++ {
+			h.say(t, conversation.ID.String(), buyerToken, fmt.Sprintf("P%d M%d", person, i))
+		}
+	}
+
+	if got := h.unreadConversations(t, ownerToken); got != 5 {
+		t.Errorf("five people counted as %d, want 5", got)
+	}
+	if got := h.unread(t, ownerToken); got != 50 {
+		t.Errorf("the message count is %d, want 50", got)
+	}
+}
+
+func TestReadingAThreadRemovesItFromTheBadge(t *testing.T) {
+	h := newChatHarness(t)
+	ownerToken, _ := h.signUp(t)
+
+	ids := make([]string, 0, 3)
+	for i := 0; i < 3; i++ {
+		apartmentID := h.publish(t, ownerToken)
+		buyerToken, _ := h.signUp(t)
+		rec := h.do(t, http.MethodPost, "/api/v1/conversations",
+			map[string]any{"apartment_id": apartmentID}, buyerToken)
+		var conversation dto.ConversationResponse
+		if err := json.Unmarshal(decode(t, rec).Data, &conversation); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		ids = append(ids, conversation.ID.String())
+		h.say(t, conversation.ID.String(), buyerToken, "Salom")
+		h.say(t, conversation.ID.String(), buyerToken, "Yana bir savol")
+	}
+
+	if got := h.unreadConversations(t, ownerToken); got != 3 {
+		t.Fatalf("three waiting people counted as %d", got)
+	}
+
+	// Opening one clears it, and the badge drops by exactly one.
+	if rec := h.do(t, http.MethodPost, "/api/v1/conversations/"+ids[0]+"/read", nil, ownerToken); rec.Code != http.StatusOK {
+		t.Fatalf("mark read got status %d", rec.Code)
+	}
+	if got := h.unreadConversations(t, ownerToken); got != 2 {
+		t.Errorf("after reading one thread the badge is %d, want 2", got)
+	}
+
+	for _, id := range ids[1:] {
+		h.do(t, http.MethodPost, "/api/v1/conversations/"+id+"/read", nil, ownerToken)
+	}
+	if got := h.unreadConversations(t, ownerToken); got != 0 {
+		t.Errorf("everything read leaves the badge at %d, want 0", got)
+	}
+}
+
+// The list's own totals must agree with the endpoint's, since the client reads
+// the badge from whichever it fetched last.
+func TestTheListAndTheEndpointAgree(t *testing.T) {
+	h := newChatHarness(t)
+	id, ownerToken, buyerToken := h.thread(t)
+	for i := 0; i < 4; i++ {
+		h.say(t, id, buyerToken, fmt.Sprintf("Xabar %d", i))
+	}
+
+	rec := h.do(t, http.MethodGet, "/api/v1/conversations", nil, ownerToken)
+	var page dto.ConversationListResponse
+	if err := json.Unmarshal(decode(t, rec).Data, &page); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+
+	if page.UnreadConversations != h.unreadConversations(t, ownerToken) {
+		t.Errorf("the list says %d conversations, the endpoint says %d",
+			page.UnreadConversations, h.unreadConversations(t, ownerToken))
+	}
+	if page.UnreadTotal != h.unread(t, ownerToken) {
+		t.Errorf("the list says %d messages, the endpoint says %d",
+			page.UnreadTotal, h.unread(t, ownerToken))
+	}
+	if page.UnreadConversations != 1 || page.UnreadTotal != 4 {
+		t.Errorf("got %d conversations / %d messages, want 1 / 4",
+			page.UnreadConversations, page.UnreadTotal)
+	}
+}
+
+// A thread the reader filed away is not shown in the inbox, so a badge that
+// counted it would point at nothing they can open.
+func TestArchivedThreadsAreNotInTheBadge(t *testing.T) {
+	h := newChatHarness(t)
+	id, ownerToken, buyerToken := h.thread(t)
+	h.say(t, id, buyerToken, "O'qilmagan")
+
+	if got := h.unreadConversations(t, ownerToken); got != 1 {
+		t.Fatalf("the badge is %d before archiving, want 1", got)
+	}
+
+	h.do(t, http.MethodPatch, "/api/v1/conversations/"+id+"/archive",
+		map[string]any{"value": true}, ownerToken)
+
+	if got := h.unreadConversations(t, ownerToken); got != 0 {
+		t.Errorf("an archived thread is still in the badge (%d)", got)
+	}
+	if got := h.unread(t, ownerToken); got != 0 {
+		t.Errorf("an archived thread still contributes %d unread messages", got)
+	}
+}
+
+// One seller with several listings is one conversation, so one badge unit.
+func TestSeveralListingsFromOneSellerCountOnce(t *testing.T) {
+	h := newChatHarness(t)
+	ownerToken, _ := h.signUp(t)
+	buyerToken, _ := h.signUp(t)
+
+	for i := 0; i < 3; i++ {
+		apartmentID := h.publish(t, ownerToken)
+		id := h.startAbout(t, buyerToken, apartmentID)
+		h.sayAbout(t, id, buyerToken, fmt.Sprintf("Listing %d haqida", i), apartmentID)
+	}
+
+	if got := h.unreadConversations(t, ownerToken); got != 1 {
+		t.Errorf("three listings from one buyer counted as %d, want 1", got)
+	}
+	if got := h.unread(t, ownerToken); got != 3 {
+		t.Errorf("the message count is %d, want 3", got)
 	}
 }

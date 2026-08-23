@@ -215,8 +215,12 @@ type LastMessage struct {
 // ConversationListResponse is the sidebar, plus the badge total so the client
 // does not have to add up the rows itself and disagree with the server.
 type ConversationListResponse struct {
-	Items       []ConversationResponse `json:"items"`
-	UnreadTotal int64                  `json:"unread_total"`
+	Items []ConversationResponse `json:"items"`
+	// UnreadTotal is how many messages are waiting; UnreadConversations is how
+	// many threads they are spread across. The header badge shows the second —
+	// thirty messages from one person is one conversation to open.
+	UnreadTotal         int64 `json:"unread_total"`
+	UnreadConversations int64 `json:"unread_conversations"`
 }
 
 // ReadReceipt is the payload of a read event: which messages just turned

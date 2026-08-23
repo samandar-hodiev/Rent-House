@@ -116,7 +116,10 @@ export async function fetchConversations({ token, signal, archived = false } = {
   const data = await request(path, { token, signal })
   return {
     items: (data.items ?? []).map(toConversation),
+    // Two different figures: how many messages are waiting, and how many
+    // people are waiting. The badges show the second.
     unreadTotal: data.unread_total ?? 0,
+    unreadConversations: data.unread_conversations ?? 0,
   }
 }
 

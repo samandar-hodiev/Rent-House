@@ -376,13 +376,18 @@ func (h *ChatHandler) UnreadTotal(c *gin.Context) {
 		return
 	}
 
-	total, err := h.chat.UnreadTotal(c.Request.Context(), actorID)
+	messages, conversations, err := h.chat.UnreadCounts(c.Request.Context(), actorID)
 	if err != nil {
 		h.writeError(c, err, "count unread")
 		return
 	}
 
-	response.OK(c, "", gin.H{"unread_total": total})
+	// Both, named for what they are. `unread_total` keeps its meaning — how
+	// many messages — and the badge reads the other.
+	response.OK(c, "", gin.H{
+		"unread_total":         messages,
+		"unread_conversations": conversations,
+	})
 }
 
 // --- internals -------------------------------------------------------------

@@ -20,7 +20,9 @@ function AuthedHeaderActions({ variant = 'desktop', onNavigate }) {
   const { t } = useLocale()
   const { user, signOut } = useAuth()
   // Shared with the dashboard sidebar badge — see ChatContext.
-  const { unreadTotal: unread } = useChat()
+  // How many people are waiting, not how many messages: thirty from one
+  // person is one conversation to open.
+  const { unreadConversations: unread } = useChat()
 
   // Same order as the dashboard sidebar's own log out, so the two behave
   // identically wherever the user reaches for it.

@@ -542,18 +542,38 @@ func (r *ChatRepository) FindAttachment(
 	return &attachment, row.ConversationID, nil
 }
 
-// UnreadTotal counts everything unread across all of a user's threads, for the
-// badge in the header and the sidebar.
-func (r *ChatRepository) UnreadTotal(ctx context.Context, userID uuid.UUID) (int64, error) {
-	var count int64
-	err := r.db.WithContext(ctx).
+// UnreadCounts answers two different questions about the same messages.
+//
+// `messages` is how many are waiting; `conversations` is how many people are
+// waiting. The header badge wants the second: somebody who sent thirty messages
+// is still one person to reply to, and a badge reading 450 says nothing a
+// reader can act on.
+//
+// Both come from one query, so the two figures cannot disagree about which
+// messages they are describing.
+//
+// Archived threads are excluded, matching the list: a badge that counts what
+// the inbox does not show points at nothing the reader can open.
+func (r *ChatRepository) UnreadCounts(
+	ctx context.Context, userID uuid.UUID,
+) (messages int64, conversations int64, err error) {
+	var row struct {
+		Messages      int64
+		Conversations int64
+	}
+
+	err = r.db.WithContext(ctx).
 		Model(&models.Message{}).
+		Select("COUNT(*) AS messages, COUNT(DISTINCT messages.conversation_id) AS conversations").
 		Joins("JOIN conversation_participants cp ON cp.conversation_id = messages.conversation_id").
 		Joins("JOIN conversations c ON c.id = messages.conversation_id").
 		Where("cp.user_id = ?", userID).
 		// The badge counts what the user can actually open: not a withdrawn
-		// thread, and not messages from before they deleted it themselves.
+		// thread, not one they filed away, and not messages from before they
+		// deleted it themselves.
 		Where("c.deleted_at IS NULL").
+		Where("cp.archived_at IS NULL").
+		Where("cp.hidden_at IS NULL OR messages.created_at > cp.hidden_at").
 		Where("cp.cleared_at IS NULL OR messages.created_at > cp.cleared_at").
 		Where("messages.sender_id <> ?", userID).
 		Where("NOT messages.is_read").
@@ -562,11 +582,11 @@ func (r *ChatRepository) UnreadTotal(ctx context.Context, userID uuid.UUID) (int
 			SELECT 1 FROM message_deletions d
 			WHERE d.message_id = messages.id AND d.user_id = ?
 		)`, userID).
-		Count(&count).Error
+		Scan(&row).Error
 	if err != nil {
-		return 0, fmt.Errorf("count unread: %w", err)
+		return 0, 0, fmt.Errorf("count unread: %w", err)
 	}
-	return count, nil
+	return row.Messages, row.Conversations, nil
 }
 
 // SetPinned pins or unpins a thread for one person.
