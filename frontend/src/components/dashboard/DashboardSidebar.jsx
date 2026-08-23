@@ -117,10 +117,18 @@ export function DashboardNavList({ onNavigate }) {
   )
 }
 
-// Flush against the left edge of the viewport, full height below the header.
+/**
+ * Flush against the left edge of the viewport, full height below the header.
+ *
+ * Narrower below `2xl` than above it. At 16rem the column is comfortable on a
+ * wide monitor and takes more than its share of a laptop screen, where the
+ * space it costs comes straight out of the conversation list and the chat
+ * beside it. 14rem still clears the longest label — "Mening e'lonlarim" — with
+ * room to spare, so nothing truncates on the way down.
+ */
 function DashboardSidebar() {
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-border bg-surface lg:block">
+    <aside className="hidden w-56 shrink-0 border-r border-border bg-surface lg:block 2xl:w-64">
       <div className="sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto p-3">
         <DashboardNavList />
       </div>

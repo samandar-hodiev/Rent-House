@@ -225,20 +225,32 @@ function ChatThread({
       ) : null}
 
       {/* Messages */}
-      <div ref={scrollRef} onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      {/* A column, so a short thread can sit at the bottom rather than clinging
+          to the top of an otherwise empty panel — the way every messenger
+          behaves, and the way the eye expects to find the newest message just
+          above the composer. */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3"
+      >
         {isLoading ? (
-          <p className="flex items-center justify-center gap-2 py-8 text-sm text-text-muted">
+          <p className="m-auto flex items-center justify-center gap-2 py-8 text-sm text-text-muted">
             <Loader2 aria-hidden="true" size={16} className="animate-spin" />
             {t('chat.loading')}
           </p>
         ) : status === 'error' ? (
-          <p role="alert" className="py-8 text-center text-sm text-error">
+          <p role="alert" className="m-auto py-8 text-center text-sm text-error">
             {t('chat.loadFailed')}
           </p>
         ) : messages.length === 0 ? (
-          <p className="py-8 text-center text-sm text-text-muted">{t('chat.empty')}</p>
+          <p className="m-auto py-8 text-center text-sm text-text-muted">{t('chat.empty')}</p>
         ) : (
-          <>
+          // `mt-auto` rather than `justify-end` on the container: an auto
+          // margin collapses to zero once the thread is taller than the panel,
+          // where `justify-end` would clip the messages that overflow upward
+          // and put the oldest ones out of reach.
+          <div className="mt-auto">
             {hasMore ? (
               <div className="mb-3 flex justify-center">
                 <button
@@ -285,7 +297,7 @@ function ChatThread({
                 )
               })}
             </ul>
-          </>
+          </div>
         )}
         <div ref={bottomRef} />
       </div>
