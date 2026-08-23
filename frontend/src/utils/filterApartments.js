@@ -18,7 +18,10 @@ export function filterApartments(apartments, { districtId, keyword, filters }) {
   return apartments.filter((apartment) => {
     if (districtId && apartment.districtId !== districtId) return false
 
-    if (normalizedKeyword && !apartment.searchText.includes(normalizedKeyword)) {
+    // Defensive: a listing with nothing to match simply does not match. A
+    // missing field is a reason to exclude one row, never to throw and blank
+    // the page — which is what it did when the API mapper stopped producing it.
+    if (normalizedKeyword && !(apartment.searchText ?? '').includes(normalizedKeyword)) {
       return false
     }
 

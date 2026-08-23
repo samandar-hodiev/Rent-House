@@ -93,8 +93,58 @@ function Header() {
           </nav>
         </div>
 
+        {/* Medium desktop: the same header in two rows.
+            Between `lg` and `xl` the one-row layout does not fit, but a
+            hamburger is the wrong answer — there is room for every control,
+            just not on one line. The navigation stays visible and the search
+            takes a row of its own, where it gets more width than it had on the
+            wide layout rather than less. Below `lg` the drawer is genuinely
+            needed and is left alone. */}
+        <div className="hidden lg:block xl:hidden">
+          <div className="flex h-16 items-center justify-between gap-6">
+            <Link
+              to={ROUTES.home}
+              className="shrink-0 text-lg font-semibold tracking-tight text-text-primary"
+            >
+              {t('brand.name')}
+            </Link>
+
+            {/* The same components the wide header uses, in the same order —
+                this is one layout in two shapes, not a second header. */}
+            <nav
+              aria-label="Asosiy navigatsiya"
+              className="flex shrink-0 items-center gap-5"
+            >
+              <NavLink to={ROUTES.map} className={navLinkClass}>
+                {t('header.mapNav')}
+              </NavLink>
+              <ThemeToggle />
+              <LanguageSelector />
+              {isAuthenticated ? (
+                <AuthedHeaderActions />
+              ) : (
+                <>
+                  <NavLink to={ROUTES.login} className={navLinkClass}>
+                    {t('header.login')}
+                  </NavLink>
+                  <Link
+                    to={ROUTES.register}
+                    className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    {t('header.register')}
+                  </Link>
+                </>
+              )}
+            </nav>
+          </div>
+
+          <div className="pb-3">
+            <SearchBar />
+          </div>
+        </div>
+
         {/* Tablet & mobile: logo + language + menu toggle, search on its own row */}
-        <div ref={menuRef} className="xl:hidden">
+        <div ref={menuRef} className="lg:hidden">
           <div className="flex h-16 items-center justify-between gap-3">
             <Link
               to={ROUTES.home}

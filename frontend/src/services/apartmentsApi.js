@@ -74,6 +74,24 @@ export function toApartment(item) {
     // `districtId` and `image` above: the mapping layer is where the two
     // vocabularies meet.
     postedAt: item.created_at,
+
+    // What keyword search matches against, lower-cased once here rather than
+    // rebuilt for every listing on every keystroke.
+    //
+    // The seeded catalog carried this field and `filterApartments` has always
+    // read it; the API mapper did not produce it, so the moment listings came
+    // from the database a keyword search threw on the first row and took the
+    // home page down with it.
+    //
+    // The same three fields the server's own keyword filter uses, so the
+    // client's second pass cannot disagree with the query that fetched the
+    // rows. District is deliberately not among them — it has its own picker,
+    // and matching it here would only promise something the server has already
+    // filtered out.
+    searchText: [item.title, item.address, item.neighborhood]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase(),
   }
 }
 
