@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
-  Building2,
   Heart,
   LayoutDashboard,
   LogOut,
@@ -13,6 +12,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useChat } from '../../context/ChatContext'
 import { ROUTES } from '../../routes/paths'
 import DashboardNavItem from './DashboardNavItem'
+import DashboardListingStatusNav from './DashboardListingStatusNav'
 import DashboardSettingsMenu from './DashboardSettingsMenu'
 import LogoutDialog from '../LogoutDialog'
 
@@ -66,12 +66,9 @@ export function DashboardNavList({ onNavigate }) {
         label={t('dashboard.postListing')}
         onNavigate={onNavigate}
       />
-      <DashboardNavItem
-        to={ROUTES.dashboardListings}
-        icon={<Building2 aria-hidden="true" size={ICON_SIZE} />}
-        label={t('dashboard.listings')}
-        onNavigate={onNavigate}
-      />
+      {/* Replaces the old single "My listings" entry: the same page, reached
+          through the state the reader is actually looking for. */}
+      <DashboardListingStatusNav onNavigate={onNavigate} />
       <DashboardNavItem
         to={ROUTES.dashboardSaved}
         icon={<Heart aria-hidden="true" size={ICON_SIZE} />}

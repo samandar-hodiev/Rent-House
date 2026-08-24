@@ -34,3 +34,42 @@ export function getMyListingsSummary(listings) {
     closed: count(LISTING_STATUS.closed),
   }
 }
+
+// The sidebar's "listing status" group, and the filter the listings page
+// applies. Declared once so the two cannot drift: the nav renders this list,
+// and the page reads the same `status` values out of the query string.
+//
+// `status: null` is "all", which applies no filter at all.
+//
+// Only the four statuses the database actually stores appear here. A menu
+// entry for a state the API can never return would be a permanently empty
+// page, which is worse than not offering it.
+export const LISTING_FILTERS = [
+  { key: 'all', status: null },
+  { key: 'active', status: LISTING_STATUS.active },
+  { key: 'pending', status: LISTING_STATUS.pending },
+  { key: 'closed', status: LISTING_STATUS.closed },
+  { key: 'draft', status: LISTING_STATUS.draft },
+]
+
+/**
+ * Reads the filter out of a query string.
+ *
+ * Anything unrecognised falls back to "all" rather than showing nothing: a
+ * hand-edited or stale URL should land somewhere useful.
+ */
+export function filterFromSearch(search) {
+  const requested = new URLSearchParams(search).get('status')
+  return LISTING_FILTERS.find((filter) => filter.status === requested) ?? LISTING_FILTERS[0]
+}
+
+/** Counts for each entry in `LISTING_FILTERS`, keyed the same way. */
+export function getFilterCounts(listings) {
+  const counts = {}
+  for (const filter of LISTING_FILTERS) {
+    counts[filter.key] = filter.status
+      ? listings.filter((item) => item.status === filter.status).length
+      : listings.length
+  }
+  return counts
+}
