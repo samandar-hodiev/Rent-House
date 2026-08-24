@@ -438,6 +438,7 @@ export default {
     'Возможно, объявление удалено или не существует.',
   'apartmentDetails.notFoundAction': 'Вернуться на главную',
   'apartmentDetails.gallery.prev': 'Предыдущее фото',
+  'apartmentDetails.gallery.open': 'Открыть фото',
   'apartmentDetails.gallery.next': 'Следующее фото',
   'apartmentDetails.gallery.thumbnailLabel': '{title}, фото {index}',
   'apartmentDetails.share': 'Поделиться',

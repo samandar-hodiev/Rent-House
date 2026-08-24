@@ -12,7 +12,7 @@ import { ArchiveConversationDialog, DeleteConversationDialog } from './Conversat
 import ChatComposer from './ChatComposer'
 import ChatHeaderMenu from './ChatHeaderMenu'
 import ChatMessage from './ChatMessage'
-import ImageLightbox from './ImageLightbox'
+import ImageLightbox from '../ImageLightbox'
 import DeleteMessageDialog from './DeleteMessageDialog'
 
 /**

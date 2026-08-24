@@ -437,6 +437,7 @@ export default {
     'This listing may have been removed or does not exist.',
   'apartmentDetails.notFoundAction': 'Back to home',
   'apartmentDetails.gallery.prev': 'Previous image',
+  'apartmentDetails.gallery.open': 'Open photo',
   'apartmentDetails.gallery.next': 'Next image',
   'apartmentDetails.gallery.thumbnailLabel': '{title}, photo {index}',
   'apartmentDetails.share': 'Share',

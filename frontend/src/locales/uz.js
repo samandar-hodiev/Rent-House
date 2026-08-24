@@ -438,6 +438,7 @@ export default {
     "Siz qidirayotgan e'lon mavjud emas yoki o'chirilgan.",
   'apartmentDetails.notFoundAction': 'Bosh sahifaga qaytish',
   'apartmentDetails.gallery.prev': 'Oldingi rasm',
+  'apartmentDetails.gallery.open': "Rasmni kattalashtirib ko'rish",
   'apartmentDetails.gallery.next': 'Keyingi rasm',
   'apartmentDetails.gallery.thumbnailLabel': '{title}, {index}-rasm',
   'apartmentDetails.share': 'Ulashish',
