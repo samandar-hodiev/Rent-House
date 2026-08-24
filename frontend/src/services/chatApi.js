@@ -83,6 +83,9 @@ export function toConversation(item) {
     other: {
       id: item.other?.id ?? null,
       name: item.other?.name ?? '',
+      // Null when they have not uploaded one; the avatar falls back to
+      // initials, the same as everywhere else.
+      avatarUrl: item.other?.avatar ?? null,
       online: Boolean(item.other?.online),
     },
     lastMessage: item.last_message
@@ -385,7 +388,9 @@ export async function fetchBlockedUsers({ token, signal } = {}) {
   return (data.items ?? []).map((item) => ({
     userId: item.user_id,
     name: item.name,
-    avatar: item.avatar ?? null,
+    // Named like every other avatar in the app, so the shared component reads
+    // one prop name rather than two.
+    avatarUrl: item.avatar ?? null,
     reason: item.reason ?? null,
     reasonText: item.reason_text ?? null,
     createdAt: item.created_at,

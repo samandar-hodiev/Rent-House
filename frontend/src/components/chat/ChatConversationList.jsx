@@ -177,7 +177,7 @@ function ChatConversationList({ activeId, onSelect }) {
                 className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
               >
                 <span className="relative shrink-0">
-                  <UserAvatar name={conversation.other.name} />
+                  <UserAvatar name={conversation.other.name} src={conversation.other.avatarUrl} />
                   {/* The dot is on the avatar rather than beside the name, so a
                       long name cannot push it out of view. */}
                   {conversation.other.online ? (

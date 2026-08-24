@@ -50,6 +50,30 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	return nil
 }
 
+// UpdateProfile writes the fields a person may change about themselves.
+//
+// Named columns rather than saving the whole struct: a full save would carry
+// the password hash, the role and the verification state back to the database
+// on every profile edit, and a bug anywhere upstream could then change them.
+// `Updates` with a map also writes nils, which is how a phone number or an
+// avatar is cleared.
+func (r *UserRepository) UpdateProfile(
+	ctx context.Context, id uuid.UUID, fields map[string]any,
+) error {
+	err := r.db.WithContext(ctx).
+		Model(&models.User{}).
+		Where("id = ?", id).
+		Updates(fields).Error
+	if err != nil {
+		// Phone numbers are unique; two accounts cannot claim one.
+		if isUniqueViolation(err) {
+			return ErrDuplicateUser
+		}
+		return fmt.Errorf("update profile: %w", err)
+	}
+	return nil
+}
+
 // FindByID loads a user by primary key.
 func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	return r.findBy(ctx, "id = ?", id)

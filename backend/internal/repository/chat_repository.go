@@ -46,6 +46,8 @@ type ConversationSummary struct {
 	OtherUserID    uuid.UUID
 	OtherFirstName string
 	OtherLastName  string
+	// Nil when they have not uploaded a picture.
+	OtherAvatarURL *string
 
 	LastMessageBody      *string
 	LastMessageAt        *time.Time
@@ -277,6 +279,7 @@ SELECT
     other.id            AS other_user_id,
     other.first_name    AS other_first_name,
     other.last_name     AS other_last_name,
+    other.avatar_url    AS other_avatar_url,
     last.body           AS last_message_body,
     last.created_at     AS last_message_at,
     last.sender_id      AS last_message_sender_id,

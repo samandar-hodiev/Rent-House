@@ -158,6 +158,58 @@ func (h *AuthHandler) Login(c *gin.Context) {
 }
 
 // Me handles GET /api/v1/auth/me and runs behind the auth middleware.
+// UpdateProfile handles PATCH /api/v1/me.
+//
+// The account edited is the one the token names. There is no id in the path or
+// the body, so this cannot be aimed at anyone else.
+func (h *AuthHandler) UpdateProfile(c *gin.Context) {
+	userID, ok := middleware.UserIDFrom(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
+		return
+	}
+
+	var req dto.UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+	req.Normalize()
+
+	user, err := h.auth.UpdateProfile(c.Request.Context(), userID, req)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrUserNotFound):
+			response.Error(c, http.StatusUnauthorized, "invalid_token", "Invalid token")
+		case errors.Is(err, service.ErrNameRequired):
+			response.Error(c, http.StatusBadRequest, "validation_failed",
+				"First name and last name cannot be empty")
+		case errors.Is(err, service.ErrInvalidPhone):
+			response.Error(c, http.StatusBadRequest, "invalid_phone",
+				"Enter a valid Uzbek mobile number")
+		case errors.Is(err, service.ErrContactRequired):
+			response.Error(c, http.StatusBadRequest, "contact_required",
+				"An account needs a phone number or an email")
+		case errors.Is(err, service.ErrPhoneTaken):
+			// Reported openly, like registration does: the person needs to know
+			// the number is in use, and the same fact is already discoverable
+			// from the sign-in form.
+			response.Error(c, http.StatusConflict, "phone_taken",
+				"That phone number already belongs to another account")
+		case errors.Is(err, service.ErrInvalidAvatar):
+			response.Error(c, http.StatusBadRequest, "invalid_avatar",
+				"Upload the image first, then save the profile")
+		default:
+			logger.Errorf("update profile: %v", err)
+			response.Error(c, http.StatusInternalServerError, "internal_error",
+				"Could not save the profile")
+		}
+		return
+	}
+
+	response.OK(c, "Profile updated", user)
+}
+
 func (h *AuthHandler) Me(c *gin.Context) {
 	// The identity comes from the verified token, never from the request body
 	// or a query parameter.

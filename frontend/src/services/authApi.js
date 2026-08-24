@@ -51,3 +51,17 @@ export function login({ identifier, password }) {
 export function fetchCurrentUser(token) {
   return request('/auth/me', { token })
 }
+
+/**
+ * Saves the parts of an account its owner may change.
+ *
+ * A PATCH, and only the fields that were actually edited are sent: a field the
+ * form left alone must not be erased, and the server tells "absent" from
+ * "cleared" by whether the key is present at all.
+ *
+ * Returns the account as stored, which is what the rest of the application
+ * then reads — the response is the new truth, not the values that were typed.
+ */
+export function updateProfile(patch, { token } = {}) {
+  return request('/me', { method: 'PATCH', body: patch, token })
+}

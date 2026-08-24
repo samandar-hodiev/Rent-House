@@ -96,7 +96,7 @@ function AuthedHeaderActions({ variant = 'desktop', onNavigate }) {
           onClick={onNavigate}
           className={mobileNavLinkClass({ isActive: false })}
         >
-          <UserAvatar name={user.name} />
+          <UserAvatar name={user.name} src={user.avatarUrl} />
           <span className="truncate">{user.name}</span>
         </Link>
 
@@ -137,7 +137,7 @@ function AuthedHeaderActions({ variant = 'desktop', onNavigate }) {
         aria-label={t('header.account')}
         className="flex min-w-0 shrink-0 items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
-        <UserAvatar name={user.name} />
+        <UserAvatar name={user.name} src={user.avatarUrl} />
         <span className="truncate text-sm font-medium text-text-primary">{user.name}</span>
       </Link>
     </>

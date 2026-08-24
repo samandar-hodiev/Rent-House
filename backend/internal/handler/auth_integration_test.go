@@ -144,6 +144,10 @@ func newHarness(t *testing.T) *harness {
 	auth.POST("/login", h.Login)
 	auth.GET("/me", middleware.Auth(tokens), h.Me)
 
+	// Mirrors cmd/server, so a profile test cannot pass because the route was
+	// missing rather than because the rule held.
+	router.PATCH("/api/v1/me", middleware.Auth(tokens), h.UpdateProfile)
+
 	t.Cleanup(func() {
 		if sqlDB, err := db.DB(); err == nil {
 			_ = sqlDB.Close()

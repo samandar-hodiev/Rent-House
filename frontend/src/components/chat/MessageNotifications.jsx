@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useChat } from '../../context/ChatContext'
 import { useLocale } from '../../context/LocaleContext'
 import { CHAT_EVENTS } from '../../services/chatSocket'
+import { useMessageSound } from '../../hooks/useMessageSound'
 import { ROUTES } from '../../routes/paths'
 import UserAvatar from '../dashboard/UserAvatar'
 
@@ -38,6 +39,11 @@ function MessageNotifications() {
   const { subscribe, conversations, activeConversationRef, isAuthenticated } = useChat()
   const { user } = useAuth()
   const [toasts, setToasts] = useState([])
+
+  // The audible half of "a message arrived". Kept separate from the cards
+  // below because the two answer different questions: a card is suppressed
+  // when the reader is already looking at the thread, a sound is not.
+  useMessageSound()
 
   // Read inside the socket handler, which is created once — refs keep them
   // current without resubscribing on every render.

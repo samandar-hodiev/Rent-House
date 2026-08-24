@@ -127,15 +127,19 @@ export function AuthProvider({ children }) {
     }
   }, [token])
 
-  // Local-only profile edits, so the edit form can show its own changes until a
-  // profile-update endpoint exists.
-  const updateUser = useCallback((patch) => {
-    setUser((current) => {
-      if (!current) return current
-      const next = { ...current, ...patch }
-      next.name = [next.firstName, next.lastName].filter(Boolean).join(' ') || next.name
-      return next
-    })
+  /**
+   * Replaces the signed-in account with what the server just returned.
+   *
+   * This is how a profile edit reaches the rest of the application: the header,
+   * the chat, every set of initials and every avatar read from this one user
+   * object, so saving the profile updates all of them without any of them
+   * knowing the profile page exists.
+   *
+   * Takes the API shape rather than the UI shape, so callers hand over the
+   * response untouched and the mapping stays in one place.
+   */
+  const applyUser = useCallback((apiUser) => {
+    setUser(toUiUser(apiUser))
   }, [])
 
   const value = useMemo(
@@ -149,9 +153,9 @@ export function AuthProvider({ children }) {
       user: user ?? EMPTY_USER,
       signIn,
       signOut,
-      updateUser,
+      applyUser,
     }),
-    [status, token, user, signIn, signOut, updateUser],
+    [status, token, user, signIn, signOut, applyUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

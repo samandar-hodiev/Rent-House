@@ -39,7 +39,7 @@ function DashboardHeader({ onOpenMenu }) {
             to={ROUTES.dashboardEditProfile}
             className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <UserAvatar name={user.name} />
+            <UserAvatar name={user.name} src={user.avatarUrl} />
             <span className="hidden truncate text-sm font-medium text-text-primary sm:block">
               {user.name}
             </span>

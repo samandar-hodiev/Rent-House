@@ -267,6 +267,14 @@ func (s *ChatService) ListMessages(
 	return out, nil
 }
 
+// derefString reads a nullable column, treating "absent" as "empty".
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
 // chatApartment renders a listing the way chat shows it. The nullable columns
 // are a listing that has lost its district, price or cover, none of which stops
 // the card from naming it.
@@ -827,6 +835,7 @@ func conversationFrom(summary repository.ConversationSummary, online bool) dto.C
 		Other: dto.ChatUserResponse{
 			ID:     summary.OtherUserID,
 			Name:   strings.TrimSpace(summary.OtherFirstName + " " + summary.OtherLastName),
+			Avatar: derefString(summary.OtherAvatarURL),
 			Online: online,
 		},
 		UnreadCount: summary.UnreadCount,

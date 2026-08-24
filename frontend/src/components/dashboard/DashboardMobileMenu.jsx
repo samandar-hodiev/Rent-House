@@ -35,7 +35,7 @@ function DashboardMobileMenu({ isOpen, onClose }) {
       >
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
           <span className="flex min-w-0 items-center gap-2">
-            <UserAvatar name={user.name} />
+            <UserAvatar name={user.name} src={user.avatarUrl} />
             <span className="truncate text-sm font-medium text-text-primary">
               {user.name}
             </span>

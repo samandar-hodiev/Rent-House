@@ -132,6 +132,54 @@ func (r *LoginRequest) Normalize() {
 
 // UserResponse is the public view of a user. It has no password field of any
 // kind, which is what makes it safe to return.
+// UpdateProfileRequest is the body of PATCH /api/v1/me.
+//
+// Every field is a pointer so "not sent" and "sent empty" are different things:
+// omitting `phone` leaves it alone, sending "" clears it. A struct of plain
+// strings could not tell those apart, and a profile form that leaves a field
+// untouched must not erase it.
+type UpdateProfileRequest struct {
+	FirstName *string `json:"first_name" binding:"omitempty,min=1,max=100"`
+	LastName  *string `json:"last_name"  binding:"omitempty,min=1,max=100"`
+	// Free-form rather than a strict pattern: numbers are entered with spaces,
+	// brackets and a leading +, and the service normalizes before storing.
+	Phone *string `json:"phone" binding:"omitempty,max=32"`
+	// A path produced by the upload endpoint, not an arbitrary URL — checked in
+	// the service, because an image the client names could otherwise point
+	// anywhere and every viewer's browser would fetch it.
+	AvatarURL *string `json:"avatar_url" binding:"omitempty,max=512"`
+}
+
+// Normalize trims what the person typed. Names keep their inner spacing;
+// only the edges go.
+func (r *UpdateProfileRequest) Normalize() {
+	if r.FirstName != nil {
+		trimmed := strings.TrimSpace(*r.FirstName)
+		r.FirstName = &trimmed
+	}
+	if r.LastName != nil {
+		trimmed := strings.TrimSpace(*r.LastName)
+		r.LastName = &trimmed
+	}
+	// Put through the same normalizer registration uses, so one account cannot
+	// hold "+998 90 123 45 67" while another holds "998901234567" and the
+	// unique constraint treats them as different people.
+	//
+	// A number the normalizer cannot read keeps the text as typed rather than
+	// becoming "". Empty means "remove my phone number", so collapsing an
+	// unreadable one into it would turn a typo into a deletion — the service
+	// rejects the raw text instead, which is what a typo deserves.
+	if r.Phone != nil && *r.Phone != "" {
+		if normalized := NormalizeUzPhone(*r.Phone); normalized != "" {
+			r.Phone = &normalized
+		}
+	}
+	if r.AvatarURL != nil {
+		trimmed := strings.TrimSpace(*r.AvatarURL)
+		r.AvatarURL = &trimmed
+	}
+}
+
 type UserResponse struct {
 	ID        string  `json:"id"`
 	FirstName string  `json:"first_name"`

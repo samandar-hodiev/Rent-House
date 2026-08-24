@@ -128,7 +128,7 @@ function BlockedUsersPage() {
               className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:items-center"
             >
               <span className="flex min-w-0 flex-1 items-start gap-3">
-                <UserAvatar name={person.name} />
+                <UserAvatar name={person.name} src={person.avatarUrl} />
 
                 <span className="flex min-w-0 flex-col gap-0.5">
                   <span className="truncate text-sm font-medium text-text-primary">

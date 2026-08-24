@@ -31,6 +31,7 @@ import EmptyState from '../components/EmptyState'
 import ImageGallery from '../components/ImageGallery'
 import ApartmentDetailsSkeleton from '../components/ApartmentDetailsSkeleton'
 import ContactChatModal from '../components/ContactChatModal'
+import NoPhoneDialog from '../components/NoPhoneDialog'
 import ApartmentGrid from '../components/ApartmentGrid'
 import { useLocale } from '../context/LocaleContext'
 import { useAuth } from '../context/AuthContext'
@@ -100,6 +101,12 @@ function ApartmentDetailsPage() {
   // saving and messaging require signing in, and both return here afterwards.
   const handleSaveClick = requireAuth(() => toggleWishlist(apartment?.id))
   const handleChatClick = requireAuth(() => setIsChatOpen(true))
+
+  // Calling needs a number to call. When the owner has not added one, a `tel:`
+  // link would open an empty dialer or do nothing at all, so the button says
+  // why instead and offers chat, which does work.
+  const [noPhoneOpen, setNoPhoneOpen] = useState(false)
+  const ownerPhone = apartment?.owner?.phone?.trim() || null
   const [shareCopied, setShareCopied] = useState(false)
 
   // The token is sent when there is one so an owner can open their own
@@ -333,13 +340,24 @@ function ApartmentDetailsPage() {
               </div>
             ) : (
               <div className="mt-4 hidden gap-3 lg:flex">
-                <a
-                  href={`tel:${apartment.owner.phone}`}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                >
-                  <Phone aria-hidden="true" size={16} />
-                  {t('apartmentDetails.call')}
-                </a>
+                {ownerPhone ? (
+                  <a
+                    href={`tel:${ownerPhone}`}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <Phone aria-hidden="true" size={16} />
+                    {t('apartmentDetails.call')}
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setNoPhoneOpen(true)}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <Phone aria-hidden="true" size={16} />
+                    {t('apartmentDetails.call')}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleChatClick}
@@ -387,13 +405,24 @@ function ApartmentDetailsPage() {
           </Link>
         ) : (
           <>
-            <a
-              href={`tel:${apartment.owner.phone}`}
-              className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <Phone aria-hidden="true" size={16} />
-              {t('apartmentDetails.call')}
-            </a>
+            {ownerPhone ? (
+              <a
+                href={`tel:${ownerPhone}`}
+                className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <Phone aria-hidden="true" size={16} />
+                {t('apartmentDetails.call')}
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setNoPhoneOpen(true)}
+                className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <Phone aria-hidden="true" size={16} />
+                {t('apartmentDetails.call')}
+              </button>
+            )}
             <button
               type="button"
               onClick={handleChatClick}
@@ -405,6 +434,17 @@ function ApartmentDetailsPage() {
           </>
         )}
       </div>
+
+      {noPhoneOpen ? (
+        <NoPhoneDialog
+          name={apartment.owner?.name ?? ''}
+          onClose={() => setNoPhoneOpen(false)}
+          onOpenChat={() => {
+            setNoPhoneOpen(false)
+            handleChatClick()
+          }}
+        />
+      ) : null}
 
       {isChatOpen ? (
         <ContactChatModal apartmentId={apartment.id} onClose={() => setIsChatOpen(false)} />

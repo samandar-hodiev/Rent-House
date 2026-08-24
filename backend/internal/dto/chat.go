@@ -118,9 +118,12 @@ func (q *MessageListQuery) Normalize() {
 // ChatUserResponse is a participant as chat shows them: enough to put a name
 // and initials in a header, and nothing else about the account.
 type ChatUserResponse struct {
-	ID     uuid.UUID `json:"id"`
-	Name   string    `json:"name"`
-	Online bool      `json:"online"`
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+	// Avatar is the path to their picture, absent when they have not uploaded
+	// one — the client falls back to initials, as it does everywhere else.
+	Avatar string `json:"avatar,omitempty"`
+	Online bool   `json:"online"`
 }
 
 // ChatApartmentResponse is the listing a thread is about.

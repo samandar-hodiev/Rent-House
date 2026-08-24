@@ -261,7 +261,7 @@ function ChatThread({
 
       {/* Header */}
       <div className={`shrink-0 items-center gap-3 border-b border-border px-4 py-3 ${selecting ? 'hidden' : 'flex'}`}>
-        <UserAvatar name={other.name} />
+        <UserAvatar name={other.name} src={other.avatarUrl} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-text-primary">{other.name}</p>
           {/* Somebody who has been blocked is told so here, in place of a

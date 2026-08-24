@@ -278,6 +278,10 @@ func newRouter(
 	// dashboard, where a draft is exactly what they came to find.
 	me := v1.Group("/me", middleware.Auth(tokens))
 	{
+		// The signed-in account's own profile. PATCH rather than PUT: a form
+		// that leaves a field untouched must not erase it.
+		me.PATCH("", authHandler.UpdateProfile)
+
 		me.GET("/apartments", apartmentHandler.ListMine)
 		me.GET("/apartments/stats", apartmentHandler.Stats)
 		// The dashboard chart: every published listing this user owns, as one

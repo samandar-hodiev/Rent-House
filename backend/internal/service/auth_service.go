@@ -10,6 +10,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/url"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -39,6 +42,14 @@ var (
 	ErrContactTaken = errors.New("contact already registered")
 
 	ErrUserNotFound = errors.New("user not found")
+
+	// Profile editing. Each says exactly what the person has to change, so the
+	// handler can map it to a message rather than a generic refusal.
+	ErrNameRequired    = errors.New("name cannot be empty")
+	ErrContactRequired = errors.New("an account needs a phone number or an email")
+	ErrInvalidPhone    = errors.New("phone number is not a valid Uzbek mobile number")
+	ErrPhoneTaken      = errors.New("phone number already belongs to another account")
+	ErrInvalidAvatar   = errors.New("avatar must be an uploaded image")
 
 	// ErrResendTooSoon means the cooldown has not elapsed.
 	ErrResendTooSoon = errors.New("verification code requested too soon")
@@ -399,6 +410,128 @@ func (s *AuthService) CurrentUser(ctx context.Context, userID uuid.UUID) (*dto.U
 	}
 
 	response := dto.NewUserResponse(user)
+	return &response, nil
+}
+
+// uploadPathPrefix is where this server serves what it stored.
+const uploadPathPrefix = "/uploads/"
+
+// uploadPath reduces whatever the client sent to the path part, and accepts it
+// only if that path is one this server serves.
+//
+// The upload endpoint returns an absolute URL because the frontend may sit on
+// another origin; what is kept is the path inside it, so the origin is this
+// server's to decide when the value is read back.
+func uploadPath(raw string) (string, error) {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", ErrInvalidAvatar
+	}
+	// `url.Parse` leaves "../" in the path, and the static handler resolves it,
+	// so a traversal has to be refused here rather than assumed impossible.
+	cleaned := path.Clean(parsed.Path)
+	if !strings.HasPrefix(cleaned, uploadPathPrefix) {
+		return "", ErrInvalidAvatar
+	}
+	return cleaned, nil
+}
+
+// UpdateProfile changes the parts of an account its owner may change.
+//
+// Only name, phone and avatar. Email is deliberately absent: it is a login
+// identifier and a verified one, so changing it is a flow with a confirmation
+// code rather than a field on a form.
+//
+// The identity comes from the caller's token — there is no user id in the
+// request — so this cannot be pointed at somebody else's account.
+func (s *AuthService) UpdateProfile(
+	ctx context.Context, userID uuid.UUID, req dto.UpdateProfileRequest,
+) (*dto.UserResponse, error) {
+	user, err := s.users.FindByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	fields := map[string]any{}
+
+	// A name is how everyone else in the app refers to this person, so it can
+	// be changed but not emptied.
+	if req.FirstName != nil {
+		if *req.FirstName == "" {
+			return nil, ErrNameRequired
+		}
+		fields["first_name"] = *req.FirstName
+	}
+	if req.LastName != nil {
+		if *req.LastName == "" {
+			return nil, ErrNameRequired
+		}
+		fields["last_name"] = *req.LastName
+	}
+
+	if req.Phone != nil {
+		if *req.Phone == "" {
+			// The database insists on at least one way to reach an account, and
+			// it is also how this person signs in. Removing the only one would
+			// lock them out.
+			if user.Email == nil || *user.Email == "" {
+				return nil, ErrContactRequired
+			}
+			fields["phone"] = nil
+		} else {
+			// Normalization already ran in the DTO and returns "" for anything
+			// it could not read, so a non-empty value here is canonical.
+			if !dto.IsValidUzPhone(*req.Phone) {
+				return nil, ErrInvalidPhone
+			}
+			fields["phone"] = *req.Phone
+		}
+	}
+
+	if req.AvatarURL != nil {
+		if *req.AvatarURL == "" {
+			fields["avatar_url"] = nil
+		} else {
+			// Stored as a path, never as the absolute URL the upload endpoint
+			// hands back.
+			//
+			// An avatar is rendered in other people's browsers — in chat, on a
+			// listing — so a value pointing at another origin would make every
+			// viewer fetch an image from a server of this account's choosing,
+			// which is a way to collect the address of everyone who looks at
+			// the profile. Keeping only the path makes that impossible to
+			// express rather than merely disallowed, and the client resolves it
+			// against the API origin it already knows.
+			path, err := uploadPath(*req.AvatarURL)
+			if err != nil {
+				return nil, ErrInvalidAvatar
+			}
+			fields["avatar_url"] = path
+		}
+	}
+
+	if len(fields) == 0 {
+		response := dto.NewUserResponse(user)
+		return &response, nil
+	}
+
+	if err := s.users.UpdateProfile(ctx, userID, fields); err != nil {
+		if errors.Is(err, repository.ErrDuplicateUser) {
+			return nil, ErrPhoneTaken
+		}
+		return nil, err
+	}
+
+	// Read back rather than patching the struct in memory, so the response is
+	// what the database actually holds.
+	updated, err := s.users.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	response := dto.NewUserResponse(updated)
 	return &response, nil
 }
 
