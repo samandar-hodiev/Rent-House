@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, CheckCheck, CheckSquare, CornerUpLeft, Pencil, Trash2, X } from 'lucide-react'
+import { Check, CheckCheck, X } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { formatMessageTime } from '../../utils/formatChatTime'
 import MessageAttachment from './MessageAttachment'
+import MessageActionsMenu from './MessageActionsMenu'
 import MessageQuote from './MessageQuote'
 
 /**
@@ -76,9 +77,14 @@ function ChatMessage({
       }
     : {}
 
+  // Warning rather than the primary green. Selecting is a staging step towards
+  // deleting, so it should not wear the colour the app uses for its ordinary
+  // affirmative actions. A tinted row plus a filled box reads clearly in both
+  // themes without shouting, and leaves the bubbles' own colours untouched —
+  // the tint is on the row behind them.
   const selectionClass = selecting
     ? `-mx-2 cursor-pointer rounded-md px-2 py-0.5 transition-colors ${
-        selected ? 'bg-primary/10' : 'hover:bg-surface-secondary'
+        selected ? 'bg-warning/15' : 'hover:bg-surface-secondary'
       }`
     : ''
 
@@ -88,12 +94,19 @@ function ChatMessage({
     <span
       aria-hidden="true"
       className={`mt-2 flex size-4 shrink-0 items-center justify-center rounded-sm border transition-colors ${
-        selected ? 'border-primary bg-primary text-white' : 'border-border bg-surface'
+        // A dark tick on the amber fill. White on amber is barely legible,
+        // and the chip is amber in both themes, so the tick is dark in both.
+        selected ? 'border-warning bg-warning text-slate-900' : 'border-border bg-surface'
       }`}
     >
       {selected ? <Check size={11} strokeWidth={3} /> : null}
     </span>
   ) : null
+
+  // Not while editing (the bubble is a form), not while selecting (the row
+  // means one thing only), and not on a withdrawn message (there is nothing
+  // left to act on).
+  const showMenu = !editing && !selecting && !message.isDeleted
 
   if (message.isDeleted) {
     return (
@@ -120,69 +133,34 @@ function ChatMessage({
       }`}
     >
       {!isMine ? checkbox : null}
-      <div className={`flex max-w-[85%] items-end gap-1 sm:max-w-[75%] ${isMine ? 'flex-row' : 'flex-row-reverse'}`}>
-        {/* Actions sit outside the bubble and appear on hover, or always on a
-            touch screen where there is no hover to reveal them. Hidden while
-            selecting, where the row means one thing only. */}
-        {!editing && !selecting ? (
-          <div className="flex shrink-0 flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-100">
-            {/* Reply is offered on every message, incoming and outgoing alike:
-                answering your own message to add to it is as ordinary as
-                answering someone else's. */}
-            <button
-              type="button"
-              onClick={() => onReply(message)}
-              aria-label={t('chat.reply')}
-              title={t('chat.reply')}
-              className="flex size-7 items-center justify-center rounded-md text-text-muted hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <CornerUpLeft aria-hidden="true" size={13} />
-            </button>
-
-            {/* The way into selection mode. Selecting the first message turns
-                it on; from then on the rows themselves are the control, so
-                this is the only place it has to be offered. */}
-            <button
-              type="button"
-              onClick={() => onToggleSelect(message.id)}
-              aria-label={t('chat.selectMessages')}
-              title={t('chat.selectMessages')}
-              className="flex size-7 items-center justify-center rounded-md text-text-muted hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <CheckSquare aria-hidden="true" size={13} />
-            </button>
-
-            {/* Editing and deleting stay the author's own, as they were. */}
-            {isMine && isText ? (
-            <button
-              type="button"
-              onClick={startEditing}
-              aria-label={t('chat.edit')}
-              title={t('chat.edit')}
-              className="flex size-7 items-center justify-center rounded-md text-text-muted hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <Pencil aria-hidden="true" size={13} />
-            </button>
-            ) : null}
-            {isMine ? (
-            <button
-              type="button"
-              onClick={() => onDelete(message)}
-              aria-label={t('chat.delete')}
-              title={t('chat.delete')}
-              className="flex size-7 items-center justify-center rounded-md text-text-muted hover:bg-error/10 hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <Trash2 aria-hidden="true" size={13} />
-            </button>
-            ) : null}
-          </div>
-        ) : null}
-
+      {/* Holds the bubble's width limit. The actions used to be a second
+          column here, which is why it was a row. */}
+      <div className="flex max-w-[85%] flex-col sm:max-w-[75%]">
         <div
-          className={`min-w-0 rounded-lg px-3 py-2 ${
-            isMine ? 'bg-primary text-white' : 'border border-border bg-surface-secondary'
+          className={`relative min-w-0 rounded-lg py-2 pl-3 ${
+            // A gutter for the actions button, reserved rather than overlaid,
+            // so nothing shifts when it fades in and no text runs under it.
+            showMenu ? 'pr-9' : 'pr-3'
+          } ${isMine ? 'bg-primary text-white' : 'border border-border bg-surface-secondary'} ${
+            // While selecting, the row is the only thing that responds. Without
+            // this, clicking an image inside a bubble would open the lightbox
+            // *and* toggle the message underneath it.
+            selecting ? 'pointer-events-none select-none' : ''
           }`}
         >
+          {/* One button in the bubble's top corner, in place of the four that
+              used to sit beside every row. */}
+          {showMenu ? (
+            <MessageActionsMenu
+              isMine={isMine}
+              isText={isText}
+              onSurface={isMine}
+              onReply={() => onReply(message)}
+              onSelect={() => onToggleSelect(message.id)}
+              onEdit={startEditing}
+              onDelete={() => onDelete(message)}
+            />
+          ) : null}
           {editing ? (
             <form onSubmit={submitEdit} className="flex flex-col gap-2">
               <input

@@ -252,6 +252,7 @@ export default {
   'chat.cancel': 'Cancel',
   'chat.delete': 'Delete',
   'chat.reply': 'Reply',
+  'chat.messageActions': 'Message actions',
   'chat.cancelReply': 'Cancel reply',
   'chat.you': 'You',
   'chat.quoteImage': 'Photo',

@@ -328,6 +328,9 @@ function ChatThread({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
+        // Named so a message's actions menu can measure the room it actually
+        // has: this element clips anything that leaves it.
+        data-chat-scroll=""
         className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3"
       >
         {isLoading ? (
