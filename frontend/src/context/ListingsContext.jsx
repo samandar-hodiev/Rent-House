@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useAuth } from './AuthContext'
 import {
+  changeApartmentStatus as changeApartmentStatusRequest,
   createApartment as createApartmentRequest,
   deleteApartment as deleteApartmentRequest,
   fetchMyApartments,
@@ -82,10 +83,31 @@ export function ListingsProvider({ children }) {
     [token],
   )
 
+  // Deleting is a status change on the server — the row stays so the
+  // conversations, saved listings and view history pointing at it survive — so
+  // the listing is updated in place here rather than dropped. It leaves the
+  // active lists because those filter by status, not because it stopped
+  // existing.
   const removeListing = useCallback(
     async (id) => {
       await deleteApartmentRequest(id, { token })
-      setListings((current) => current.filter((listing) => String(listing.id) !== String(id)))
+      setListings((current) =>
+        current.map((listing) =>
+          String(listing.id) === String(id) ? { ...listing, status: 'deleted' } : listing,
+        ),
+      )
+    },
+    [token],
+  )
+
+  /** Moves a listing through its lifecycle and keeps the cached copy in step. */
+  const changeListingStatus = useCallback(
+    async (id, status) => {
+      const updated = await changeApartmentStatusRequest(id, status, { token })
+      setListings((current) =>
+        current.map((listing) => (String(listing.id) === String(id) ? updated : listing)),
+      )
+      return updated
     },
     [token],
   )
@@ -101,10 +123,12 @@ export function ListingsProvider({ children }) {
       createListing,
       updateListing,
       removeListing,
+      changeListingStatus,
       reload: () => load(),
     }),
     [
       listings,
+      changeListingStatus,
       status,
       error,
       isAuthenticated,

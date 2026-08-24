@@ -186,6 +186,43 @@ func (h *ApartmentHandler) Update(c *gin.Context) {
 }
 
 // Delete handles DELETE /api/v1/apartments/:id.
+// ChangeStatus handles PATCH /api/v1/apartments/:id/status.
+//
+// The listing's lifecycle, as its owner drives it: publishing a draft, pausing
+// a live listing, closing one, taking one down. Ownership is checked in the
+// service against the token's account, so this cannot be aimed at somebody
+// else's listing.
+func (h *ApartmentHandler) ChangeStatus(c *gin.Context) {
+	actorID, ok := middleware.UserIDFrom(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
+		return
+	}
+	id, ok := parseUUIDParam(c, "id")
+	if !ok {
+		return
+	}
+
+	var req dto.ChangeStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+
+	apartment, err := h.apartments.ChangeStatus(c.Request.Context(), id, actorID, req.Status)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidStatusChange) {
+			response.Error(c, http.StatusConflict, "invalid_status_change",
+				"This listing cannot move to that status")
+			return
+		}
+		h.writeError(c, err, "change listing status")
+		return
+	}
+
+	response.OK(c, "Status updated", apartment)
+}
+
 func (h *ApartmentHandler) Delete(c *gin.Context) {
 	actorID, ok := middleware.UserIDFrom(c)
 	if !ok {

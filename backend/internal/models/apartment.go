@@ -27,6 +27,10 @@ const (
 	ApartmentStatusPending = "pending"
 	ApartmentStatusActive  = "active"
 	ApartmentStatusClosed  = "closed"
+	// ApartmentStatusDeleted is a listing its owner removed. Kept rather than
+	// erased: the conversations, saved listings and view history that point at
+	// it outlive the owner's decision to take it down.
+	ApartmentStatusDeleted = "deleted"
 )
 
 // Who pays for gas, water and electricity on top of the rent.
@@ -46,6 +50,7 @@ var (
 		ApartmentStatusPending,
 		ApartmentStatusActive,
 		ApartmentStatusClosed,
+		ApartmentStatusDeleted,
 	}
 )
 

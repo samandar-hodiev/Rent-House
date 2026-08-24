@@ -1,6 +1,15 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Building2, CheckCircle2, ChevronDown, ChevronUp, Clock, FileText, XCircle } from 'lucide-react'
+import {
+  Building2,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  FileText,
+  Trash2,
+  XCircle,
+} from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useListings } from '../../context/ListingsContext'
 import { LISTING_FILTERS, filterFromSearch, getFilterCounts } from '../../data/listingStatus'
@@ -28,6 +37,7 @@ const STATUS_ICONS = {
   pending: { Icon: Clock, tint: 'text-warning' },
   closed: { Icon: XCircle, tint: 'text-error' },
   draft: { Icon: FileText, tint: 'text-text-muted' },
+  deleted: { Icon: Trash2, tint: 'text-text-muted' },
 }
 
 /**

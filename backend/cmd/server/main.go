@@ -268,6 +268,9 @@ func newRouter(
 		listings.POST("", middleware.Auth(tokens), apartmentHandler.Create)
 		listings.PUT("/:id", middleware.Auth(tokens), apartmentHandler.Update)
 		listings.DELETE("/:id", middleware.Auth(tokens), apartmentHandler.Delete)
+		// The listing's lifecycle, separate from editing its content: a status
+		// change rewrites neither the gallery nor the description.
+		listings.PATCH("/:id/status", middleware.Auth(tokens), apartmentHandler.ChangeStatus)
 
 		// How many people looked at a listing is its owner's business, so this
 		// one is authenticated even though the listing beside it is public.

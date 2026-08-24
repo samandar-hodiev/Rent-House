@@ -187,6 +187,22 @@ export async function updateApartment(id, payload, { token } = {}) {
   return toApartment(await request(`/apartments/${id}`, { method: 'PUT', body: payload, token }))
 }
 
+/**
+ * Moves a listing to another point in its lifecycle.
+ *
+ * Separate from `updateApartment`, which rewrites the listing's content along
+ * with its gallery and amenities. A status change touches none of that, and
+ * which transitions are legal is decided by the server.
+ */
+export async function changeApartmentStatus(id, status, { token } = {}) {
+  const data = await request(`/apartments/${id}/status`, {
+    method: 'PATCH',
+    body: { status },
+    token,
+  })
+  return toApartment(data)
+}
+
 export function deleteApartment(id, { token } = {}) {
   return request(`/apartments/${id}`, { method: 'DELETE', token })
 }

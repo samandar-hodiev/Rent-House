@@ -23,3 +23,12 @@ export const ROUTES = {
 export const apartmentDetailsPath = (id) => `/apartment/${id}`
 
 export const editListingPath = (id) => `/edit-listing/${id}`
+
+/**
+ * The dashboard page a listing in a given state lives on.
+ *
+ * The sidebar links here and a status change navigates here, so both agree
+ * about where a listing goes without either spelling out the query string.
+ */
+export const listingsPathFor = (status) =>
+  status ? `${ROUTES.dashboardListings}?status=${status}` : ROUTES.dashboardListings

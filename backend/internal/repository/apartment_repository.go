@@ -207,6 +207,29 @@ func (r *ApartmentRepository) applyFilter(query *gorm.DB, filter ApartmentFilter
 // `fields` is an explicit column set rather than the whole struct: saving the
 // struct would also write owner_id, status and views_count, letting an edit
 // silently reassign or republish a listing.
+// UpdateFields writes a named set of columns and nothing else.
+//
+// Separate from `Update`, which rewrites a listing's content along with its
+// images and amenities. A status change touches neither, and running the full
+// update for it would rewrite the gallery on every transition.
+//
+// `Updates` with a map writes nils, which is how published_at is cleared.
+func (r *ApartmentRepository) UpdateFields(
+	ctx context.Context, id uuid.UUID, fields map[string]any,
+) error {
+	result := r.db.WithContext(ctx).
+		Model(&models.Apartment{}).
+		Where("id = ?", id).
+		Updates(fields)
+	if result.Error != nil {
+		return fmt.Errorf("update apartment fields: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return ErrApartmentNotFound
+	}
+	return nil
+}
+
 func (r *ApartmentRepository) Update(
 	ctx context.Context,
 	id uuid.UUID,

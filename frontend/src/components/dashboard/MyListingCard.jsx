@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eye, Pencil, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useListings } from '../../context/ListingsContext'
 import { useLocale } from '../../context/LocaleContext'
+import { useToast } from '../../context/ToastContext'
 import { districtNameKey, getDistrictById } from '../../data/districts'
-import { LISTING_STATUS_CLASS } from '../../data/listingStatus'
-import { apartmentDetailsPath, editListingPath } from '../../routes/paths'
+import { LISTING_STATUS, LISTING_STATUS_CLASS } from '../../data/listingStatus'
+import ListingStatusMenu from './ListingStatusMenu'
+import ListingStatusDialog from './ListingStatusDialog'
+import { apartmentDetailsPath, editListingPath, listingsPathFor } from '../../routes/paths'
 import { formatListingPrice } from '../../utils/formatPrice'
 import { formatPostedAt } from '../../utils/formatRelativeTime'
 import { listingTitle } from '../../utils/listingText'
@@ -19,25 +23,38 @@ import ListingGalleryModal from './ListingGalleryModal'
 // the summary offers viewing and editing and sends you there for the rest.
 function MyListingCard({ listing, compact = false }) {
   const { t } = useLocale()
-  const { removeListing } = useListings()
-  const [deleting, setDeleting] = useState(false)
+  const navigate = useNavigate()
+  const { removeListing, changeListingStatus } = useListings()
+  const { showToast } = useToast()
+
+  // The state being confirmed, if any. One piece of state for both the menu's
+  // transitions and the delete button, because they are the same action with
+  // different targets — and having two would let two dialogs open at once.
+  const [pendingTarget, setPendingTarget] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState(null)
   const [deleteError, setDeleteError] = useState(null)
 
-  // `confirm` rather than a modal: the project has no dialog system, and
-  // inventing one for a single destructive action would be more UI than the
-  // feature needs. The guard that matters is the server's ownership check.
-  const handleDelete = async () => {
-    if (deleting) return
-    if (!window.confirm(t('listing.deleteConfirm'))) return
-
-    setDeleting(true)
-    setDeleteError(null)
+  const confirmStatusChange = async () => {
+    if (busy) return
+    setBusy(true)
+    setActionError(null)
     try {
-      await removeListing(listing.id)
-      // No state reset afterwards: a successful delete unmounts this card.
+      if (pendingTarget === LISTING_STATUS.deleted) {
+        await removeListing(listing.id)
+      } else {
+        await changeListingStatus(listing.id, pendingTarget)
+      }
+      showToast(t(`listingAction.${pendingTarget}.done`))
+      setPendingTarget(null)
+      // Sent to the state the listing has just moved into, which is where it
+      // now lives — leaving the reader on a page the card has just left would
+      // look like the action did nothing.
+      navigate(listingsPathFor(pendingTarget))
     } catch {
-      setDeleteError(t('listing.errorDeleteFailed'))
-      setDeleting(false)
+      setActionError(t('listing.errorDeleteFailed'))
+    } finally {
+      setBusy(false)
     }
   }
   const [isGalleryOpen, setIsGalleryOpen] = useState(false)
@@ -72,10 +89,25 @@ function MyListingCard({ listing, compact = false }) {
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex items-start justify-between gap-3">
             <h2 className="min-w-0 truncate text-sm font-semibold text-text-primary">{title}</h2>
-            <span
-              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${LISTING_STATUS_CLASS[listing.status]}`}
-            >
-              {t(`listingStatus.${listing.status}`)}
+            <span className="flex shrink-0 items-center gap-1">
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${LISTING_STATUS_CLASS[listing.status]}`}
+              >
+                {t(`listingStatus.${listing.status}`)}
+              </span>
+              {/* Beside the badge, because what it offers is a change to
+                  exactly that. Absent from the dashboard's preview, where
+                  management is not the job. */}
+              {compact ? null : (
+                <ListingStatusMenu
+                  status={listing.status}
+                  disabled={busy}
+                  onSelect={(target) => {
+                    setActionError(null)
+                    setPendingTarget(target)
+                  }}
+                />
+              )}
             </span>
           </div>
 
@@ -130,15 +162,29 @@ function MyListingCard({ listing, compact = false }) {
           {compact ? null : (
             <button
               type="button"
-              onClick={handleDelete}
-              disabled={deleting}
+              onClick={() => {
+                setActionError(null)
+                setDeleteError(null)
+                setPendingTarget(LISTING_STATUS.deleted)
+              }}
+              disabled={busy}
               className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-error/40 hover:bg-error/10 hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Trash2 aria-hidden="true" size={14} />
-              {deleting ? t('listing.deleting') : t('listing.delete')}
+              {t('listing.delete')}
             </button>
           )}
         </div>
+
+        {pendingTarget ? (
+          <ListingStatusDialog
+            target={pendingTarget}
+            busy={busy}
+            error={actionError}
+            onCancel={() => (busy ? undefined : setPendingTarget(null))}
+            onConfirm={confirmStatusChange}
+          />
+        ) : null}
 
         {deleteError ? (
           <p role="alert" className="text-xs text-error">

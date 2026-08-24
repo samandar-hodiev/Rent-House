@@ -292,7 +292,11 @@ JOIN conversation_participants cp
 -- The thread's current listing context. LEFT, because a conversation outlives
 -- the listing it last referred to — the pair keep talking, and the header
 -- simply has nothing to pin.
-LEFT JOIN apartments a ON a.id = c.apartment_id
+--
+-- A listing its owner deleted counts as gone here. The row survives so the
+-- messages about it survive, but the other person must not be shown a card
+-- for it, still less a link that would refuse them when they followed it.
+LEFT JOIN apartments a ON a.id = c.apartment_id AND a.status <> 'deleted'
 LEFT JOIN districts d ON d.id = a.district_id
 -- The other side of the pair. Read from the conversation itself now rather than
 -- through the listing, so who this thread is with does not depend on a listing
@@ -478,6 +482,10 @@ func (r *ChatRepository) ConversationApartments(
 		) img ON true
 		WHERE m.conversation_id = @conversation_id
 		  AND m.apartment_id IS NOT NULL
+		  -- Deleted listings are absent rather than listed: the client heads a
+		  -- run of messages only when it has the listing, so those messages
+		  -- simply carry no card.
+		  AND a.status <> 'deleted'
 		  AND NOT EXISTS (
 		      SELECT 1 FROM conversation_participants cp
 		      WHERE cp.conversation_id = m.conversation_id

@@ -2,8 +2,13 @@ package models
 
 import "testing"
 
-// The constants are mirrored by CHECK constraints in 0001_init.up.sql. These
+// The constants are mirrored by CHECK constraints in the migrations. These
 // tests catch a value being added in Go without the constraint being widened.
+//
+// The expected sets below are the *current* schema, which is not always what
+// 0001 created: a later migration can redefine a constraint, and the value
+// listed here has to follow it. `deleted` arrived that way in
+// 0014_apartment_deleted_status.
 
 func assertUnique(t *testing.T, label string, values []string) {
 	t.Helper()
@@ -37,7 +42,8 @@ func TestEnumValuesMatchTheDatabaseCheckConstraints(t *testing.T) {
 		{"Themes", Themes, []string{"light", "dark"}},
 		{"Currencies", Currencies, []string{"UZS", "USD"}},
 		{"RentalPeriods", RentalPeriods, []string{"monthly", "daily"}},
-		{"ApartmentStatuses", ApartmentStatuses, []string{"draft", "pending", "active", "closed"}},
+		// Widened by 0014_apartment_deleted_status.
+		{"ApartmentStatuses", ApartmentStatuses, []string{"draft", "pending", "active", "closed", "deleted"}},
 	}
 
 	for _, c := range cases {

@@ -6,10 +6,10 @@ import MyListingCard from '../components/dashboard/MyListingCard'
 import { useLocale } from '../context/LocaleContext'
 import { useListings } from '../context/ListingsContext'
 import {
-  LISTING_STATUS,
+  LISTING_FILTERS,
   LISTING_STATUS_CLASS,
   filterFromSearch,
-  getMyListingsSummary,
+  getFilterCounts,
 } from '../data/listingStatus'
 import { ROUTES } from '../routes/paths'
 
@@ -54,7 +54,8 @@ function DashboardListingsPage() {
     [listings, filter.status],
   )
 
-  const summary = useMemo(() => getMyListingsSummary(listings), [listings])
+  // Whole-account figures, for the unfiltered breakdown.
+  const counts = useMemo(() => getFilterCounts(listings), [listings])
 
   // A first load has nothing to show yet, and an empty list means something
   // different from "not loaded" — showing the empty state during the request
@@ -123,36 +124,34 @@ function DashboardListingsPage() {
               : t('dashboard.listingsTitle')}
           </h1>
 
+          {/* The summary describes what is on the page.
+              
+              It used to list every state's count regardless of the filter, so
+              "Kutilmoqda" showed a green "Faol 2" beside a list containing no
+              active listings at all — three different answers to the same
+              question on one screen. Filtered, there is exactly one badge and
+              it is the state being viewed; unfiltered, the whole breakdown is
+              the point. */}
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-            <SummaryItem label={t('dashboard.summaryTotal')} value={summary.total} />
-            <SummaryBadge
-              status={LISTING_STATUS.active}
-              label={t('listingStatus.active')}
-              value={summary.active}
-            />
-            {/* Drafts are shown only when there are any: a permanent "0
-                Qoralama" is noise on a dashboard that has none. */}
-            {summary.draft > 0 ? (
+            <SummaryItem label={t('dashboard.summaryTotal')} value={visible.length} />
+            {filter.status ? (
               <SummaryBadge
-                status={LISTING_STATUS.draft}
-                label={t('listingStatus.draft')}
-                value={summary.draft}
+                status={filter.status}
+                label={t(`listingStatus.${filter.status}`)}
+                value={visible.length}
               />
-            ) : null}
-            {summary.pending > 0 ? (
-              <SummaryBadge
-                status={LISTING_STATUS.pending}
-                label={t('listingStatus.pending')}
-                value={summary.pending}
-              />
-            ) : null}
-            {summary.closed > 0 ? (
-              <SummaryBadge
-                status={LISTING_STATUS.closed}
-                label={t('listingStatus.closed')}
-                value={summary.closed}
-              />
-            ) : null}
+            ) : (
+              LISTING_FILTERS.filter((entry) => entry.status && counts[entry.key] > 0).map(
+                (entry) => (
+                  <SummaryBadge
+                    key={entry.key}
+                    status={entry.status}
+                    label={t(`listingStatus.${entry.status}`)}
+                    value={counts[entry.key]}
+                  />
+                ),
+              )
+            )}
           </div>
         </div>
 
@@ -190,10 +189,11 @@ function DashboardListingsPage() {
 
       {/* Having listings but none in this state is a different thing from
           having none at all, and says so rather than reusing the "post your
-          first listing" prompt. */}
+          first listing" prompt. The wording follows the state, because "no
+          drafts" and "nothing deleted" are different pieces of news. */}
       {visible.length === 0 && listings.length > 0 ? (
         <p className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-text-muted">
-          {t('dashboard.noListingsInStatus')}
+          {t(`dashboard.empty.${filter.key}`)}
         </p>
       ) : null}
     </section>

@@ -56,6 +56,9 @@ func newListingHarness(t *testing.T) *listingHarness {
 	listings.POST("", middleware.Auth(h.tokens), apartmentHandler.Create)
 	listings.PUT("/:id", middleware.Auth(h.tokens), apartmentHandler.Update)
 	listings.DELETE("/:id", middleware.Auth(h.tokens), apartmentHandler.Delete)
+	// Mirrors cmd/server, so a lifecycle test cannot pass because the route was
+	// missing rather than because the rule held.
+	listings.PATCH("/:id/status", middleware.Auth(h.tokens), apartmentHandler.ChangeStatus)
 	listings.GET("/:id/analytics", middleware.Auth(h.tokens), analyticsHandler.ApartmentViews)
 
 	me := v1.Group("/me", middleware.Auth(h.tokens))
@@ -500,9 +503,17 @@ func TestOwnerCanDeleteTheirListing(t *testing.T) {
 	if page := h.list(t, "", ""); contains(page.Items, created.ID.String()) {
 		t.Error("the deleted listing is still in the feed")
 	}
-	// A repeated delete — a double-clicked button — is a 404, not a 500.
-	if rec := h.do(t, http.MethodDelete, path, nil, token); rec.Code != http.StatusNotFound {
-		t.Errorf("second delete got status %d, want 404", rec.Code)
+	// Deleting is a soft delete, so the row is still there and a repeated
+	// delete — a double-clicked button — simply asks for a state it is already
+	// in. Idempotent rather than an error: the caller wanted it gone, and it is.
+	if rec := h.do(t, http.MethodDelete, path, nil, token); rec.Code != http.StatusOK {
+		t.Errorf("second delete got status %d, want 200", rec.Code)
+	}
+
+	// And it is still the owner's to see, which is the point of keeping it.
+	rec := h.do(t, http.MethodGet, path, nil, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("the owner cannot see their own deleted listing: status %d", rec.Code)
 	}
 }
 

@@ -11,6 +11,10 @@ export const LISTING_STATUS = {
   pending: 'pending',
   active: 'active',
   closed: 'closed',
+  // Removed by its owner. A state rather than an absence: the conversations,
+  // saved listings and view history that point at a listing outlive the
+  // decision to take it down.
+  deleted: 'deleted',
 }
 
 // Semantic tints inside the existing token palette: primary for live, warning
@@ -20,7 +24,8 @@ export const LISTING_STATUS_CLASS = {
   [LISTING_STATUS.active]: 'bg-primary-light text-primary-hover dark:text-primary',
   [LISTING_STATUS.pending]: 'bg-warning/15 text-warning',
   [LISTING_STATUS.draft]: 'bg-surface-secondary text-text-muted',
-  [LISTING_STATUS.closed]: 'bg-surface-secondary text-text-muted',
+  [LISTING_STATUS.closed]: 'bg-error/10 text-error',
+  [LISTING_STATUS.deleted]: 'bg-surface-secondary text-text-muted',
 }
 
 /** Counts by status, for the dashboard's summary badges. */
@@ -32,6 +37,7 @@ export function getMyListingsSummary(listings) {
     draft: count(LISTING_STATUS.draft),
     pending: count(LISTING_STATUS.pending),
     closed: count(LISTING_STATUS.closed),
+    deleted: count(LISTING_STATUS.deleted),
   }
 }
 
@@ -50,7 +56,22 @@ export const LISTING_FILTERS = [
   { key: 'pending', status: LISTING_STATUS.pending },
   { key: 'closed', status: LISTING_STATUS.closed },
   { key: 'draft', status: LISTING_STATUS.draft },
+  { key: 'deleted', status: LISTING_STATUS.deleted },
 ]
+
+/**
+ * What an owner may do to a listing in a given state, in the order the menu
+ * offers it. Mirrors the transitions the server allows — the server is what
+ * enforces them, and a menu offering something it would refuse is a bug the
+ * person finds only after clicking.
+ */
+export const STATUS_ACTIONS = {
+  [LISTING_STATUS.active]: [LISTING_STATUS.pending, LISTING_STATUS.closed],
+  [LISTING_STATUS.pending]: [LISTING_STATUS.active, LISTING_STATUS.closed],
+  [LISTING_STATUS.draft]: [LISTING_STATUS.active],
+  [LISTING_STATUS.closed]: [LISTING_STATUS.active],
+  [LISTING_STATUS.deleted]: [LISTING_STATUS.draft],
+}
 
 /**
  * Reads the filter out of a query string.

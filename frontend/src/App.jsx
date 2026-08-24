@@ -27,6 +27,7 @@ import DashboardChatsPage from './pages/DashboardChatsPage'
 import DashboardEditProfilePage from './pages/DashboardEditProfilePage'
 import CreateListingPage from './pages/CreateListingPage'
 import NotFoundPage from './pages/NotFoundPage'
+import { ToastProvider } from './context/ToastContext'
 import { ROUTES } from './routes/paths'
 
 function App() {
@@ -38,6 +39,9 @@ function App() {
             <ListingsProvider>
               <SearchProvider>
                 <WishlistProvider>
+                  {/* Above the router: a confirmation usually outlives the
+                      navigation that follows the action it confirms. */}
+                  <ToastProvider>
                   <BrowserRouter>
                     {/* Mounted above the routes so a message arriving while
                         the reader is anywhere in the app still reaches them. */}
@@ -110,6 +114,7 @@ function App() {
                       </Route>
                     </Routes>
                   </BrowserRouter>
+                  </ToastProvider>
                 </WishlistProvider>
               </SearchProvider>
             </ListingsProvider>

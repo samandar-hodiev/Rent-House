@@ -155,6 +155,15 @@ type DistrictResponse struct {
 	Longitude float64 `json:"longitude"`
 }
 
+// ChangeStatusRequest is the body of PATCH /api/v1/apartments/:id/status.
+//
+// The target state only. Which transitions are legal is the service's to
+// decide — a client naming a state it should not reach is refused there, not
+// trusted here.
+type ChangeStatusRequest struct {
+	Status string `json:"status" binding:"required,oneof=draft pending active closed deleted"`
+}
+
 // ApartmentOwnerResponse is the public view of an owner: enough to contact
 // them, and nothing else. No email unless they published one, no id-adjacent
 // account detail, never a password hash.

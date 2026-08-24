@@ -29,6 +29,10 @@ var (
 	// ErrInvalidDistrict and ErrInvalidAmenity are validation failures the
 	// binding tags cannot catch, because they depend on what is in the database.
 	ErrInvalidDistrict = errors.New("district does not exist")
+
+	// ErrInvalidStatusChange is a transition the lifecycle does not allow —
+	// reviving a deleted listing straight to public, for instance.
+	ErrInvalidStatusChange = errors.New("listing cannot move to that status")
 	ErrInvalidAmenity  = errors.New("amenity does not exist")
 
 	// ErrInvalidPrice covers a price or deposit that parses as a number but is
@@ -211,12 +215,110 @@ func (s *ApartmentService) Update(
 	return s.get(ctx, id, true)
 }
 
+// ChangeStatus moves a listing through its lifecycle.
+//
+// The owner's own transitions only — a draft going live, a live listing being
+// paused or closed, a listing being removed. Which target is allowed from which
+// state is decided here rather than by the client, so a crafted request cannot
+// put a listing somewhere the UI never offers.
+//
+// `published_at` is maintained alongside the status because the database
+// insists the two agree: `ck_apartments_published_at` says a listing carries a
+// publication date exactly when it is active. Setting one without the other
+// fails the constraint, which is precisely what makes it worth having.
+func (s *ApartmentService) ChangeStatus(
+	ctx context.Context, id, actorID uuid.UUID, target string,
+) (*dto.ApartmentResponse, error) {
+	if err := s.assertOwner(ctx, id, actorID); err != nil {
+		return nil, err
+	}
+
+	current, err := s.apartments.FindByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrApartmentNotFound) {
+			return nil, ErrApartmentNotFound
+		}
+		return nil, err
+	}
+
+	if !allowedTransition(current.Status, target) {
+		return nil, ErrInvalidStatusChange
+	}
+
+	fields := map[string]any{"status": target}
+	if target == models.ApartmentStatusActive {
+		// Re-published: it needs a date, and keeping the original would date a
+		// listing to a moment it was not actually visible.
+		fields["published_at"] = time.Now().UTC()
+	} else {
+		fields["published_at"] = nil
+	}
+
+	if err := s.apartments.UpdateFields(ctx, id, fields); err != nil {
+		if errors.Is(err, repository.ErrApartmentNotFound) {
+			return nil, ErrApartmentNotFound
+		}
+		return nil, err
+	}
+
+	return s.get(ctx, id, true)
+}
+
+// allowedTransition is the lifecycle, written out.
+//
+// Deliberately not "anything to anything": a listing cannot go straight from
+// deleted back to active, and closing a draft that was never published is not a
+// thing the interface offers. Everything an owner can reach is reachable in one
+// or two steps through states that mean something.
+func allowedTransition(from, to string) bool {
+	if from == to {
+		return false
+	}
+	// Removing is always available, from wherever the listing currently is.
+	if to == models.ApartmentStatusDeleted {
+		return from != models.ApartmentStatusDeleted
+	}
+	switch from {
+	case models.ApartmentStatusDraft:
+		// A draft goes live. Nothing else to do with one that has never been
+		// published.
+		return to == models.ApartmentStatusActive
+	case models.ApartmentStatusActive:
+		return to == models.ApartmentStatusPending || to == models.ApartmentStatusClosed
+	case models.ApartmentStatusPending:
+		return to == models.ApartmentStatusActive || to == models.ApartmentStatusClosed
+	case models.ApartmentStatusClosed:
+		// Re-opening something that was closed.
+		return to == models.ApartmentStatusActive
+	case models.ApartmentStatusDeleted:
+		// Restoring a removed listing puts it back out of sight, not straight
+		// back in front of the public.
+		return to == models.ApartmentStatusDraft
+	default:
+		return false
+	}
+}
+
 // Delete removes a listing the caller owns.
+// A soft delete: the row stays and its status becomes `deleted`.
+//
+// Erasing it would take the conversations people had about it, the view history
+// its analytics are built from and anyone who had saved it. It is also
+// unrecoverable for an owner who meant "take this down" rather than "destroy
+// this". It stops being public either way, which is what "delete" has to mean
+// to everybody else.
 func (s *ApartmentService) Delete(ctx context.Context, id uuid.UUID, actorID uuid.UUID) error {
 	if err := s.assertOwner(ctx, id, actorID); err != nil {
 		return err
 	}
-	if err := s.apartments.Delete(ctx, id); err != nil {
+
+	fields := map[string]any{
+		"status": models.ApartmentStatusDeleted,
+		// Required by ck_apartments_published_at: only an active listing has a
+		// publication date.
+		"published_at": nil,
+	}
+	if err := s.apartments.UpdateFields(ctx, id, fields); err != nil {
 		if errors.Is(err, repository.ErrApartmentNotFound) {
 			return ErrApartmentNotFound
 		}

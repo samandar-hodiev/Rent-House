@@ -844,7 +844,12 @@ func conversationFrom(summary repository.ConversationSummary, online bool) dto.C
 		IsArchived:  summary.ArchivedAt != nil,
 	}
 	// The listing the pair last wrote about, when there still is one.
-	if summary.ApartmentID != nil {
+	//
+	// Keyed on the title rather than on the id: `conversations.apartment_id`
+	// stays set even when the join found nothing, which is the case for a
+	// listing its owner deleted. Building a context from the id alone produced
+	// a card with an id and no words in it.
+	if summary.ApartmentID != nil && summary.ApartmentTitle != nil {
 		out.Apartment = &dto.ChatApartmentResponse{ID: *summary.ApartmentID}
 		if summary.ApartmentTitle != nil {
 			out.Apartment.Title = *summary.ApartmentTitle
