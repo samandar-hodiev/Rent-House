@@ -95,6 +95,7 @@ function ChatThread({
   }, [conversation?.id, setActiveConversation])
   const {
     messages,
+    apartments,
     myId,
     isLoading,
     status,
@@ -209,9 +210,10 @@ function ChatThread({
         />
       </div>
 
-      {/* What the pair are discussing now. Absent when the listing has been
-          withdrawn — the conversation carries on regardless. */}
-      <ApartmentContextBar apartment={conversation.apartment} />
+      {/* The listing context is not here on purpose. A thread can range over
+          several listings, and a single bar under the header can only name one
+          of them — so it is rendered inside the message flow instead, at the
+          point each listing's run of messages begins. */}
 
       {/* The connection banner appears only when something is wrong, so a
           healthy chat carries no chrome about being healthy. */}
@@ -269,21 +271,23 @@ function ChatThread({
 
             <ul className="flex flex-col gap-2">
               {messages.map((message, index) => {
-                // A divider whenever the listing being discussed changes, so a
-                // reader scrolling back can see where one apartment's thread of
-                // discussion ended and the next began.
+                // The listing context opens each run of messages about a given
+                // listing, so one thread can cover several and still say which
+                // is which.
                 const previous = index > 0 ? messages[index - 1].apartmentId : null
                 const changed = message.apartmentId && message.apartmentId !== previous
+                // Looked up by the message's own listing id — never the
+                // thread's pinned one, which would caption an older run with
+                // whatever is being discussed now. A listing withdrawn since
+                // is simply absent, and heads nothing rather than heading the
+                // wrong thing.
+                const listing = changed ? (apartments[message.apartmentId] ?? null) : null
 
                 return (
                   <Fragment key={message.id}>
-                    {changed ? (
-                      <li className="flex justify-center py-1">
-                        <span className="rounded-full bg-surface-secondary px-3 py-1 text-[11px] text-text-muted">
-                          {message.apartmentId === conversation.apartment?.id
-                            ? conversation.apartment.title
-                            : t('chat.otherApartment')}
-                        </span>
+                    {listing ? (
+                      <li>
+                        <ApartmentContextBar apartment={listing} />
                       </li>
                     ) : null}
                     <ChatMessage

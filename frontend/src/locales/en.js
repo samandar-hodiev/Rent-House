@@ -187,7 +187,6 @@ export default {
   'chat.attachmentMessage': "Sent a file",
   'chat.notifications': "Message notifications",
   'chat.viewApartment': "View listing",
-  'chat.otherApartment': "Another listing",
   'chat.noApartmentContext': "No listing named",
   'chat.headerActions': "Conversation actions",
   'chat.block': "Block",

@@ -187,7 +187,6 @@ export default {
   'chat.attachmentMessage': "Отправил файл",
   'chat.notifications': "Уведомления о сообщениях",
   'chat.viewApartment': "Открыть объявление",
-  'chat.otherApartment': "Другое объявление",
   'chat.noApartmentContext': "Объявление не указано",
   'chat.headerActions': "Действия с диалогом",
   'chat.block': "Заблокировать",

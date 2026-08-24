@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -419,6 +420,74 @@ func (r *ChatRepository) ListMessages(
 	}
 	page.Messages = messages
 	return page, nil
+}
+
+// ApartmentContext is a listing as a message names it: enough to render the
+// card that introduces a run of messages, and nothing more.
+type ApartmentContext struct {
+	ID           uuid.UUID
+	Title        string
+	District     *string
+	Price        *string
+	Currency     *string
+	RentalPeriod *string
+	Image        *string
+}
+
+// ConversationApartments returns every listing this reader's messages in the
+// thread refer to.
+//
+// A conversation belongs to two people and can range over several listings, so
+// the client needs details for all of them, not only the one currently pinned —
+// otherwise a message about an earlier listing has nothing to show but a
+// placeholder. Returned for the whole thread rather than per page, so paging
+// backwards never lands on a message whose listing is unknown.
+//
+// The visibility rules are the same two ListMessages applies, so a listing
+// cannot be learned from a message the reader is not allowed to see.
+func (r *ChatRepository) ConversationApartments(
+	ctx context.Context, conversationID, viewerID uuid.UUID,
+) ([]ApartmentContext, error) {
+	var out []ApartmentContext
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT DISTINCT ON (a.id)
+		    a.id            AS id,
+		    a.title         AS title,
+		    d.name          AS district,
+		    a.price         AS price,
+		    a.currency      AS currency,
+		    a.rental_period AS rental_period,
+		    img.url         AS image
+		FROM messages m
+		JOIN apartments a ON a.id = m.apartment_id
+		LEFT JOIN districts d ON d.id = a.district_id
+		-- The cover, ordered the way every other endpoint orders a gallery.
+		LEFT JOIN LATERAL (
+		    SELECT ai.url
+		    FROM apartment_images ai
+		    WHERE ai.apartment_id = a.id
+		    ORDER BY ai.is_primary DESC, ai.sort_order ASC, ai.created_at ASC
+		    LIMIT 1
+		) img ON true
+		WHERE m.conversation_id = @conversation_id
+		  AND m.apartment_id IS NOT NULL
+		  AND NOT EXISTS (
+		      SELECT 1 FROM conversation_participants cp
+		      WHERE cp.conversation_id = m.conversation_id
+		        AND cp.user_id = @viewer_id
+		        AND cp.cleared_at IS NOT NULL
+		        AND m.created_at <= cp.cleared_at
+		  )
+		  AND NOT EXISTS (
+		      SELECT 1 FROM message_deletions md
+		      WHERE md.message_id = m.id AND md.user_id = @viewer_id
+		  )
+	`, sql.Named("conversation_id", conversationID), sql.Named("viewer_id", viewerID)).
+		Scan(&out).Error
+	if err != nil {
+		return nil, fmt.Errorf("conversation apartments: %w", err)
+	}
+	return out, nil
 }
 
 // CreateMessage stores a message, its attachment if it has one, and marks its

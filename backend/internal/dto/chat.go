@@ -177,6 +177,14 @@ type MessagePageResponse struct {
 	HasMore bool `json:"has_more"`
 	// NextBefore is the cursor for the next page, absent when there is none.
 	NextBefore string `json:"next_before,omitempty"`
+	// Apartments are the listings this thread's messages refer to, keyed from
+	// each message's apartment_id.
+	//
+	// Sent as a set beside the messages rather than embedded in each one: a run
+	// of twenty messages about the same listing would otherwise repeat its
+	// title, price and image twenty times. The client renders the card that
+	// introduces each run by looking the id up here.
+	Apartments []ChatApartmentResponse `json:"apartments"`
 }
 
 // ConversationResponse is one thread as the list and the header show it.

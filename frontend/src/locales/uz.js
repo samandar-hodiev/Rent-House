@@ -187,7 +187,6 @@ export default {
   'chat.attachmentMessage': "Fayl yubordi",
   'chat.notifications': "Xabar bildirishnomalari",
   'chat.viewApartment': "E'lonni ochish",
-  'chat.otherApartment': "Boshqa e'lon",
   'chat.noApartmentContext': "E'lon ko'rsatilmagan",
   'chat.headerActions': "Suhbat amallari",
   'chat.block': "Bloklash",

@@ -5,22 +5,25 @@ import { apartmentDetailsPath } from '../../routes/paths'
 import { formatListingPrice } from '../../utils/formatPrice'
 
 /**
- * The listing a conversation is currently about.
+ * The listing a run of messages is about.
  *
  * A conversation belongs to two people, not to a listing, so this is context
- * rather than identity — it says what is being discussed now, and changes when
- * the pair start talking about something else. Nothing is lost when it does:
- * the older listings stay on the messages that named them.
+ * rather than identity. It is rendered inside the message flow, immediately
+ * before the first message about a given listing, which is what lets one thread
+ * cover several listings and still be readable: each run announces what it is
+ * about, and scrolling back shows where one listing's discussion ended and the
+ * next began.
  *
- * Compact on purpose. It sits above every message in the thread, so it earns
- * one line and a way out of it, not a card.
+ * Deliberately not in the thread header. A header can only ever name one
+ * listing — whichever is pinned — so anything written about an earlier one
+ * would be captioned wrongly.
  */
 function ApartmentContextBar({ apartment }) {
   const { t } = useLocale()
   if (!apartment?.id) return null
 
   return (
-    <div className="flex shrink-0 items-center gap-3 border-b border-border bg-surface-secondary px-4 py-2">
+    <div className="my-1 flex items-center gap-3 rounded-lg border border-border bg-surface-secondary px-3 py-2">
       {apartment.image ? (
         <img
           src={apartment.image}

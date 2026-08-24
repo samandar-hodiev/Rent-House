@@ -42,6 +42,23 @@ export function toMessage(item) {
   }
 }
 
+/**
+ * A listing as chat shows it — the thread's pinned context and the cards that
+ * head each run of messages are the same shape, so they read from one mapper
+ * and cannot drift apart.
+ */
+export function toChatApartment(item) {
+  return {
+    id: item.id,
+    title: item.title ?? '',
+    image: item.image ?? null,
+    district: item.district ?? '',
+    price: item.price ? Number(item.price) : null,
+    currency: item.currency ?? 'UZS',
+    rentalPeriod: item.rental_period ?? 'monthly',
+  }
+}
+
 /** Turns an API conversation into the shape the list and header render. */
 export function toConversation(item) {
   return {
@@ -49,17 +66,7 @@ export function toConversation(item) {
     // The thread's current listing context — the one most recently written
     // about. Null when that listing has been withdrawn, or when the pair have
     // never named one: a conversation belongs to two people, not to a listing.
-    apartment: item.apartment
-      ? {
-          id: item.apartment.id,
-          title: item.apartment.title ?? '',
-          image: item.apartment.image ?? null,
-          district: item.apartment.district ?? '',
-          price: item.apartment.price ? Number(item.apartment.price) : null,
-          currency: item.apartment.currency ?? 'UZS',
-          rentalPeriod: item.apartment.rental_period ?? 'monthly',
-        }
-      : null,
+    apartment: item.apartment ? toChatApartment(item.apartment) : null,
     other: {
       id: item.other?.id ?? null,
       name: item.other?.name ?? '',
@@ -147,6 +154,13 @@ export async function fetchMessages(conversationId, { token, signal, limit = 30,
     items: (data.items ?? []).map(toMessage),
     hasMore: Boolean(data.has_more),
     nextBefore: data.next_before ?? null,
+    // Every listing this thread's messages name, keyed by id. A message
+    // carries only `apartmentId`; this is where its title, price and image
+    // come from, so a run of messages about an older listing can still be
+    // headed by that listing rather than by a placeholder.
+    apartments: Object.fromEntries(
+      (data.apartments ?? []).map((item) => [item.id, toChatApartment(item)]),
+    ),
   }
 }
 

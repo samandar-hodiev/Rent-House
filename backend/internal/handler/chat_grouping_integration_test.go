@@ -38,7 +38,7 @@ func (h *chatHarness) start(t *testing.T, token, apartmentID string) dto.Convers
 // `sayAbout` — sending a message tagged with the listing it is about — already
 // exists on the harness in conversation_state_integration_test.go.
 
-func (h *chatHarness) messages(t *testing.T, conversationID, token string) []dto.MessageResponse {
+func (h *chatHarness) page(t *testing.T, conversationID, token string) dto.MessagePageResponse {
 	t.Helper()
 	rec := h.do(t, http.MethodGet,
 		"/api/v1/conversations/"+conversationID+"/messages?limit=100", nil, token)
@@ -49,7 +49,12 @@ func (h *chatHarness) messages(t *testing.T, conversationID, token string) []dto
 	if err := json.Unmarshal(decode(t, rec).Data, &out); err != nil {
 		t.Fatalf("decode messages: %v", err)
 	}
-	return out.Items
+	return out
+}
+
+func (h *chatHarness) messages(t *testing.T, conversationID, token string) []dto.MessageResponse {
+	t.Helper()
+	return h.page(t, conversationID, token).Items
 }
 
 // --- grouping --------------------------------------------------------------
@@ -284,6 +289,69 @@ func TestContextMovesWithTheLatestMessage(t *testing.T) {
 	}
 	if msgs[1].ApartmentID == nil || msgs[1].ApartmentID.String() != second {
 		t.Fatalf("the later message does not name its listing")
+	}
+}
+
+// The client heads each run of messages with the listing that run is about, so
+// the page has to carry details for every listing the thread names — not only
+// the one currently pinned, which is all the conversation itself reports.
+func TestMessagePageCarriesEveryListingItNames(t *testing.T) {
+	h := newChatHarness(t)
+	ownerToken, _ := h.signUp(t)
+	buyerToken, _ := h.signUp(t)
+
+	first := h.publish(t, ownerToken)
+	second := h.publish(t, ownerToken)
+	third := h.publish(t, ownerToken)
+
+	conversation := h.start(t, buyerToken, first)
+	id := conversation.ID.String()
+	h.sayAbout(t, id, buyerToken, "Birinchi uy", first)
+	h.sayAbout(t, id, buyerToken, "Yana birinchi uy", first)
+	h.sayAbout(t, id, buyerToken, "Ikkinchi uy", second)
+	h.sayAbout(t, id, buyerToken, "Uchinchi uy", third)
+
+	for _, side := range []struct {
+		name  string
+		token string
+	}{{"buyer", buyerToken}, {"owner", ownerToken}} {
+		page := h.page(t, id, side.token)
+
+		byID := map[string]dto.ChatApartmentResponse{}
+		for _, listing := range page.Apartments {
+			byID[listing.ID.String()] = listing
+		}
+		if len(byID) != 3 {
+			t.Fatalf("%s got %d listings, want 3", side.name, len(byID))
+		}
+
+		// Every message can be captioned from what the page carries, which is
+		// the property the UI depends on.
+		for _, m := range page.Items {
+			if m.ApartmentID == nil {
+				t.Fatalf("%s: message %s has no listing", side.name, m.ID)
+			}
+			listing, ok := byID[m.ApartmentID.String()]
+			if !ok {
+				t.Fatalf("%s: message %s names listing %s, absent from the page",
+					side.name, m.ID, m.ApartmentID)
+			}
+			// A caption needs something to say.
+			if listing.Title == "" {
+				t.Fatalf("%s: listing %s came back without a title", side.name, listing.ID)
+			}
+			if listing.Price == "" {
+				t.Fatalf("%s: listing %s came back without a price", side.name, listing.ID)
+			}
+			if listing.District == "" {
+				t.Fatalf("%s: listing %s came back without a district", side.name, listing.ID)
+			}
+		}
+
+		// The pinned context is only the latest; the page must exceed it.
+		if conversation.Apartment != nil && len(byID) == 1 {
+			t.Fatal("page carries only the pinned listing")
+		}
 	}
 }
 

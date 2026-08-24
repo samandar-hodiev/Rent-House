@@ -252,7 +252,42 @@ func (s *ChatService) ListMessages(
 	if page.HasMore && len(items) > 0 {
 		out.NextBefore = items[0].ID.String()
 	}
+
+	// Every listing the thread's messages name, so the client can head each run
+	// of messages with the listing it is actually about instead of falling back
+	// to a placeholder for anything that is not the currently pinned one.
+	contexts, err := s.chat.ConversationApartments(ctx, conversationID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	out.Apartments = make([]dto.ChatApartmentResponse, 0, len(contexts))
+	for _, listing := range contexts {
+		out.Apartments = append(out.Apartments, chatApartment(listing))
+	}
 	return out, nil
+}
+
+// chatApartment renders a listing the way chat shows it. The nullable columns
+// are a listing that has lost its district, price or cover, none of which stops
+// the card from naming it.
+func chatApartment(listing repository.ApartmentContext) dto.ChatApartmentResponse {
+	out := dto.ChatApartmentResponse{ID: listing.ID, Title: listing.Title}
+	if listing.District != nil {
+		out.District = *listing.District
+	}
+	if listing.Price != nil {
+		out.Price = *listing.Price
+	}
+	if listing.Currency != nil {
+		out.Currency = *listing.Currency
+	}
+	if listing.RentalPeriod != nil {
+		out.RentalPeriod = *listing.RentalPeriod
+	}
+	if listing.Image != nil {
+		out.Image = *listing.Image
+	}
+	return out
 }
 
 // SendMessage stores a message and pushes it to whoever is connected.

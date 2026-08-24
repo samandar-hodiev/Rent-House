@@ -33,6 +33,9 @@ export function useConversation(conversationId, apartmentId = null) {
   const myId = user?.id ?? null
 
   const [messages, setMessages] = useState([])
+  // Listings the thread's messages refer to, by id. A message carries only an
+  // id, so this is what turns it into a card with a title, price and image.
+  const [apartments, setApartments] = useState({})
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
   const [hasMore, setHasMore] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
@@ -47,6 +50,7 @@ export function useConversation(conversationId, apartmentId = null) {
   useEffect(() => {
     if (!conversationId || !token) {
       setMessages([])
+      setApartments({})
       setStatus('idle')
       return undefined
     }
@@ -54,11 +58,13 @@ export function useConversation(conversationId, apartmentId = null) {
     const controller = new AbortController()
     setStatus('loading')
     setMessages([])
+    setApartments({})
     cursor.current = null
 
     fetchMessages(conversationId, { token, signal: controller.signal })
       .then((page) => {
         setMessages(page.items)
+        setApartments(page.apartments)
         setHasMore(page.hasMore)
         cursor.current = page.nextBefore
         setStatus('ready')
@@ -181,6 +187,10 @@ export function useConversation(conversationId, apartmentId = null) {
         const held = new Set(current.map((message) => message.id))
         return [...page.items.filter((message) => !held.has(message.id)), ...current]
       })
+      // Merged rather than replaced. The server sends the whole thread's
+      // listings on every page, but merging keeps this correct even if an
+      // older page ever names one a later page did not.
+      setApartments((current) => ({ ...current, ...page.apartments }))
       setHasMore(page.hasMore)
       cursor.current = page.nextBefore
     } catch {
@@ -292,6 +302,7 @@ export function useConversation(conversationId, apartmentId = null) {
 
   return {
     messages,
+    apartments,
     myId,
     status,
     isLoading: status === 'loading',
