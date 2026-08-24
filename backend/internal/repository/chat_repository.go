@@ -78,13 +78,21 @@ func NewChatRepository(db *gorm.DB) *ChatRepository {
 	return &ChatRepository{db: db}
 }
 
-// FindOrCreateConversation returns the thread between this buyer and this
-// apartment, creating it the first time.
+// FindOrCreateConversation returns the thread between these two people,
+// creating it the first time, and points it at the listing being asked about.
 //
-// The insert leans on the UNIQUE (apartment_id, buyer_id) constraint rather
-// than checking first: a check-then-insert has a race window in which two taps
-// on "Xabar yozish" both pass the check and produce two threads. The constraint
-// has no such window, so the loser simply reads back the winner's row.
+// The pair is unordered. `buyerID` is whoever is asking and `ownerID` owns the
+// listing they are asking about, but those roles swap the moment the other
+// person enquires about one of *their* listings — and it is still the same two
+// people, so it is still the same conversation. Both the lookup below and the
+// unique index it conflicts against are written over LEAST/GREATEST for that
+// reason; matching on the columns in order would hand the pair a second thread
+// and show the same person twice in the chat list.
+//
+// The insert leans on that index rather than checking first: a check-then-insert
+// has a race window in which two taps on "Xabar yozish" both pass the check and
+// produce two threads. The index has no such window, so the loser simply reads
+// back the winner's row.
 func (r *ChatRepository) FindOrCreateConversation(
 	ctx context.Context, apartmentID, buyerID, ownerID uuid.UUID,
 ) (*models.Conversation, error) {
@@ -95,18 +103,25 @@ func (r *ChatRepository) FindOrCreateConversation(
 	}
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// An expression index cannot be named by column list, so the conflict
+		// target is written out. GORM passes the expression through untouched.
 		result := tx.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "buyer_id"}, {Name: "owner_id"}},
+			Columns: []clause.Column{
+				{Name: "LEAST(buyer_id, owner_id)", Raw: true},
+				{Name: "GREATEST(buyer_id, owner_id)", Raw: true},
+			},
 			DoNothing: true,
 		}).Create(conversation)
 		if result.Error != nil {
 			return result.Error
 		}
 
-		// DoNothing means the pair already had a thread; read it back.
+		// DoNothing means the pair already had a thread; read it back, in
+		// whichever order it was originally created.
 		if result.RowsAffected == 0 {
 			if err := tx.First(conversation,
-				"buyer_id = ? AND owner_id = ?", buyerID, ownerID).Error; err != nil {
+				"(buyer_id = ? AND owner_id = ?) OR (buyer_id = ? AND owner_id = ?)",
+				buyerID, ownerID, ownerID, buyerID).Error; err != nil {
 				return err
 			}
 

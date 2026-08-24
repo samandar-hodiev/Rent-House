@@ -88,7 +88,17 @@ function DashboardChatsPage() {
               <ArrowLeft aria-hidden="true" size={16} />
               {t('chat.backToList')}
             </button>
-            <ChatThread conversation={selected} className="flex-1" />
+            {/* Opened from the inbox rather than from a listing, so the
+                context is whichever listing the thread is currently pinned
+                to — the one shown in the header above the messages. Without
+                this, everything sent from here was stored with no listing at
+                all, and a thread covering several listings could not say which
+                message belonged to which. */}
+            <ChatThread
+              conversation={selected}
+              apartmentId={selected.apartment?.id ?? null}
+              className="flex-1"
+            />
           </>
         ) : (
           <div className="flex flex-1 items-center justify-center p-4">
