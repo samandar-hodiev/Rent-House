@@ -31,7 +31,7 @@ import EmptyState from '../components/EmptyState'
 import ImageGallery from '../components/ImageGallery'
 import ApartmentDetailsSkeleton from '../components/ApartmentDetailsSkeleton'
 import ContactChatModal from '../components/ContactChatModal'
-import ApartmentCard from '../components/ApartmentCard'
+import ApartmentGrid from '../components/ApartmentGrid'
 import { useLocale } from '../context/LocaleContext'
 import { useAuth } from '../context/AuthContext'
 import { useWishlist } from '../context/WishlistContext'
@@ -368,11 +368,11 @@ function ApartmentDetailsPage() {
           <h2 className="mb-5 text-xl font-semibold text-text-primary">
             {t('apartmentDetails.similarApartments')}
           </h2>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {similarApartments.map((similarApartment) => (
-              <ApartmentCard key={similarApartment.id} apartment={similarApartment} />
-            ))}
-          </div>
+          {/* Spans the same container as the home grid, so it uses the same
+              component rather than repeating a column ladder that would drift
+              out of step with it. The length check above means the empty state
+              is never reached. */}
+          <ApartmentGrid apartments={similarApartments} />
         </div>
       ) : null}
 

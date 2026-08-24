@@ -105,11 +105,13 @@ function ApartmentCard({ apartment, title: titleOverride, interactive = true }) 
         ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 p-5">
+      <div className="flex flex-1 flex-col gap-1.5 p-4">
         <p className="text-xl font-bold text-text-primary">
           {formatListingPrice(t, apartment)}
         </p>
 
+        {/* Two lines are reserved whether or not the title needs them, so the
+            rows below it line up across a row of cards. */}
         <h3 className="line-clamp-2 min-h-12 text-base font-medium text-text-primary">{title}</h3>
 
         <p className="flex items-center gap-1 text-sm text-text-secondary">
@@ -126,15 +128,22 @@ function ApartmentCard({ apartment, title: titleOverride, interactive = true }) 
           })}
         </p>
 
-        <div className="mt-auto flex items-center justify-between pt-3 text-sm">
+        {/* The narrowest card this grid produces is around 250px, and at that
+            width the posted-at text and the map link together are close to the
+            full inner width — closer still in Russian, where the label is
+            "Смотреть на карте". `whitespace-nowrap` keeps the link on one line
+            at any width in any language, and `flex-wrap` gives the row a way to
+            resolve a genuine shortfall by moving the link down a line intact
+            rather than breaking it in half or overflowing the card. */}
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-2.5 text-[13px]">
           <span className="text-text-muted">{formatPostedAt(apartment.postedAt, t)}</span>
           {interactive ? (
           <button
             type="button"
             onClick={handleMapClick}
-            className="flex items-center gap-1 font-medium text-primary hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="flex items-center gap-1 whitespace-nowrap font-medium text-primary hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <Map aria-hidden="true" size={14} className="shrink-0" />
+            <Map aria-hidden="true" size={13} className="shrink-0" />
             {t('apartmentCard.mapView')}
           </button>
           ) : null}
