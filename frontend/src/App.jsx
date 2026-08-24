@@ -19,7 +19,6 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ProfilePage from './pages/ProfilePage'
 import OwnerDashboardPage from './pages/OwnerDashboardPage'
-import AdminPage from './pages/AdminPage'
 import DashboardPage from './pages/DashboardPage'
 import DashboardListingsPage from './pages/DashboardListingsPage'
 import DashboardChatsPage from './pages/DashboardChatsPage'
@@ -27,6 +26,22 @@ import DashboardEditProfilePage from './pages/DashboardEditProfilePage'
 import CreateListingPage from './pages/CreateListingPage'
 import NotFoundPage from './pages/NotFoundPage'
 import { ToastProvider } from './context/ToastContext'
+import AdminLayout from './components/admin/AdminLayout'
+import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import AdminUsersPage from './pages/admin/AdminUsersPage'
+import AdminUserDetailPage from './pages/admin/AdminUserDetailPage'
+import AdminListingsPage from './pages/admin/AdminListingsPage'
+import AdminListingDetailPage from './pages/admin/AdminListingDetailPage'
+import AdminChatsPage from './pages/admin/AdminChatsPage'
+import AdminReportsPage from './pages/admin/AdminReportsPage'
+import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage'
+import AdminNotificationsPage from './pages/admin/AdminNotificationsPage'
+import AdminAdminsPage from './pages/admin/AdminAdminsPage'
+import AdminRolesPage from './pages/admin/AdminRolesPage'
+import AdminAuditLogsPage from './pages/admin/AdminAuditLogsPage'
+import AdminSettingsPage from './pages/admin/AdminSettingsPage'
+import { ADMIN_ROUTES } from './routes/adminPaths'
+import { LISTING_STATUS } from './data/listingStatus'
 import { ROUTES } from './routes/paths'
 
 function App() {
@@ -67,9 +82,72 @@ function App() {
                           />
                           <Route path={ROUTES.profile} element={<ProfilePage />} />
                           <Route path={ROUTES.owner} element={<OwnerDashboardPage />} />
-                          <Route path={ROUTES.admin} element={<AdminPage />} />
                         </Route>
                         <Route path="*" element={<NotFoundPage />} />
+                      </Route>
+
+                      {/* The admin area. Its own shell rather than the public
+                          layout: it answers to a different person and shares
+                          only the design tokens.
+
+                          Access is unguarded for now — admin authentication is
+                          explicitly not part of this stage, and adding a check
+                          against a role the API does not yet return would be a
+                          lock with no key. */}
+                      <Route path={ADMIN_ROUTES.dashboard} element={<AdminLayout />}>
+                        <Route index element={<AdminDashboardPage />} />
+
+                        <Route path="users" element={<AdminUsersPage />} />
+                        <Route path="users/:id" element={<AdminUserDetailPage />} />
+
+                        <Route
+                          path="listings"
+                          element={<AdminListingsPage title="All Listings" />}
+                        />
+                        <Route
+                          path="listings/pending"
+                          element={<AdminListingsPage status={LISTING_STATUS.pending} title="Pending" />}
+                        />
+                        <Route
+                          path="listings/active"
+                          element={<AdminListingsPage status={LISTING_STATUS.active} title="Active" />}
+                        />
+                        <Route
+                          path="listings/closed"
+                          element={<AdminListingsPage status={LISTING_STATUS.closed} title="Closed" />}
+                        />
+                        <Route
+                          path="listings/drafts"
+                          element={<AdminListingsPage status={LISTING_STATUS.draft} title="Drafts" />}
+                        />
+                        <Route
+                          path="listings/deleted"
+                          element={<AdminListingsPage status={LISTING_STATUS.deleted} title="Deleted" />}
+                        />
+                        <Route path="listings/detail/:id" element={<AdminListingDetailPage />} />
+
+                        <Route path="chats" element={<AdminChatsPage />} />
+                        <Route path="reports" element={<AdminReportsPage />} />
+                        <Route path="analytics" element={<AdminAnalyticsPage />} />
+                        <Route path="notifications" element={<AdminNotificationsPage />} />
+
+                        <Route path="admins" element={<AdminAdminsPage />} />
+                        <Route path="roles" element={<AdminRolesPage />} />
+                        <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+
+                        <Route path="settings" element={<AdminSettingsPage panel="general" title="General" />} />
+                        <Route
+                          path="settings/listings"
+                          element={<AdminSettingsPage panel="listings" title="Listings" />}
+                        />
+                        <Route
+                          path="settings/chat"
+                          element={<AdminSettingsPage panel="chat" title="Chat" />}
+                        />
+                        <Route
+                          path="settings/security"
+                          element={<AdminSettingsPage panel="security" title="Security" />}
+                        />
                       </Route>
 
                       {/* Authentication owns the full viewport: no header, no
