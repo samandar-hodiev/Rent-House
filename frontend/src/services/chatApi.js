@@ -22,6 +22,19 @@ export function toMessage(item) {
     // Which listing this message was written about. The same conversation can
     // hold messages about several, and this is what tells them apart.
     apartmentId: item.apartment_id ?? null,
+    // The message this one answers, reduced to what the quote line shows.
+    // Null when it answers nothing; a withdrawn original arrives with an empty
+    // body and `isDeleted`, so the quote says so rather than showing text that
+    // was taken back.
+    replyTo: item.reply_to
+      ? {
+          id: item.reply_to.id,
+          senderId: item.reply_to.sender_id,
+          kind: item.reply_to.kind ?? 'text',
+          body: item.reply_to.body ?? '',
+          isDeleted: Boolean(item.reply_to.is_deleted),
+        }
+      : null,
     attachment: item.attachment
       ? {
           id: item.attachment.id,
@@ -171,13 +184,35 @@ export async function fetchMessages(conversationId, { token, signal, limit = 30,
  * thread is chosen by who the two people are, and this says what was being
  * discussed when the message was written.
  */
-export async function sendMessage(conversationId, body, { token, apartmentId } = {}) {
+export async function sendMessage(
+  conversationId,
+  body,
+  { token, apartmentId, replyToMessageId } = {},
+) {
+  const payload = { body }
+  if (apartmentId) payload.apartment_id = apartmentId
+  // The message being answered. The server checks it belongs to this same
+  // thread, so a quote cannot reach into a conversation the sender is not in.
+  if (replyToMessageId) payload.reply_to_message_id = replyToMessageId
+
   const data = await request(`/conversations/${conversationId}/messages`, {
     method: 'POST',
-    body: apartmentId ? { body, apartment_id: apartmentId } : { body },
+    body: payload,
     token,
   })
   return toMessage(data)
+}
+
+/**
+ * Removes a selection of messages in one action.
+ *
+ * `scope` is the same choice a single delete offers: 'me' hides them from this
+ * reader alone, 'everyone' withdraws them from both sides. The server applies
+ * the same rules per message — only an author may withdraw — so this is one
+ * round trip rather than a shortcut around them.
+ */
+export function deleteMessages(ids, scope, { token } = {}) {
+  return request('/messages/delete', { method: 'POST', body: { ids, scope }, token })
 }
 
 /** Marks everything the other side sent as read. */

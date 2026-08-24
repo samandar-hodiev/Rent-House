@@ -57,6 +57,13 @@ func newChatHarness(t *testing.T) *chatHarness {
 	conversations.PATCH("/:id/archive", chatHandler.SetArchived)
 	conversations.DELETE("/:id", chatHandler.DeleteConversation)
 
+	// Mirrors the routes cmd/server registers, so a test cannot pass because an
+	// endpoint was missing rather than because the rule under test held.
+	messages := v1.Group("/messages", middleware.Auth(h.tokens))
+	messages.PATCH("/:id", chatHandler.EditMessage)
+	messages.DELETE("/:id", chatHandler.DeleteMessage)
+	messages.POST("/delete", chatHandler.DeleteMessages)
+
 	blockHandler := NewBlockHandler(chatService)
 	me := v1.Group("/me", middleware.Auth(h.tokens))
 	me.GET("/blocks", blockHandler.List)

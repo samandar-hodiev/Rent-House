@@ -3,11 +3,16 @@ import { useAuth } from '../context/AuthContext'
 import { useChat } from '../context/ChatContext'
 import {
   deleteMessage as deleteMessageRequest,
+  deleteMessages as deleteMessagesRequest,
   editMessage as editMessageRequest,
   fetchMessages,
   markConversationRead,
   sendAttachment,
   sendMessage as sendMessageRequest,
+  // The socket delivers exactly the shape the REST endpoints return, so the
+  // same mapper reads both. Keeping a second copy here is how live messages
+  // silently lost fields the REST path already carried.
+  toMessage as normalize,
 } from '../services/chatApi'
 import { CHAT_EVENTS, SOCKET_STATUS } from '../services/chatSocket'
 
@@ -200,16 +205,24 @@ export function useConversation(conversationId, apartmentId = null) {
     }
   }, [conversationId, token, hasMore, loadingOlder])
 
-  /** Sends a message. The POST's response is what lands in the list. */
+  /**
+   * Sends a message. The POST's response is what lands in the list.
+   *
+   * `replyToMessageId` is the message being answered, when one is.
+   */
   const send = useCallback(
-    async (body) => {
+    async (body, replyToMessageId = null) => {
       const text = body.trim()
       if (!text || sending) return false
 
       setSending(true)
       setSendError(null)
       try {
-        const message = await sendMessageRequest(conversationId, text, { token, apartmentId })
+        const message = await sendMessageRequest(conversationId, text, {
+          token,
+          apartmentId,
+          replyToMessageId,
+        })
         setMessages((current) =>
           current.some((item) => item.id === message.id) ? current : [...current, message],
         )
@@ -300,6 +313,36 @@ export function useConversation(conversationId, apartmentId = null) {
     [token],
   )
 
+  /**
+   * Removes a selection in one action.
+   *
+   * The same two scopes as `remove`, applied to every id at once. The list is
+   * updated the same way too, so a bulk delete and a single one leave the
+   * thread in the same shape.
+   */
+  const removeMany = useCallback(
+    async (messageIds, scope) => {
+      if (messageIds.length === 0) return true
+      const ids = new Set(messageIds)
+      try {
+        await deleteMessagesRequest(messageIds, scope, { token })
+        setMessages((current) =>
+          scope === 'me'
+            ? current.filter((message) => !ids.has(message.id))
+            : current.map((message) =>
+                ids.has(message.id)
+                  ? { ...message, isDeleted: true, body: '', isEdited: false }
+                  : message,
+              ),
+        )
+        return true
+      } catch {
+        return false
+      }
+    },
+    [token],
+  )
+
   return {
     messages,
     apartments,
@@ -316,33 +359,7 @@ export function useConversation(conversationId, apartmentId = null) {
     sendFile,
     edit,
     remove,
+    removeMany,
   }
 }
 
-/** The socket sends the same shape the REST endpoints do, in snake_case. */
-function normalize(payload) {
-  return {
-    id: payload.id,
-    conversationId: payload.conversation_id,
-    senderId: payload.sender_id,
-    kind: payload.kind ?? 'text',
-    body: payload.body,
-    attachment: payload.attachment
-      ? {
-          id: payload.attachment.id,
-          kind: payload.attachment.kind,
-          name: payload.attachment.name,
-          url: payload.attachment.url,
-          mimeType: payload.attachment.mime_type,
-          sizeBytes: payload.attachment.size_bytes,
-          durationSeconds: payload.attachment.duration_seconds ?? null,
-        }
-      : null,
-    isRead: payload.is_read,
-    isEdited: payload.is_edited,
-    isDeleted: payload.is_deleted,
-    createdAt: payload.created_at,
-    readAt: payload.read_at ?? null,
-    editedAt: payload.edited_at ?? null,
-  }
-}

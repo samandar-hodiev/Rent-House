@@ -148,14 +148,15 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	body, attachment, apartmentID, cleanup, ok := h.readMessage(c)
+	draft, cleanup, ok := h.readMessage(c)
 	if !ok {
 		return
 	}
 	defer cleanup()
 
 	message, err := h.chat.SendMessage(
-		c.Request.Context(), conversationID, actorID, body, attachment, apartmentID)
+		c.Request.Context(), conversationID, actorID,
+		draft.Body, draft.Attachment, draft.ApartmentID, draft.ReplyTo)
 	if err != nil {
 		h.writeError(c, err, "send message")
 		return
@@ -164,30 +165,46 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 	response.Success(c, http.StatusCreated, "", message)
 }
 
+// messageDraft is what a send request carried, whichever encoding it used.
+type messageDraft struct {
+	Body       string
+	Attachment *service.Attachment
+	// The listing the sender was looking at, and the message being answered.
+	// Both optional, and both are context the server verifies rather than
+	// trusts.
+	ApartmentID *uuid.UUID
+	ReplyTo     *uuid.UUID
+}
+
 // readMessage pulls the text and the optional file out of either encoding.
 func (h *ChatHandler) readMessage(
 	c *gin.Context,
-) (body string, attachment *service.Attachment, apartmentID *uuid.UUID, cleanup func(), ok bool) {
+) (draft messageDraft, cleanup func(), ok bool) {
 	cleanup = func() {}
 
 	if !strings.HasPrefix(c.ContentType(), "multipart/form-data") {
 		var req dto.SendMessageRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
-			return "", nil, nil, cleanup, false
+			return messageDraft{}, cleanup, false
 		}
 		req.Normalize()
-		return req.Body, nil, parseOptionalUUID(req.ApartmentID), cleanup, true
+		return messageDraft{
+			Body:        req.Body,
+			ApartmentID: parseOptionalUUID(req.ApartmentID),
+			ReplyTo:     parseOptionalUUID(req.ReplyToMessageID),
+		}, cleanup, true
 	}
 
-	// Multipart carries it as a field beside the file.
-	apartmentID = parseOptionalUUID(c.PostForm("apartment_id"))
+	// Multipart carries them as fields beside the file.
+	draft.ApartmentID = parseOptionalUUID(c.PostForm("apartment_id"))
+	draft.ReplyTo = parseOptionalUUID(c.PostForm("reply_to_message_id"))
 
 	header, err := c.FormFile("file")
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "validation_failed",
 			"Attach a file in the 'file' field")
-		return "", nil, nil, cleanup, false
+		return messageDraft{}, cleanup, false
 	}
 
 	// Checked before the file is opened, so an oversized upload is refused
@@ -197,23 +214,23 @@ func (h *ChatHandler) readMessage(
 	if !known {
 		response.Error(c, http.StatusUnsupportedMediaType, "unsupported_type",
 			"This file type is not accepted")
-		return "", nil, nil, cleanup, false
+		return messageDraft{}, cleanup, false
 	}
 	if header.Size > kind.MaxBytes {
 		response.Error(c, http.StatusRequestEntityTooLarge, "file_too_large",
 			"The file is larger than the limit for its type")
-		return "", nil, nil, cleanup, false
+		return messageDraft{}, cleanup, false
 	}
 
 	file, err := header.Open()
 	if err != nil {
 		logger.Errorf("send message: open upload: %v", err)
 		response.Error(c, http.StatusInternalServerError, "internal_error", "Something went wrong")
-		return "", nil, nil, cleanup, false
+		return messageDraft{}, cleanup, false
 	}
 	cleanup = func() { _ = file.Close() }
 
-	attachment = &service.Attachment{
+	attachment := &service.Attachment{
 		Reader:       file,
 		ContentType:  header.Header.Get("Content-Type"),
 		OriginalName: header.Filename,
@@ -226,7 +243,9 @@ func (h *ChatHandler) readMessage(
 		}
 	}
 
-	return strings.TrimSpace(c.PostForm("body")), attachment, apartmentID, cleanup, true
+	draft.Body = strings.TrimSpace(c.PostForm("body"))
+	draft.Attachment = attachment
+	return draft, cleanup, true
 }
 
 // DownloadAttachment handles GET /api/v1/attachments/:id.
@@ -367,6 +386,44 @@ func (h *ChatHandler) DeleteMessage(c *gin.Context) {
 		return
 	}
 	response.OK(c, "", message)
+}
+
+// DeleteMessages handles POST /api/v1/messages/delete.
+//
+// A selection removed in one action. POST rather than DELETE because the ids
+// travel in a body, which DELETE is not reliably allowed to carry.
+//
+// It is a batching of the single-message endpoint, not a privileged one: the
+// same two scopes, and the same rule that only an author may withdraw something
+// from both sides.
+func (h *ChatHandler) DeleteMessages(c *gin.Context) {
+	actorID, ok := h.actor(c)
+	if !ok {
+		return
+	}
+
+	var req dto.DeleteMessagesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+
+	ids := make([]uuid.UUID, 0, len(req.IDs))
+	for _, raw := range req.IDs {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, "validation_failed", "ids must be uuids")
+			return
+		}
+		ids = append(ids, id)
+	}
+
+	out, err := h.chat.DeleteMessages(c.Request.Context(), ids, actorID, req.Scope)
+	if err != nil {
+		h.writeError(c, err, "delete messages")
+		return
+	}
+	response.OK(c, "", out)
 }
 
 // UnreadTotal handles GET /api/v1/conversations/unread.

@@ -22,6 +22,11 @@ type Message struct {
 	// the listing is later withdrawn — the message outlives it either way.
 	ApartmentID *uuid.UUID `gorm:"column:apartment_id;type:uuid" json:"apartment_id,omitempty"`
 
+	// ReplyToMessageID is the message this one answers, when it answers one.
+	// Set to nil if that message is later withdrawn: the reply is its author's
+	// own words and stays, it simply stops quoting.
+	ReplyToMessageID *uuid.UUID `gorm:"column:reply_to_message_id;type:uuid" json:"reply_to_message_id,omitempty"`
+
 	// Kind decides whether Body or the attachment is the message. A column
 	// rather than a lookup, because the not-blank CHECK has to be satisfiable
 	// from this row alone.
@@ -44,6 +49,8 @@ type Message struct {
 	Conversation *Conversation      `gorm:"foreignKey:ConversationID;references:ID" json:"conversation,omitempty"`
 	Sender       *User              `gorm:"foreignKey:SenderID;references:ID" json:"sender,omitempty"`
 	Attachment   *MessageAttachment `gorm:"foreignKey:MessageID" json:"attachment,omitempty"`
+	// ReplyTo is the quoted original, loaded for rendering the "↳ …" line.
+	ReplyTo *Message `gorm:"foreignKey:ReplyToMessageID;references:ID" json:"reply_to,omitempty"`
 }
 
 func (Message) TableName() string { return "messages" }

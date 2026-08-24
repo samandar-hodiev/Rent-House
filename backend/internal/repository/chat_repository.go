@@ -401,6 +401,10 @@ func (r *ChatRepository) ListMessages(
 	var messages []models.Message
 	err := query.
 		Preload("Attachment").
+		// The quoted original, so a reply can render its "↳ …" line without a
+		// follow-up request per message.
+		Preload("ReplyTo").
+		Preload("ReplyTo.Attachment").
 		Order("messages.created_at DESC, messages.id DESC").
 		Limit(limit + 1).
 		Find(&messages).Error
@@ -524,7 +528,11 @@ func (r *ChatRepository) CreateMessage(
 // FindMessage loads one message with its attachment.
 func (r *ChatRepository) FindMessage(ctx context.Context, id uuid.UUID) (*models.Message, error) {
 	var message models.Message
-	if err := r.db.WithContext(ctx).Preload("Attachment").First(&message, "id = ?", id).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Preload("Attachment").
+		Preload("ReplyTo").
+		Preload("ReplyTo.Attachment").
+		First(&message, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrMessageNotFound
 		}
@@ -569,14 +577,68 @@ func (r *ChatRepository) SoftDeleteMessage(
 func (r *ChatRepository) HideMessageForUser(
 	ctx context.Context, messageID, userID uuid.UUID,
 ) error {
-	deletion := models.MessageDeletion{MessageID: messageID, UserID: userID}
+	return r.HideMessagesForUser(ctx, []uuid.UUID{messageID}, userID)
+}
+
+// HideMessagesForUser records "delete for me" across a selection, in one
+// statement rather than one per message.
+func (r *ChatRepository) HideMessagesForUser(
+	ctx context.Context, messageIDs []uuid.UUID, userID uuid.UUID,
+) error {
+	if len(messageIDs) == 0 {
+		return nil
+	}
+	deletions := make([]models.MessageDeletion, 0, len(messageIDs))
+	for _, id := range messageIDs {
+		deletions = append(deletions, models.MessageDeletion{MessageID: id, UserID: userID})
+	}
 	err := r.db.WithContext(ctx).
 		Clauses(clause.OnConflict{DoNothing: true}).
-		Create(&deletion).Error
+		Create(&deletions).Error
 	if err != nil {
-		return fmt.Errorf("hide message: %w", err)
+		return fmt.Errorf("hide messages: %w", err)
 	}
 	return nil
+}
+
+// SoftDeleteMessages withdraws a selection from both sides at once.
+//
+// One statement, so a selection cannot end up half-withdrawn because the caller
+// failed partway through a loop.
+func (r *ChatRepository) SoftDeleteMessages(
+	ctx context.Context, ids []uuid.UUID, deletedAt time.Time,
+) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	err := r.db.WithContext(ctx).
+		Model(&models.Message{}).
+		Where("id IN ?", ids).
+		// Already-withdrawn messages keep their original timestamp: re-running
+		// a delete should not move when it happened.
+		Where("deleted_at IS NULL").
+		Updates(map[string]any{"deleted_at": deletedAt, "body": ""}).Error
+	if err != nil {
+		return fmt.Errorf("delete messages: %w", err)
+	}
+	return nil
+}
+
+// FindMessages loads a selection, with the attachments the responses need.
+func (r *ChatRepository) FindMessages(
+	ctx context.Context, ids []uuid.UUID,
+) ([]models.Message, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var messages []models.Message
+	err := r.db.WithContext(ctx).
+		Preload("Attachment").
+		Find(&messages, "id IN ?", ids).Error
+	if err != nil {
+		return nil, fmt.Errorf("find messages: %w", err)
+	}
+	return messages, nil
 }
 
 // MarkRead marks everything the other side sent in this thread as read, and

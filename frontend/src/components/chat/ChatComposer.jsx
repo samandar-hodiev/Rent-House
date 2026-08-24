@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Mic, Paperclip, Send, Square, X } from 'lucide-react'
+import { CornerUpLeft, Loader2, Mic, Paperclip, Send, Square, X } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { canRecord, useVoiceRecorder } from '../../hooks/useVoiceRecorder'
 import { formatBytes, formatDuration } from './MessageAttachment'
+import MessageQuote from './MessageQuote'
 
 /**
  * The composer: text, one attachment, or a voice note.
@@ -15,7 +16,17 @@ import { formatBytes, formatDuration } from './MessageAttachment'
  * failure and partial-send semantics, and a single reliable attachment is worth
  * more than a half-working set of them.
  */
-function ChatComposer({ onSendText, onSendFile, sending, limits }) {
+function ChatComposer({
+  onSendText,
+  onSendFile,
+  sending,
+  limits,
+  // The message being answered, and the way out of answering it. Held by the
+  // thread rather than here, because the reply is started from a bubble.
+  replyTo = null,
+  replyAuthorName = '',
+  onCancelReply,
+}) {
   const { t } = useLocale()
   const recorder = useVoiceRecorder()
 
@@ -93,6 +104,8 @@ function ChatComposer({ onSendText, onSendFile, sending, limits }) {
 
     const text = draft
     setDraft('')
+    // The reply is cleared by the thread once the send succeeds, so a failed
+    // send leaves both the text and what it was answering in place.
     if (!(await onSendText(text))) setDraft(text)
   }
 
@@ -142,6 +155,28 @@ function ChatComposer({ onSendText, onSendFile, sending, limits }) {
 
   return (
     <div className="shrink-0 border-t border-border px-4 py-3">
+      {/* What this message will answer. Above the input rather than inside it,
+          so the quote is not mistaken for text that will be sent. */}
+      {replyTo ? (
+        <div className="mb-2 flex items-center gap-2 rounded-md bg-surface-secondary px-2.5 py-1.5">
+          <CornerUpLeft aria-hidden="true" size={13} className="shrink-0 text-text-muted" />
+          <MessageQuote
+            quote={replyTo}
+            authorName={replyAuthorName}
+            className="min-w-0 flex-1"
+          />
+          <button
+            type="button"
+            onClick={onCancelReply}
+            aria-label={t('chat.cancelReply')}
+            title={t('chat.cancelReply')}
+            className="flex size-7 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-surface hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <X aria-hidden="true" size={14} />
+          </button>
+        </div>
+      ) : null}
+
       {recorder.error ? (
         <p role="alert" className="mb-2 text-xs text-error">
           {recorder.error === 'unsupported' ? t('chat.recordUnsupported') : t('chat.micDenied')}

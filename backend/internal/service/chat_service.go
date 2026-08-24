@@ -297,7 +297,7 @@ func chatApartment(listing repository.ApartmentContext) dto.ChatApartmentRespons
 // file that failed to save would render as a broken bubble for both people.
 func (s *ChatService) SendMessage(
 	ctx context.Context, conversationID, actorID uuid.UUID, body string,
-	attachment *Attachment, apartmentID *uuid.UUID,
+	attachment *Attachment, apartmentID *uuid.UUID, replyTo *uuid.UUID,
 ) (*dto.MessageResponse, error) {
 	if err := s.assertParticipant(ctx, conversationID, actorID); err != nil {
 		return nil, err
@@ -329,12 +329,32 @@ func (s *ChatService) SendMessage(
 		}
 	}
 
+	// The message being answered. Checked to be in this same thread rather
+	// than merely to exist: without that, a reply would be a way to quote a
+	// message out of a conversation the sender has no part in, and the quote
+	// carries the original's text.
+	var quoted *models.Message
+	if replyTo != nil {
+		original, err := s.chat.FindMessage(ctx, *replyTo)
+		if err != nil {
+			if errors.Is(err, repository.ErrMessageNotFound) {
+				return nil, ErrMessageNotFound
+			}
+			return nil, err
+		}
+		if original.ConversationID != conversationID {
+			return nil, ErrMessageNotFound
+		}
+		quoted = original
+	}
+
 	message := &models.Message{
-		ConversationID: conversationID,
-		SenderID:       actorID,
-		Kind:           models.MessageKindText,
-		Body:           body,
-		ApartmentID:    apartmentID,
+		ConversationID:   conversationID,
+		SenderID:         actorID,
+		Kind:             models.MessageKindText,
+		Body:             body,
+		ApartmentID:      apartmentID,
+		ReplyToMessageID: replyTo,
 	}
 
 	var stored *models.MessageAttachment
@@ -370,6 +390,9 @@ func (s *ChatService) SendMessage(
 		s.protect(stored)
 		message.Attachment = stored
 	}
+	// Already loaded during validation, so the sender's own copy carries the
+	// quote without a second read.
+	message.ReplyTo = quoted
 
 	response := dto.NewMessageResponse(message)
 	// Saved first, announced second: a recipient must never see a message that
@@ -514,6 +537,92 @@ func (s *ChatService) DeleteMessage(
 	response := dto.NewMessageResponse(message)
 	s.broadcast(ctx, message.ConversationID, realtime.EventMessageDeleted, response)
 	return &response, nil
+}
+
+// DeleteMessages removes a selection in one action.
+//
+// The permission rules are the single-message ones, applied to every id: anyone
+// in the thread may hide anything from their own view, and only the author may
+// withdraw something from both sides. They are checked before anything is
+// written, so a selection is refused whole rather than half-applied — a partial
+// delete would leave the person unsure what actually happened.
+func (s *ChatService) DeleteMessages(
+	ctx context.Context, ids []uuid.UUID, actorID uuid.UUID, scope string,
+) (*dto.DeleteMessagesResponse, error) {
+	if len(ids) == 0 {
+		return &dto.DeleteMessagesResponse{Deleted: []dto.MessageResponse{}}, nil
+	}
+
+	// Duplicates in the selection would otherwise be counted twice.
+	unique := make([]uuid.UUID, 0, len(ids))
+	seen := make(map[uuid.UUID]bool, len(ids))
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			unique = append(unique, id)
+		}
+	}
+
+	messages, err := s.chat.FindMessages(ctx, unique)
+	if err != nil {
+		return nil, err
+	}
+	// An id that matched nothing is an id the caller should not be acting on.
+	if len(messages) != len(unique) {
+		return nil, ErrMessageNotFound
+	}
+
+	// Every message must be in a thread the caller belongs to, and every thread
+	// is checked once however many messages the selection holds in it.
+	checked := make(map[uuid.UUID]bool, 2)
+	for i := range messages {
+		message := &messages[i]
+		if !checked[message.ConversationID] {
+			if err := s.assertParticipant(ctx, message.ConversationID, actorID); err != nil {
+				return nil, ErrMessageNotFound
+			}
+			checked[message.ConversationID] = true
+		}
+		if scope == dto.DeleteScopeEveryone && message.SenderID != actorID {
+			return nil, ErrNotMessageAuthor
+		}
+	}
+
+	if scope == dto.DeleteScopeMe {
+		if err := s.chat.HideMessagesForUser(ctx, unique, actorID); err != nil {
+			return nil, err
+		}
+		// Nothing is broadcast: only this reader's view changed.
+		return &dto.DeleteMessagesResponse{
+			Deleted: []dto.MessageResponse{},
+			Count:   len(unique),
+		}, nil
+	}
+
+	deletedAt := s.now().UTC()
+	if err := s.chat.SoftDeleteMessages(ctx, unique, deletedAt); err != nil {
+		return nil, err
+	}
+
+	out := &dto.DeleteMessagesResponse{
+		Deleted: make([]dto.MessageResponse, 0, len(messages)),
+		Count:   len(unique),
+	}
+	for i := range messages {
+		message := &messages[i]
+		// Already withdrawn messages keep the timestamp they had; the rest take
+		// this one. Either way the response says "deleted", which is what the
+		// caller asked for.
+		if message.DeletedAt == nil {
+			message.DeletedAt = &deletedAt
+		}
+		response := dto.NewMessageResponse(message)
+		// One event per message, the same event a single delete publishes, so
+		// the other side's client needs no special case for a bulk delete.
+		s.broadcast(ctx, message.ConversationID, realtime.EventMessageDeleted, response)
+		out.Deleted = append(out.Deleted, response)
+	}
+	return out, nil
 }
 
 // MarkRead marks the other side's messages as read and tells them so.

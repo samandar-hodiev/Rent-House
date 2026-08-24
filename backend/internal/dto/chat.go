@@ -43,6 +43,10 @@ type SendMessageRequest struct {
 	// routing: it does not decide which thread the message lands in — the pair
 	// does that — it records what the message is about.
 	ApartmentID string `json:"apartment_id" binding:"omitempty,uuid"`
+	// ReplyToMessageID is the message this one answers. Verified server-side to
+	// belong to the same thread, so a reply cannot be used to quote a message
+	// out of a conversation the sender is not in.
+	ReplyToMessageID string `json:"reply_to_message_id" binding:"omitempty,uuid"`
 }
 
 // Normalize trims the text. A message of only whitespace is not a message, and
@@ -67,6 +71,28 @@ const (
 // DeleteMessageRequest is the body of DELETE /api/v1/messages/:id.
 type DeleteMessageRequest struct {
 	Scope string `json:"scope" binding:"required,oneof=me everyone"`
+}
+
+// DeleteMessagesRequest is the body of POST /api/v1/messages/delete, which
+// removes a selection in one action.
+//
+// The same two scopes and the same permission rules as the single-message
+// endpoint — this is one round trip instead of many, not a second set of rules.
+// The cap is what one selection can reasonably hold and bounds the work a
+// single request can ask for.
+type DeleteMessagesRequest struct {
+	IDs   []string `json:"ids"   binding:"required,min=1,max=100,dive,uuid"`
+	Scope string   `json:"scope" binding:"required,oneof=me everyone"`
+}
+
+// DeleteMessagesResponse reports what the selection did.
+type DeleteMessagesResponse struct {
+	// Deleted are the messages withdrawn for both sides, so the client can
+	// replace exactly those bubbles. Empty for a "delete for me", where nothing
+	// about the messages themselves changed.
+	Deleted []MessageResponse `json:"deleted"`
+	// Count is how many messages the action covered, under either scope.
+	Count int `json:"count"`
 }
 
 // MessageListQuery is the query string of the messages endpoint.
@@ -136,15 +162,53 @@ type MessageResponse struct {
 	// about several listings, and this is what tells them apart.
 	ApartmentID *uuid.UUID `json:"apartment_id,omitempty"`
 
+	// ReplyTo is the message this one answers, when it answers one. Absent
+	// rather than empty when it does not, and when the quoted message has since
+	// been hard-removed.
+	ReplyTo *MessageQuoteResponse `json:"reply_to,omitempty"`
+
 	CreatedAt time.Time  `json:"created_at"`
 	ReadAt    *time.Time `json:"read_at,omitempty"`
 	EditedAt  *time.Time `json:"edited_at,omitempty"`
 }
 
 // NewMessageResponse converts a stored message into its API shape.
+// MessageQuoteResponse is the message a reply answers, reduced to what the
+// quote line renders. Not the full message: a quote needs a line of text and
+// who said it, and nesting whole messages would let one reply drag an entire
+// chain of earlier ones into the response.
+type MessageQuoteResponse struct {
+	ID       uuid.UUID `json:"id"`
+	SenderID uuid.UUID `json:"sender_id"`
+	Kind     string    `json:"kind"`
+	Body     string    `json:"body"`
+	// IsDeleted lets the quote say "this message was deleted" in place of text
+	// that must not be sent.
+	IsDeleted bool `json:"is_deleted"`
+}
+
+func newMessageQuote(message *models.Message) *MessageQuoteResponse {
+	if message == nil {
+		return nil
+	}
+	out := &MessageQuoteResponse{
+		ID:        message.ID,
+		SenderID:  message.SenderID,
+		Kind:      message.Kind,
+		Body:      message.Body,
+		IsDeleted: message.DeletedAt != nil,
+	}
+	// A withdrawn message's text is not sent anywhere, quotes included.
+	if out.IsDeleted {
+		out.Body = ""
+	}
+	return out
+}
+
 func NewMessageResponse(message *models.Message) MessageResponse {
 	out := MessageResponse{
 		ApartmentID:    message.ApartmentID,
+		ReplyTo:        newMessageQuote(message.ReplyTo),
 		ID:             message.ID,
 		ConversationID: message.ConversationID,
 		SenderID:       message.SenderID,

@@ -350,6 +350,9 @@ func newRouter(
 	{
 		messages.PATCH("/:id", chatHandler.EditMessage)
 		messages.DELETE("/:id", chatHandler.DeleteMessage)
+		// Registered before ":id" would ever be consulted for it — a POST to
+		// /messages/delete is the bulk action, not a message with that id.
+		messages.POST("/delete", chatHandler.DeleteMessages)
 	}
 
 	// What the client may send. Read from the server so the picker's filters

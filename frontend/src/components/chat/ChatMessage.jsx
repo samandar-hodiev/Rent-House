@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, CheckCheck, Pencil, Trash2, X } from 'lucide-react'
+import { Check, CheckCheck, CheckSquare, CornerUpLeft, Pencil, Trash2, X } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { formatMessageTime } from '../../utils/formatChatTime'
 import MessageAttachment from './MessageAttachment'
+import MessageQuote from './MessageQuote'
 
 /**
  * One bubble.
@@ -15,7 +16,21 @@ import MessageAttachment from './MessageAttachment'
  * would leave an unexplained gap where both people remember something being
  * said.
  */
-function ChatMessage({ message, isMine, onEdit, onDelete, onOpenImage }) {
+function ChatMessage({
+  message,
+  isMine,
+  onEdit,
+  onDelete,
+  onOpenImage,
+  onReply,
+  // Selection. `selecting` is the mode rather than a per-message flag: while it
+  // is on, a click anywhere on a row toggles it instead of doing whatever that
+  // part of the row usually does.
+  selecting = false,
+  selected = false,
+  onToggleSelect,
+  quoteAuthorName,
+}) {
   const { t, locale } = useLocale()
   const isText = (message.kind ?? 'text') === 'text'
   const [editing, setEditing] = useState(false)
@@ -42,27 +57,103 @@ function ChatMessage({ message, isMine, onEdit, onDelete, onOpenImage }) {
     if (await onEdit(message.id, text)) setEditing(false)
   }
 
+  // While selecting, the whole row is the control. A click anywhere toggles the
+  // message rather than reaching the edit, reply or attachment beneath it, so
+  // there is no part of a row that does something unexpected mid-selection.
+  const selectionProps = selecting
+    ? {
+        onClick: () => onToggleSelect(message.id),
+        role: 'button',
+        tabIndex: 0,
+        'aria-pressed': selected,
+        'aria-label': selected ? t('chat.deselectMessage') : t('chat.selectMessage'),
+        onKeyDown: (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            onToggleSelect(message.id)
+          }
+        },
+      }
+    : {}
+
+  const selectionClass = selecting
+    ? `-mx-2 cursor-pointer rounded-md px-2 py-0.5 transition-colors ${
+        selected ? 'bg-primary/10' : 'hover:bg-surface-secondary'
+      }`
+    : ''
+
+  // A checkbox that reflects state rather than owning it — the row is what
+  // handles the click, so this must not take one of its own.
+  const checkbox = selecting ? (
+    <span
+      aria-hidden="true"
+      className={`mt-2 flex size-4 shrink-0 items-center justify-center rounded-sm border transition-colors ${
+        selected ? 'border-primary bg-primary text-white' : 'border-border bg-surface'
+      }`}
+    >
+      {selected ? <Check size={11} strokeWidth={3} /> : null}
+    </span>
+  ) : null
+
   if (message.isDeleted) {
     return (
-      <li className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+      <li
+        {...selectionProps}
+        className={`flex items-start gap-2 ${selectionClass} ${
+          isMine ? 'justify-end' : 'justify-start'
+        }`}
+      >
+        {!isMine ? checkbox : null}
         <div className="max-w-[80%] rounded-lg border border-dashed border-border px-3 py-2 sm:max-w-[70%]">
           <p className="text-sm italic text-text-muted">{t('chat.messageDeleted')}</p>
         </div>
+        {isMine ? checkbox : null}
       </li>
     )
   }
 
   return (
-    <li className={`group flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+    <li
+      {...selectionProps}
+      className={`group flex items-start gap-2 ${selectionClass} ${
+        isMine ? 'justify-end' : 'justify-start'
+      }`}
+    >
+      {!isMine ? checkbox : null}
       <div className={`flex max-w-[85%] items-end gap-1 sm:max-w-[75%] ${isMine ? 'flex-row' : 'flex-row-reverse'}`}>
         {/* Actions sit outside the bubble and appear on hover, or always on a
-            touch screen where there is no hover to reveal them. */}
-        {isMine && !editing ? (
+            touch screen where there is no hover to reveal them. Hidden while
+            selecting, where the row means one thing only. */}
+        {!editing && !selecting ? (
           <div className="flex shrink-0 flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-100">
-            {/* An attachment is immutable — swapping the file under a message
-                would leave the two people looking at different things — so only
-                a text message offers Edit. */}
-            {isText ? (
+            {/* Reply is offered on every message, incoming and outgoing alike:
+                answering your own message to add to it is as ordinary as
+                answering someone else's. */}
+            <button
+              type="button"
+              onClick={() => onReply(message)}
+              aria-label={t('chat.reply')}
+              title={t('chat.reply')}
+              className="flex size-7 items-center justify-center rounded-md text-text-muted hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <CornerUpLeft aria-hidden="true" size={13} />
+            </button>
+
+            {/* The way into selection mode. Selecting the first message turns
+                it on; from then on the rows themselves are the control, so
+                this is the only place it has to be offered. */}
+            <button
+              type="button"
+              onClick={() => onToggleSelect(message.id)}
+              aria-label={t('chat.selectMessages')}
+              title={t('chat.selectMessages')}
+              className="flex size-7 items-center justify-center rounded-md text-text-muted hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <CheckSquare aria-hidden="true" size={13} />
+            </button>
+
+            {/* Editing and deleting stay the author's own, as they were. */}
+            {isMine && isText ? (
             <button
               type="button"
               onClick={startEditing}
@@ -73,6 +164,7 @@ function ChatMessage({ message, isMine, onEdit, onDelete, onOpenImage }) {
               <Pencil aria-hidden="true" size={13} />
             </button>
             ) : null}
+            {isMine ? (
             <button
               type="button"
               onClick={() => onDelete(message)}
@@ -82,6 +174,7 @@ function ChatMessage({ message, isMine, onEdit, onDelete, onOpenImage }) {
             >
               <Trash2 aria-hidden="true" size={13} />
             </button>
+            ) : null}
           </div>
         ) : null}
 
@@ -122,6 +215,16 @@ function ChatMessage({ message, isMine, onEdit, onDelete, onOpenImage }) {
             </form>
           ) : (
             <>
+              {/* The message being answered, above this one's own words. */}
+              {message.replyTo ? (
+                <MessageQuote
+                  quote={message.replyTo}
+                  authorName={quoteAuthorName}
+                  onSurface={isMine}
+                  className="mb-1.5"
+                />
+              ) : null}
+
               {message.attachment ? (
                 <div className={message.body ? 'mb-2' : undefined}>
                   <MessageAttachment
@@ -164,6 +267,7 @@ function ChatMessage({ message, isMine, onEdit, onDelete, onOpenImage }) {
           )}
         </div>
       </div>
+      {isMine ? checkbox : null}
     </li>
   )
 }

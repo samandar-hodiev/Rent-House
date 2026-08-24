@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Ban, Loader2 } from 'lucide-react'
+import { AlertTriangle, Ban, Loader2, Trash2, X } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useChat } from '../../context/ChatContext'
 import { useConversation } from '../../hooks/useConversation'
@@ -109,11 +109,21 @@ function ChatThread({
     sendFile,
     edit,
     remove,
+    removeMany,
   } = useConversation(conversation?.id, apartmentId)
 
   const [pendingDelete, setPendingDelete] = useState(null)
   const [lightbox, setLightbox] = useState(null)
   const [limits, setLimits] = useState(null)
+  // The message being answered, if any.
+  const [replyTo, setReplyTo] = useState(null)
+  // Selected message ids. A Set rather than a list: selecting is a membership
+  // question asked once per rendered bubble.
+  const [selected, setSelected] = useState(() => new Set())
+  // Set while a bulk delete is confirmed, so the dialog knows what it is about
+  // to remove and whether "for everyone" is even available.
+  const [confirmingBulk, setConfirmingBulk] = useState(false)
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   // What the server accepts, read once so the picker's filter and the size
   // check come from the side that enforces them.
@@ -143,10 +153,62 @@ function ChatThread({
     }
   }, [messages])
 
+  // Switching threads must not carry a selection or a half-written reply into
+  // the next one.
+  useEffect(() => {
+    setSelected(new Set())
+    setReplyTo(null)
+    setConfirmingBulk(false)
+  }, [conversation?.id])
+
+  const selecting = selected.size > 0
+
+  const toggleSelect = (messageId) => {
+    setSelected((current) => {
+      const next = new Set(current)
+      if (next.has(messageId)) next.delete(messageId)
+      else next.add(messageId)
+      return next
+    })
+  }
+
+  const clearSelection = () => setSelected(new Set())
+
+  // "Delete for everyone" is the author's to use, so it is offered only when
+  // every selected message is this reader's own. The server refuses the rest
+  // regardless — this stops the UI offering something that would be refused.
+  const selectedMessages = messages.filter((message) => selected.has(message.id))
+  const allMine = selectedMessages.length > 0 && selectedMessages.every((m) => m.senderId === myId)
+
+  const handleBulkDelete = async (scope) => {
+    setBulkBusy(true)
+    const ok = await removeMany([...selected], scope)
+    setBulkBusy(false)
+    if (ok) {
+      setConfirmingBulk(false)
+      clearSelection()
+    }
+  }
+
   const handleSendText = async (text) => {
     pinnedToBottom.current = true
-    return send(text)
+    const ok = await send(text, replyTo?.id ?? null)
+    // Cleared only on success, so a failed send keeps what it was answering.
+    if (ok) setReplyTo(null)
+    return ok
   }
+
+  // Starting a reply ends a selection: they are two different things to be
+  // doing with a message, and staying in both is how a stray click deletes
+  // something.
+  const handleReply = (message) => {
+    clearSelection()
+    setReplyTo(message)
+  }
+
+  // Who the quote is attributed to. The reply carries only a sender id, and
+  // the thread already knows the only two people it can belong to.
+  const quoteAuthor = (senderId) => (senderId === myId ? t('chat.you') : conversation?.other?.name)
 
   const handleSendFile = (options) => {
     pinnedToBottom.current = true
@@ -165,8 +227,40 @@ function ChatThread({
 
   return (
     <div className={`flex min-h-0 flex-col ${className}`}>
+      {/* While a selection is open it takes the header's place, so the count
+          and its two actions sit where the reader is already looking and the
+          thread does not grow a second toolbar. */}
+      {selecting ? (
+        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface-secondary px-3 py-2 sm:px-4 sm:py-3">
+          <button
+            type="button"
+            onClick={clearSelection}
+            aria-label={t('chat.cancelSelection')}
+            title={t('chat.cancelSelection')}
+            className="flex size-8 shrink-0 items-center justify-center rounded-md text-text-secondary hover:bg-surface hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <X aria-hidden="true" size={16} />
+          </button>
+
+          <p className="min-w-0 flex-1 truncate text-sm font-medium text-text-primary">
+            {t('chat.selectedCount', { count: selected.size })}
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setConfirmingBulk(true)}
+            className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-error transition-colors hover:bg-error/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <Trash2 aria-hidden="true" size={15} />
+            {/* The label is dropped on the narrowest screens, where the icon
+                and the count together are unambiguous. */}
+            <span className="max-[380px]:sr-only">{t('chat.delete')}</span>
+          </button>
+        </div>
+      ) : null}
+
       {/* Header */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
+      <div className={`shrink-0 items-center gap-3 border-b border-border px-4 py-3 ${selecting ? 'hidden' : 'flex'}`}>
         <UserAvatar name={other.name} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-text-primary">{other.name}</p>
@@ -296,6 +390,11 @@ function ChatThread({
                       onEdit={edit}
                       onDelete={setPendingDelete}
                       onOpenImage={setLightbox}
+                      onReply={handleReply}
+                      selecting={selecting}
+                      selected={selected.has(message.id)}
+                      onToggleSelect={toggleSelect}
+                      quoteAuthorName={quoteAuthor(message.replyTo?.senderId)}
                     />
                   </Fragment>
                 )
@@ -352,6 +451,9 @@ function ChatThread({
           onSendFile={handleSendFile}
           sending={sending}
           limits={limits}
+          replyTo={replyTo}
+          replyAuthorName={quoteAuthor(replyTo?.senderId)}
+          onCancelReply={() => setReplyTo(null)}
         />
       )}
 
@@ -394,6 +496,20 @@ function ChatThread({
           onCancel={() => setPendingDelete(null)}
           onDeleteForMe={() => handleDelete('me')}
           onDeleteForEveryone={() => handleDelete('everyone')}
+        />
+      ) : null}
+
+      {/* The same dialog the single delete uses, told how many messages it is
+          about and whether withdrawing them from both sides is this reader's
+          to do. */}
+      {confirmingBulk ? (
+        <DeleteMessageDialog
+          count={selected.size}
+          busy={bulkBusy}
+          allowEveryone={allMine}
+          onCancel={() => (bulkBusy ? undefined : setConfirmingBulk(false))}
+          onDeleteForMe={() => handleBulkDelete('me')}
+          onDeleteForEveryone={() => handleBulkDelete('everyone')}
         />
       ) : null}
     </div>
