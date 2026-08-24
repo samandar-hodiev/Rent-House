@@ -16,18 +16,21 @@ import { ROUTES } from '../routes/paths'
 // grid about 1170px. Container queries ask the container, which is the thing
 // that decides how many cards fit.
 //
-// The steps are the ones the design asks for: four across a large desktop,
-// three on a laptop, two on a tablet, one on a phone.
+// Five across a wide monitor, four on an ordinary desktop, three on a laptop,
+// two on a tablet, one on a phone.
 //
-// The fourth column lands at 1250px because that is what separates the two
-// cases in practice: a 1440px window leaves this grid 1168px, a 1600px one
-// leaves 1296px. The gap between them is wider than it looks because the
-// dashboard sidebar itself widens at 2xl.
+// The steps are placed by the room the grid actually has rather than by round
+// window sizes. A 1440px window leaves this grid 1168px and a 1600px one leaves
+// 1296px — a bigger gap than it looks, because the dashboard sidebar itself
+// widens at 2xl — so the fourth column lands at 1250px between them. The fifth
+// waits until 1650px: a 1920px window leaves 1616px and keeps four, while
+// anything wider would otherwise stretch four cards past 400px each and the row
+// starts looking like a row of billboards.
 // The variants query the nearest *ancestor* container, so the element that
 // declares `@container` cannot be the same one that reacts to it — the grid
 // lives inside a wrapper that is the container.
 const SAVED_GRID =
-  'grid grid-cols-1 gap-4 @[560px]:grid-cols-2 @[900px]:grid-cols-3 @[900px]:gap-5 @[1250px]:grid-cols-4'
+  'grid grid-cols-1 gap-4 @[560px]:grid-cols-2 @[900px]:grid-cols-3 @[900px]:gap-5 @[1250px]:grid-cols-4 @[1650px]:grid-cols-5'
 
 const SKELETON_COUNT = 8
 
