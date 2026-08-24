@@ -65,7 +65,12 @@ function DashboardChatsPage() {
       <h1 className="sr-only">{t('chat.title')}</h1>
 
       <div
-        className={`min-w-0 flex-col border-border md:flex md:w-80 md:shrink-0 md:border-r ${
+        // 288px from `md:` up rather than a flat 320px. The list needs room for a
+        // name, a listing title and a line of the last message — all of which
+        // truncate — while the thread beside it is where the reading actually
+        // happens, and every pixel here is one it does not get. The wider step
+        // returns at 2xl, where there is enough width for both.
+        className={`min-w-0 flex-col border-border md:flex md:w-72 md:shrink-0 md:border-r 2xl:w-80 ${
           selected ? 'hidden' : 'flex w-full'
         }`}
       >

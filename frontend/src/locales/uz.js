@@ -265,6 +265,7 @@ export default {
   'chat.cancel': 'Bekor qilish',
   'chat.delete': "O'chirish",
   'chat.reply': 'Javob berish',
+  'chat.draft': 'Qoralama:',
   'chat.messageActions': 'Xabar amallari',
   'chat.cancelReply': 'Javobni bekor qilish',
   'chat.you': 'Siz',

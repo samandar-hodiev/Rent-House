@@ -265,6 +265,7 @@ export default {
   'chat.cancel': 'Отмена',
   'chat.delete': 'Удалить',
   'chat.reply': 'Ответить',
+  'chat.draft': 'Черновик:',
   'chat.messageActions': 'Действия с сообщением',
   'chat.cancelReply': 'Отменить ответ',
   'chat.you': 'Вы',

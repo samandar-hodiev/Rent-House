@@ -21,6 +21,26 @@ import { CHAT_EVENTS, SOCKET_STATUS, openChatSocket } from '../services/chatSock
 
 const ChatContext = createContext(null)
 
+// Unsent text, kept per conversation. In localStorage rather than memory alone
+// so a draft survives a reload the way it survives a navigation — somebody who
+// half-wrote a message and closed the tab expects to find it again.
+const DRAFTS_KEY = 'renthouse_chat_drafts'
+
+function readStoredDrafts() {
+  if (typeof window === 'undefined') return {}
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(DRAFTS_KEY) ?? '{}')
+    // Anything that is not a plain map of strings is discarded rather than
+    // trusted: this is user-writable storage.
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {}
+    return Object.fromEntries(
+      Object.entries(stored).filter(([, value]) => typeof value === 'string' && value !== ''),
+    )
+  } catch {
+    return {}
+  }
+}
+
 /**
  * Owns the conversation list, the unread badge and the single WebSocket.
  *
@@ -62,6 +82,34 @@ export function ChatProvider({ children }) {
   const setActiveConversation = useCallback((conversationId) => {
     activeConversationRef.current = conversationId
   }, [])
+
+  // Unsent text per conversation. Keyed by id so two half-written messages
+  // cannot reach the wrong thread.
+  const [drafts, setDrafts] = useState(readStoredDrafts)
+
+  const setDraft = useCallback((conversationId, text) => {
+    setDrafts((current) => {
+      const trimmed = text ?? ''
+      if ((current[conversationId] ?? '') === trimmed) return current
+      const next = { ...current }
+      // An emptied draft is removed rather than stored as "", so the list has
+      // one thing to check and storage does not fill with blanks.
+      if (trimmed === '') delete next[conversationId]
+      else next[conversationId] = trimmed
+      return next
+    })
+  }, [])
+
+  const clearDraft = useCallback((conversationId) => setDraft(conversationId, ''), [setDraft])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts))
+    } catch {
+      // Private-browsing mode can refuse writes. The draft then lasts as long
+      // as the tab, which is a degraded experience rather than a broken one.
+    }
+  }, [drafts])
 
   // Screens subscribe to raw events so a thread can apply the ones for the
   // conversation it is showing. A ref rather than state: adding a listener must
@@ -156,6 +204,13 @@ export function ChatProvider({ children }) {
         // The sender's own echo, for their other tabs, must not raise their own
         // unread count.
         const isMine = payload.sender_id === myIdRef.current
+        // Neither must a message arriving in the thread the reader is looking
+        // at. It is on screen the moment it lands, so counting it as unread
+        // would put a badge on a conversation they are in the middle of
+        // reading. `document.hidden` is the qualifier: the thread can be
+        // "open" in a tab that is not in front, and that message really is
+        // unread.
+        const isBeingRead = activeConversationRef.current === conversationId && !document.hidden
         const updated = {
           ...conversation,
           lastMessage: {
@@ -164,7 +219,8 @@ export function ChatProvider({ children }) {
             isDeleted: payload.is_deleted,
             createdAt: payload.created_at,
           },
-          unreadCount: isMine ? conversation.unreadCount : conversation.unreadCount + 1,
+          unreadCount:
+            isMine || isBeingRead ? conversation.unreadCount : conversation.unreadCount + 1,
           updatedAt: payload.created_at,
         }
         // Most recently active first.
@@ -324,6 +380,9 @@ export function ChatProvider({ children }) {
       socketStatus,
       isAuthenticated,
       subscribe,
+      drafts,
+      setDraft,
+      clearDraft,
       activeConversationRef,
       setActiveConversation,
       startConversation,
@@ -344,6 +403,9 @@ export function ChatProvider({ children }) {
       socketStatus,
       isAuthenticated,
       subscribe,
+      drafts,
+      setDraft,
+      clearDraft,
       setActiveConversation,
       startConversation,
       markRead,

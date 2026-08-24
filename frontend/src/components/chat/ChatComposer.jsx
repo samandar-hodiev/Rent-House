@@ -26,11 +26,30 @@ function ChatComposer({
   replyTo = null,
   replyAuthorName = '',
   onCancelReply,
+  // Unsent text for the thread on screen. Held by the chat context rather than
+  // here, so switching conversations — or leaving the page entirely — does not
+  // lose what was half-written.
+  draftValue = '',
+  onDraftChange,
 }) {
   const { t } = useLocale()
   const recorder = useVoiceRecorder()
 
-  const [draft, setDraft] = useState('')
+  // Seeded from the stored draft and reset whenever the thread changes, so
+  // one conversation's half-written message never appears in another's box.
+  const [draft, setDraftText] = useState(draftValue)
+  const lastSeeded = useRef(draftValue)
+  if (draftValue !== lastSeeded.current) {
+    lastSeeded.current = draftValue
+    if (draftValue !== draft) setDraftText(draftValue)
+  }
+
+  // Every change goes to the store as well as to the field.
+  const setDraft = (text) => {
+    setDraftText(text)
+    lastSeeded.current = text
+    onDraftChange?.(text)
+  }
   const [picked, setPicked] = useState(null) // { file, previewUrl }
   const [progress, setProgress] = useState(null) // 0..1 while uploading
   const [failed, setFailed] = useState(null) // { file, body, durationSeconds }

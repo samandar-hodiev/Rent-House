@@ -105,6 +105,17 @@ export function useConversation(conversationId, apartmentId = null) {
 
       switch (envelope.event) {
         case CHAT_EVENTS.messageNew:
+          // Arriving in a thread that is open and in front: the reader is
+          // looking at it, so it is read. Told to the server as well as
+          // assumed locally — otherwise the badge would come back on the next
+          // load, and the sender's ticks would never turn.
+          if (payload.sender_id !== myId && !document.hidden) {
+            markConversationRead(conversationId, { token })
+              .then(() => markRead(conversationId))
+              .catch(() => {
+                // The next open corrects it; not worth interrupting anyone for.
+              })
+          }
           setMessages((current) =>
             // The sender receives their own message back for their other tabs,
             // and the POST already added it here. Keyed on id so the echo is
@@ -140,7 +151,7 @@ export function useConversation(conversationId, apartmentId = null) {
           break
       }
     })
-  }, [conversationId, subscribe])
+  }, [conversationId, subscribe, token, myId, markRead])
 
   // Recovery after a reconnect.
   //

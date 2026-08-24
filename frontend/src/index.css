@@ -249,3 +249,49 @@ body {
     animation: none !important;
   }
 }
+
+/* Chat scrollback.
+ *
+ * The browser default is a near-white bar, which cuts a bright stripe down the
+ * side of a dark panel and pulls the eye away from the messages. This is the
+ * same bar in the theme's own colours: a track that disappears into the surface
+ * and a thumb one step above the border, so it reads as texture until it is
+ * looked for.
+ *
+ * Scoped to the class rather than applied globally — the page's own scrollbar
+ * is the browser's business, and overriding it everywhere is how a site starts
+ * feeling subtly wrong. */
+.chat-scroll {
+  /* Firefox, which has no ::-webkit pseudo-elements. `thin` is roughly the
+     8px the WebKit rule below sets. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.chat-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--color-border);
+  border-radius: 9999px;
+  /* Inset by a transparent border so the thumb sits away from the very edge
+     and looks like a handle rather than a rule. */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-muted);
+  background-clip: padding-box;
+}
+
+/* No corner square where two scrollbars would meet. */
+.chat-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}

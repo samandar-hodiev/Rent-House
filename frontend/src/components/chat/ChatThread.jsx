@@ -36,8 +36,16 @@ function ChatThread({
   className = '',
 }) {
   const { t } = useLocale()
-  const { socketStatus, setActiveConversation, setBlocked, setArchived, removeConversation } =
-    useChat()
+  const {
+    socketStatus,
+    setActiveConversation,
+    setBlocked,
+    setArchived,
+    removeConversation,
+    drafts,
+    setDraft,
+    clearDraft,
+  } = useChat()
 
   // Two different facts. `isBlocked` is this reader's own decision and offers a
   // way back; `isBlockedBy` is the other party's, and only explains why the
@@ -193,8 +201,12 @@ function ChatThread({
   const handleSendText = async (text) => {
     pinnedToBottom.current = true
     const ok = await send(text, replyTo?.id ?? null)
-    // Cleared only on success, so a failed send keeps what it was answering.
-    if (ok) setReplyTo(null)
+    // Both cleared only on success, so a failed send keeps the text and what
+    // it was answering.
+    if (ok) {
+      setReplyTo(null)
+      clearDraft(conversation.id)
+    }
     return ok
   }
 
@@ -328,10 +340,9 @@ function ChatThread({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        // Named so a message's actions menu can measure the room it actually
-        // has: this element clips anything that leaves it.
-        data-chat-scroll=""
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3"
+        // `chat-scroll` is the custom scrollbar; see index.css. The default
+        // one is near-white and cuts a bright stripe down a dark panel.
+        className="chat-scroll flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3"
       >
         {isLoading ? (
           <p className="m-auto flex items-center justify-center gap-2 py-8 text-sm text-text-muted">
@@ -457,6 +468,8 @@ function ChatThread({
           replyTo={replyTo}
           replyAuthorName={quoteAuthor(replyTo?.senderId)}
           onCancelReply={() => setReplyTo(null)}
+          draftValue={drafts[conversation.id] ?? ''}
+          onDraftChange={(text) => setDraft(conversation.id, text)}
         />
       )}
 

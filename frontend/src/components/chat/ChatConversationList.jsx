@@ -26,6 +26,7 @@ function ChatConversationList({ activeId, onSelect }) {
     setArchived,
     removeConversation,
     setBlocked,
+    drafts,
   } = useChat()
 
   const [query, setQuery] = useState('')
@@ -159,6 +160,10 @@ function ChatConversationList({ activeId, onSelect }) {
         {visible.map((conversation) => {
           const isActive = conversation.id === activeId
           const last = conversation.lastMessage
+          // Not shown for the thread already open: the text is sitting in the
+          // composer right there, and repeating it in the row beside it is
+          // noise.
+          const draft = conversation.id === activeId ? '' : (drafts[conversation.id] ?? '')
 
           return (
             <li
@@ -216,13 +221,25 @@ function ChatConversationList({ activeId, onSelect }) {
                   </span>
 
                   <span className="flex items-center justify-between gap-2">
-                    <span className="truncate text-xs text-text-secondary">
-                      {last
-                        ? last.isDeleted
-                          ? t('chat.messageDeleted')
-                          : last.body
-                        : t('chat.empty')}
-                    </span>
+                    {/* An unsent draft takes the last message's place: what
+                        this thread is waiting on is something the reader
+                        started writing, which is more use to them than
+                        whatever was last said. It is their own text, so it is
+                        never unread and never touches the badge. */}
+                    {draft ? (
+                      <span className="truncate text-xs text-text-secondary">
+                        <span className="font-medium text-warning">{t('chat.draft')}</span>{' '}
+                        {draft}
+                      </span>
+                    ) : (
+                      <span className="truncate text-xs text-text-secondary">
+                        {last
+                          ? last.isDeleted
+                            ? t('chat.messageDeleted')
+                            : last.body
+                          : t('chat.empty')}
+                      </span>
+                    )}
                     {conversation.unreadCount > 0 ? (
                       <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-white">
                         {conversation.unreadCount}
@@ -269,7 +286,7 @@ function ChatConversationList({ activeId, onSelect }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {header}
-      <div className="min-h-0 flex-1 overflow-y-auto">{body()}</div>
+      <div className="chat-scroll min-h-0 flex-1 overflow-y-auto">{body()}</div>
 
       {pending?.kind === 'archive' ? (
         <ArchiveConversationDialog
