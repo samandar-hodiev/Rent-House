@@ -227,6 +227,7 @@ export default {
   'chat.archive': "Архивировать",
   'chat.unarchive': "Вернуть из архива",
   'chat.archived': "Архив диалогов",
+  'chat.settings': 'Настройки чата',
   'chat.backToInbox': "Назад к диалогам",
   'chat.noArchived': "В архиве пусто",
   'chat.noArchivedHint': "Архивированные диалоги появятся здесь.",

@@ -5,7 +5,6 @@ import {
   LogOut,
   MessageSquare,
   PlusCircle,
-  ShieldOff,
 } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useAuth } from '../../context/AuthContext'
@@ -82,14 +81,10 @@ export function DashboardNavList({ onNavigate }) {
         badge={unreadConversations > 0 ? unreadConversations : null}
         onNavigate={onNavigate}
       />
-      {/* Directly under the conversations it applies to, which is where
-          somebody looking for "who did I block" will look first. */}
-      <DashboardNavItem
-        to={ROUTES.dashboardBlocked}
-        icon={<ShieldOff aria-hidden="true" size={ICON_SIZE} />}
-        label={t('blocked.title')}
-        onNavigate={onNavigate}
-      />
+      {/* The blocked list lives in chat's own sidebar now, under "Chat
+          sozlamalari". It is a chat concern, and an entry for it among
+          Dashboard, Listings and Saved made this column look like it held two
+          different kinds of thing. */}
       {/* `mt-auto` keeps Settings and Log out pinned to the very bottom of the
           column, with Log out last. Settings' popover opens upward, so it never
           covers or displaces Log out. */}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ArrowLeft, MessageSquare } from 'lucide-react'
+import BlockedUsersPage from './BlockedUsersPage'
 import ChatConversationList from '../components/chat/ChatConversationList'
 import ChatThread from '../components/chat/ChatThread'
 import { requestNotificationPermission } from '../components/chat/MessageNotifications'
@@ -24,6 +25,13 @@ function DashboardChatsPage() {
   // The selection lives in the URL (`?c=<id>`) rather than in component state,
   // so the mobile back gesture, the browser back button and a shared/reloaded
   // link all behave the way the user expects.
+  // Which of chat's three views is open. Archived and blocked are views of
+  // this page rather than routes of their own, so the chat sidebar — and the
+  // settings menu in it that says which one you are in — stays on screen.
+  const view = searchParams.get('view')
+  const showArchive = view === 'archived'
+  const showBlocked = view === 'blocked'
+
   const requestedId = searchParams.get('c')
   // Both lists: opening an archived thread must work, and a thread the other
   // side just withdrew leaves both — at which point `selected` becomes null and
@@ -65,23 +73,32 @@ function DashboardChatsPage() {
       <h1 className="sr-only">{t('chat.title')}</h1>
 
       <div
-        // 288px from `md:` up rather than a flat 320px. The list needs room for a
-        // name, a listing title and a line of the last message — all of which
-        // truncate — while the thread beside it is where the reading actually
-        // happens, and every pixel here is one it does not get. The wider step
-        // returns at 2xl, where there is enough width for both.
-        className={`min-w-0 flex-col border-border md:flex md:w-72 md:shrink-0 md:border-r 2xl:w-80 ${
+        // 256px from `md:` up, 288px at 2xl. The list holds a name, a listing
+        // title and one line of the last message — all of which truncate —
+        // while the thread beside it is where the reading actually happens,
+        // and every pixel here is one it does not get.
+        className={`min-w-0 flex-col border-border md:flex md:w-64 md:shrink-0 md:border-r 2xl:w-72 ${
           selected ? 'hidden' : 'flex w-full'
         }`}
       >
         <ChatConversationList
           activeId={selected?.id ?? null}
           onSelect={(conversation) => select(conversation.id)}
+          showArchive={showArchive}
         />
       </div>
 
-      <div className={`min-w-0 flex-1 flex-col ${selected ? 'flex' : 'hidden md:flex'}`}>
-        {selected ? (
+      <div
+        className={`min-w-0 flex-1 flex-col ${selected || showBlocked ? 'flex' : 'hidden md:flex'}`}
+      >
+        {showBlocked ? (
+          // The blocked list, in the panel a conversation would occupy. Same
+          // component the standalone route used to render, so blocking and
+          // unblocking behave exactly as before.
+          <div className="chat-scroll min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+            <BlockedUsersPage />
+          </div>
+        ) : selected ? (
           <>
             {/* Below `md:` the thread replaces the list, so it needs its own
                 way back to it. */}

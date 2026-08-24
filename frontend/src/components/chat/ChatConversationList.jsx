@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Archive, ArrowLeft, Loader2, Pin, Search, X } from 'lucide-react'
+import { Loader2, Pin, Search, X } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useChat } from '../../context/ChatContext'
 import { formatMessageTime } from '../../utils/formatChatTime'
 import UserAvatar from '../dashboard/UserAvatar'
 import BlockUserDialog from './BlockUserDialog'
+import ChatSettingsMenu from './ChatSettingsMenu'
 import ConversationMenu from './ConversationMenu'
 import { ArchiveConversationDialog, DeleteConversationDialog } from './ConversationDialogs'
 
@@ -14,7 +15,7 @@ import { ArchiveConversationDialog, DeleteConversationDialog } from './Conversat
  * Reads the shared chat state rather than fetching, so a message arriving over
  * the socket reorders this list and moves its badge without a request.
  */
-function ChatConversationList({ activeId, onSelect }) {
+function ChatConversationList({ activeId, onSelect, showArchive = false }) {
   const { t, locale } = useLocale()
   const {
     conversations,
@@ -30,7 +31,6 @@ function ChatConversationList({ activeId, onSelect }) {
   } = useChat()
 
   const [query, setQuery] = useState('')
-  const [showArchive, setShowArchive] = useState(false)
   // { conversation, kind: 'archive' | 'delete' }
   const [pending, setPending] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -88,7 +88,7 @@ function ChatConversationList({ activeId, onSelect }) {
           onChange={(event) => setQuery(event.target.value)}
           placeholder={t('chat.searchPlaceholder')}
           aria-label={t('chat.searchPlaceholder')}
-          className="h-9 w-full rounded-md border border-border bg-surface pl-9 pr-9 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="h-9 w-full rounded-md border border-border bg-surface pl-9 pr-9 text-sm text-text-primary placeholder:text-xs placeholder:text-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         />
         {query ? (
           <button
@@ -102,21 +102,6 @@ function ChatConversationList({ activeId, onSelect }) {
         ) : null}
       </div>
 
-      <button
-        type="button"
-        onClick={() => {
-          setShowArchive((open) => !open)
-          setQuery('')
-        }}
-        className="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-      >
-        {showArchive ? (
-          <ArrowLeft aria-hidden="true" size={14} className="shrink-0" />
-        ) : (
-          <Archive aria-hidden="true" size={14} className="shrink-0" />
-        )}
-        {showArchive ? t('chat.backToInbox') : t('chat.archived')}
-      </button>
     </div>
   )
 
@@ -287,6 +272,10 @@ function ChatConversationList({ activeId, onSelect }) {
     <div className="flex h-full min-h-0 flex-col">
       {header}
       <div className="chat-scroll min-h-0 flex-1 overflow-y-auto">{body()}</div>
+
+      {/* Outside the scrolling list and after it, so it stays on screen however
+          many conversations there are. */}
+      <ChatSettingsMenu />
 
       {pending?.kind === 'archive' ? (
         <ArchiveConversationDialog

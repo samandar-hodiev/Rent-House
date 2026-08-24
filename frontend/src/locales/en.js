@@ -227,6 +227,7 @@ export default {
   'chat.archive': "Archive",
   'chat.unarchive': "Unarchive",
   'chat.archived': "Archived conversations",
+  'chat.settings': 'Chat settings',
   'chat.backToInbox': "Back to conversations",
   'chat.noArchived': "Nothing archived",
   'chat.noArchivedHint': "Archived conversations appear here.",

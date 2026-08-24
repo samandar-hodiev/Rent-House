@@ -227,6 +227,7 @@ export default {
   'chat.archive': "Arxivlash",
   'chat.unarchive': "Arxivdan chiqarish",
   'chat.archived': "Arxivlangan suhbatlar",
+  'chat.settings': 'Chat sozlamalari',
   'chat.backToInbox': "Suhbatlarga qaytish",
   'chat.noArchived': "Arxivda suhbat yo'q",
   'chat.noArchivedHint': "Arxivlangan suhbatlar shu yerda ko'rinadi.",
