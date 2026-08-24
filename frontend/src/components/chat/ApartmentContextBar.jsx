@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useLocale } from '../../context/LocaleContext'
 import { apartmentDetailsPath } from '../../routes/paths'
 import { formatListingPrice } from '../../utils/formatPrice'
+import { toReadableCase } from '../../utils/readableText'
 
 /**
  * The listing a run of messages is about.
@@ -38,7 +39,7 @@ function ApartmentContextBar({ apartment }) {
 
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-medium text-text-primary">
-          {apartment.title}
+          {toReadableCase(apartment.title)}
         </span>
         <span className="block truncate text-[11px] text-text-muted">
           {[apartment.district, apartment.price ? formatListingPrice(t, apartment) : null]

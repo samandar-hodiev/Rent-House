@@ -5,6 +5,7 @@ import { useChat } from '../../context/ChatContext'
 import { formatMessageTime } from '../../utils/formatChatTime'
 import UserAvatar from '../dashboard/UserAvatar'
 import BlockUserDialog from './BlockUserDialog'
+import { toReadableCase } from '../../utils/readableText'
 import ChatSettingsMenu from './ChatSettingsMenu'
 import ConversationMenu from './ConversationMenu'
 import { ArchiveConversationDialog, DeleteConversationDialog } from './ConversationDialogs'
@@ -202,7 +203,9 @@ function ChatConversationList({ activeId, onSelect, showArchive = false }) {
                   {/* A secondary label, not a second conversation: the same
                       pair writing about another listing stays one row. */}
                   <span className="truncate text-xs text-text-muted">
-                    {conversation.apartment?.title ?? t('chat.noApartmentContext')}
+                    {conversation.apartment
+                      ? toReadableCase(conversation.apartment.title)
+                      : t('chat.noApartmentContext')}
                   </span>
 
                   <span className="flex items-center justify-between gap-2">

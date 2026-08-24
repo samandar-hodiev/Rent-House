@@ -127,7 +127,12 @@ function ListingStatusMenu({ status, onSelect, disabled = false }) {
                       close()
                       onSelect(target)
                     }}
-                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                    // 13px rather than the 14px a top-level control uses. These
+                    // labels are long — "Faol e'lonlarga o'tkazish" — and at
+                    // full size they filled the dropdown edge to edge and read
+                    // as heavier than the card they act on. One step down still
+                    // sits on one line at this width, with room to spare.
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] leading-5 text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                   >
                     <Icon aria-hidden="true" size={15} className={`shrink-0 ${tint}`} />
                     {t(`listingAction.${target}.menu`)}

@@ -1,49 +1,41 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Heart, Home, SearchX } from 'lucide-react'
-import Container from '../components/Container'
-import FilterBar from '../components/FilterBar'
-import SortDropdown, { DEFAULT_SORT_OPTIONS } from '../components/SortDropdown'
-import ApartmentGrid from '../components/ApartmentGrid'
+import { Heart, Home } from 'lucide-react'
+import ApartmentCard from '../components/ApartmentCard'
+import ApartmentCardSkeleton from '../components/ApartmentCardSkeleton'
 import { useWishlist } from '../context/WishlistContext'
 import { useAuth } from '../context/AuthContext'
 import { useLocale } from '../context/LocaleContext'
 import { fetchFavorites } from '../services/favoritesApi'
-import { filterApartments } from '../utils/filterApartments'
-import { sortApartments } from '../utils/sortApartments'
 import { ROUTES } from '../routes/paths'
 
-const EMPTY_FILTERS = {
-  districtId: null,
-  minPrice: null,
-  maxPrice: null,
-  rooms: null,
-  minArea: null,
-  maxArea: null,
-  furnished: null,
-}
+// Columns follow the width this grid actually gets, not the window's.
+//
+// The page sits inside the dashboard, beside a sidebar, so the viewport says
+// very little about how much room the cards have — a 1440px window leaves the
+// grid about 1170px. Container queries ask the container, which is the thing
+// that decides how many cards fit.
+//
+// The steps are the ones the design asks for: four across a large desktop,
+// three on a laptop, two on a tablet, one on a phone.
+//
+// The fourth column lands at 1250px because that is what separates the two
+// cases in practice: a 1440px window leaves this grid 1168px, a 1600px one
+// leaves 1296px. The gap between them is wider than it looks because the
+// dashboard sidebar itself widens at 2xl.
+// The variants query the nearest *ancestor* container, so the element that
+// declares `@container` cannot be the same one that reacts to it — the grid
+// lives inside a wrapper that is the container.
+const SAVED_GRID =
+  'grid grid-cols-1 gap-4 @[560px]:grid-cols-2 @[900px]:grid-cols-3 @[900px]:gap-5 @[1250px]:grid-cols-4'
 
-const SAVED_SORT_OPTIONS = [
-  ...DEFAULT_SORT_OPTIONS,
-  { value: 'savedNewest', labelKey: 'sort.savedNewest' },
-  { value: 'savedOldest', labelKey: 'sort.savedOldest' },
-]
+const SKELETON_COUNT = 8
 
 function WishlistPage() {
   const { t } = useLocale()
   const navigate = useNavigate()
   const { savedCount } = useWishlist()
   const { token } = useAuth()
-  const [filters, setFiltersState] = useState(EMPTY_FILTERS)
-  const [sort, setSort] = useState('newest')
-
-  const setFilters = (partial) => setFiltersState((current) => ({ ...current, ...partial }))
-  const clearFilters = () => setFiltersState(EMPTY_FILTERS)
-
-  const activeFilterCount = useMemo(
-    () => Object.values(filters).filter((value) => value !== null).length,
-    [filters],
-  )
 
   // One request for the whole list, ordered by when each was saved. This used
   // to be one fetch per saved id, which meant twenty listings were twenty
@@ -77,25 +69,14 @@ function WishlistPage() {
     // so unsaving a listing removes its card rather than leaving it behind.
   }, [token, savedCount])
 
-  const filteredApartments = useMemo(
-    () =>
-      filterApartments(savedApartments, {
-        districtId: filters.districtId,
-        keyword: '',
-        filters,
-      }),
-    [savedApartments, filters],
-  )
-
-  const apartments = useMemo(
-    () => sortApartments(filteredApartments, sort),
-    [filteredApartments, sort],
-  )
+  // No filtering and no sorting: the server returns them in the order they
+  // were saved, which is the order somebody expects their own list in.
+  const apartments = savedApartments
 
   if (!loading && savedApartments.length === 0) {
     return (
-      <Container className="pt-10 pb-12 lg:pt-12">
-        <h1 className="mb-6 text-2xl font-semibold text-text-primary">
+      <section className="flex flex-col gap-4">
+        <h1 className="text-xl font-semibold text-text-primary sm:text-2xl">
           {t('header.wishlistNav')}
         </h1>
         <div className="flex flex-col items-center gap-4 px-4 py-10 text-center">
@@ -121,46 +102,37 @@ function WishlistPage() {
             {t('wishlist.emptyAction')}
           </button>
         </div>
-      </Container>
+      </section>
     )
   }
 
   return (
-    <Container className="pt-10 pb-12 lg:pt-12">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold text-text-primary">
-            {t('header.wishlistNav')}
-          </h1>
-          <p className="text-sm text-text-muted">
-            {t('wishlist.resultCount', { count: apartments.length })}
-          </p>
+    // No `Container` here: the dashboard's main area already provides the
+    // padding, and nesting a second centred wrapper inside it added a margin
+    // the page did not need and pushed the title down the screen.
+    <section className="flex flex-col gap-4">
+      <div>
+        <h1 className="text-xl font-semibold text-text-primary sm:text-2xl">
+          {t('header.wishlistNav')}
+        </h1>
+        <p className="mt-0.5 text-sm text-text-muted">
+          {t('wishlist.resultCount', { count: apartments.length })}
+        </p>
+      </div>
+
+      <div className="@container">
+        <div className={SAVED_GRID}>
+        {loading && apartments.length === 0
+          ? Array.from({ length: SKELETON_COUNT }).map((_, index) => (
+              // eslint-disable-next-line react/no-array-index-key
+              <ApartmentCardSkeleton key={index} />
+            ))
+          : apartments.map((apartment) => (
+              <ApartmentCard key={apartment.id} apartment={apartment} />
+            ))}
         </div>
-
-        <SortDropdown sort={sort} onChange={setSort} options={SAVED_SORT_OPTIONS} />
       </div>
-
-      <div className="mb-6">
-        <FilterBar
-          filters={filters}
-          setFilters={setFilters}
-          clearFilters={clearFilters}
-          activeFilterCount={activeFilterCount}
-          showDistrict
-          showFloor={false}
-        />
-      </div>
-
-      <ApartmentGrid
-        apartments={apartments}
-        loading={loading}
-        onClearFilters={clearFilters}
-        emptyIcon={<SearchX aria-hidden="true" size={32} className="text-text-muted" />}
-        emptyTitle={t('wishlist.filteredEmptyTitle')}
-        emptyDescription={t('wishlist.filteredEmptyDescription')}
-        emptyActionLabel={t('emptyState.action')}
-      />
-    </Container>
+    </section>
   )
 }
 

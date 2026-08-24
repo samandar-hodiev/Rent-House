@@ -43,6 +43,7 @@ import { ROUTES, editListingPath } from '../routes/paths'
 import { listingDescription, listingTitle } from '../utils/listingText'
 import { formatListingPrice } from '../utils/formatPrice'
 import { formatPostedAt } from '../utils/formatRelativeTime'
+import { toReadableCase } from '../utils/readableText'
 
 // Keyed by amenity slug — the same ids the API returns and the listing form
 // submits. Every seeded amenity has an entry, so none of them render as a
@@ -273,7 +274,8 @@ function ApartmentDetailsPage() {
 
           <p className="mt-2 flex items-center gap-1 text-sm text-text-secondary">
             <MapPin aria-hidden="true" size={15} className="shrink-0" />
-            {district ? t(districtNameKey(district.id)) : ''}, {t('city.tashkent')} — {apartment.address}
+            {district ? t(districtNameKey(district.id)) : ''}, {t('city.tashkent')} —{' '}
+            {toReadableCase(apartment.address)}
           </p>
 
           <p className="mt-1 text-xs text-text-muted">{formatPostedAt(apartment.postedAt, t)}</p>

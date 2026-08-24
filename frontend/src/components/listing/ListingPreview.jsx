@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import ApartmentCard from '../ApartmentCard'
+import { toReadableCase } from '../../utils/readableText'
 import { useLocale } from '../../context/LocaleContext'
 
 // Maps the form state onto the shape `ApartmentCard` already consumes, so the
@@ -38,7 +39,7 @@ function ListingPreview({ listing }) {
       {cover ? (
         <ApartmentCard
           apartment={apartment}
-          title={listing.title || t('listing.previewPlaceholderTitle')}
+          title={toReadableCase(listing.title) || t('listing.previewPlaceholderTitle')}
           interactive={false}
         />
       ) : (
