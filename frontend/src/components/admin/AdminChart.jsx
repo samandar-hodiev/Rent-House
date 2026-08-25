@@ -1,4 +1,4 @@
-import { useCallback, useId, useRef, useState } from 'react'
+import { Fragment, useCallback, useId, useRef, useState } from 'react'
 import { useAdminFormat } from './adminUi'
 
 // Where a series counts as flat. A line that wanders by a couple of per cent is
@@ -66,16 +66,20 @@ const TICKS = 4
  *
  * The line is not one colour. Each step is coloured by the direction it went —
  * green climbing, amber flat, red falling — so a single series shows all three
- * at once. The colours meet through a gradient placed at the middle of each
- * step rather than at its ends, which puts the blend where the eye expects a
- * transition instead of breaking the line into stripes.
+ * at once, and each colour keeps to its own stretch: the steps are drawn as
+ * separate paths in flat colour, never blended into one another.
+ *
+ * The fill under the line follows the same division. One area shape is drawn
+ * once per colour and clipped to the steps that colour belongs to, so the
+ * boundary is a clean change of hue on continuous geometry — no seam where two
+ * shapes meet, and no double-strength band where two translucent fills would
+ * otherwise overlap.
  *
  * `labels` are translation keys, or the string `'weeks'` for a series numbered
  * by week; `t` resolves them.
  */
 export function LineChart({ labels, values, ariaLabel, t, tooltipKey }) {
-  const gradientId = useId()
-  const maskId = useId()
+  const uid = useId()
   const { formatNumber } = useAdminFormat()
   const plotRef = useRef(null)
   // Which point the tooltip is describing, or null when the pointer is away.
@@ -95,15 +99,18 @@ export function LineChart({ labels, values, ariaLabel, t, tooltipKey }) {
     .join(' ')
   const area = `${line} L${width},${height} L0,${height} Z`
 
-  // A stop at the middle of every step, so each step is unmistakably its own
-  // colour and the change happens between them.
-  const stops = []
-  for (let i = 0; i < values.length - 1; i += 1) {
-    const color = TREND_COLOR[stepTrend(values[i], values[i + 1])]
-    if (i === 0) stops.push({ offset: 0, color })
-    stops.push({ offset: (x(i) + x(i + 1)) / 2, color })
-    if (i === values.length - 2) stops.push({ offset: width, color })
-  }
+  // One entry per step, each knowing where it runs and which way it went.
+  const steps = values.slice(0, -1).map((value, index) => ({
+    index,
+    from: x(index),
+    to: x(index + 1),
+    d: `M${x(index)},${y(value)} L${x(index + 1)},${y(values[index + 1])}`,
+    trend: stepTrend(value, values[index + 1]),
+  }))
+
+  // Grouped by colour, so each fill is drawn once and clipped to its stretches
+  // rather than once per step.
+  const trends = [...new Set(steps.map((step) => step.trend))]
 
   const ticks = Array.from({ length: TICKS }, (_, i) => min + (span * (TICKS - 1 - i)) / (TICKS - 1))
 
@@ -162,41 +169,41 @@ export function LineChart({ labels, values, ariaLabel, t, tooltipKey }) {
             className="h-full w-full"
           >
             <defs>
-              {/* Horizontal: the colour depends on where along the series you
-                  are, not how high the line is. */}
-              <linearGradient
-                id={gradientId}
-                gradientUnits="userSpaceOnUse"
-                x1="0"
-                y1="0"
-                x2={width}
-                y2="0"
-              >
-                {stops.map((stop, index) => (
-                  <stop key={index} offset={`${stop.offset}%`} stopColor={stop.color} />
-                ))}
-              </linearGradient>
+              {trends.map((trend) => (
+                <Fragment key={trend}>
+                  {/* Flat colour fading downwards — the fill under a step, in
+                      that step's own hue. Anchored to the plot rather than to
+                      each shape's own box, so every stretch fades on the same
+                      scale and neighbours line up. Kept faint: this sits behind
+                      the numbers, not in front of them. */}
+                  <linearGradient
+                    id={`${uid}-fill-${trend}`}
+                    gradientUnits="userSpaceOnUse"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2={height}
+                  >
+                    <stop offset="0%" stopColor={TREND_COLOR[trend]} stopOpacity="0.24" />
+                    <stop offset="55%" stopColor={TREND_COLOR[trend]} stopOpacity="0.07" />
+                    <stop offset="100%" stopColor={TREND_COLOR[trend]} stopOpacity="0" />
+                  </linearGradient>
 
-              {/* The area is the line's own gradient behind a vertical fade, so
-                  the fill under each step matches that step and still softens
-                  downwards. One colour, two jobs — never a second hue. */}
-              {/* Most of the colour sits close to the line and the rest falls
-                  away quickly. A flat wash over the whole area reads as neon on
-                  a dark surface, which is not what this dashboard looks like. */}
-              <linearGradient id={`${maskId}-fade`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#fff" stopOpacity="0.26" />
-                <stop offset="45%" stopColor="#fff" stopOpacity="0.08" />
-                <stop offset="100%" stopColor="#fff" stopOpacity="0" />
-              </linearGradient>
-              <mask id={maskId}>
-                <rect
-                  x="0"
-                  y="0"
-                  width={width}
-                  height={height}
-                  fill={`url(#${maskId}-fade)`}
-                />
-              </mask>
+                  <clipPath id={`${uid}-clip-${trend}`}>
+                    {steps
+                      .filter((step) => step.trend === trend)
+                      .map((step) => (
+                        <rect
+                          key={step.index}
+                          x={step.from}
+                          y="0"
+                          width={step.to - step.from}
+                          height={height}
+                        />
+                      ))}
+                  </clipPath>
+                </Fragment>
+              ))}
             </defs>
 
             {ticks.map((tick) => (
@@ -212,18 +219,30 @@ export function LineChart({ labels, values, ariaLabel, t, tooltipKey }) {
               />
             ))}
 
-            <path d={area} fill={`url(#${gradientId})`} mask={`url(#${maskId})`} />
-            <path
-              d={line}
-              fill="none"
-              stroke={`url(#${gradientId})`}
-              strokeWidth="1.5"
-              // The stroke would scale with the viewBox otherwise, and a chart
-              // stretched to fill a tall card would draw a wedge.
-              vectorEffect="non-scaling-stroke"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
+            {trends.map((trend) => (
+              <path
+                key={trend}
+                d={area}
+                fill={`url(#${uid}-fill-${trend})`}
+                clipPath={`url(#${uid}-clip-${trend})`}
+              />
+            ))}
+
+            {steps.map((step) => (
+              <path
+                key={step.index}
+                d={step.d}
+                fill="none"
+                stroke={TREND_COLOR[step.trend]}
+                strokeWidth="1.5"
+                // The stroke would scale with the viewBox otherwise, and a
+                // chart stretched to fill a tall card would draw a wedge.
+                vectorEffect="non-scaling-stroke"
+                // Round caps let neighbouring steps meet without a notch at the
+                // corner. The strokes are opaque, so the overlap does not show.
+                strokeLinecap="round"
+              />
+            ))}
 
             {active !== null ? (
               <>

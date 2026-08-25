@@ -251,36 +251,70 @@ const MONTH_ORDER = [
 const MONTH_KEYS = MONTH_ORDER.map((m) => `chart.month.${m}`)
 
 /**
- * A series that climbs, levels off, then falls away.
+ * The demo shape: up, down, level, up again.
  *
  * The chart colours each step by its direction, so a series that only ever
- * climbed would leave two of the three colours as code nobody sees. Every
- * range carries all three phases instead: roughly the first 40% rising, the
- * next quarter flat, the rest declining.
- *
- * Deterministic, not random — a chart that reshuffles itself every render
- * reads as a bug even when the numbers are admittedly fake.
+ * climbed would leave two of the three colours as code nobody sees. This walks
+ * all four phases in an order that reads like a real month rather than a neat
+ * hill, and every range gets the same story at its own resolution.
  */
-function shaped(points, { start, peak, end, seed }) {
-  const last = points - 1
-  const riseEnd = Math.round(last * 0.4)
-  const flatEnd = Math.round(last * 0.65)
+const SHAPE = [
+  { trend: 'rising', weight: 2 },
+  { trend: 'falling', weight: 2 },
+  { trend: 'steady', weight: 1.5 },
+  { trend: 'rising', weight: 1.5 },
+]
 
-  return Array.from({ length: points }, (_, index) => {
-    let value
-    if (index <= riseEnd) {
-      value = start + ((peak - start) * index) / riseEnd
-    } else if (index <= flatEnd) {
-      value = peak
-    } else {
-      value = peak + ((end - peak) * (index - flatEnd)) / (last - flatEnd)
-    }
-    // The wobble stays small enough on the plateau that a step never crosses
-    // the band the chart uses to call a stretch flat — otherwise the middle of
-    // the line would flicker green and red instead of reading as steady.
-    const amplitude = index > riseEnd && index <= flatEnd ? peak * 0.006 : peak * 0.02
-    return Math.max(0, Math.round(value + Math.sin((index + seed) * 1.7) * amplitude))
+/**
+ * How many steps each phase gets out of `segments`.
+ *
+ * Every phase takes at least one, or a short range would drop a phase
+ * altogether; what is left over goes by weight, largest share first.
+ */
+function sharePhases(segments) {
+  const total = SHAPE.reduce((sum, phase) => sum + phase.weight, 0)
+  const counts = SHAPE.map(() => 1)
+  let left = segments - SHAPE.length
+
+  const wanted = SHAPE.map((phase) => ((segments * phase.weight) / total) - 1)
+  while (left > 0) {
+    let best = 0
+    for (let i = 1; i < wanted.length; i += 1) if (wanted[i] > wanted[best]) best = i
+    counts[best] += 1
+    wanted[best] -= 1
+    left -= 1
+  }
+
+  return SHAPE.flatMap((phase, index) => Array(counts[index]).fill(phase.trend))
+}
+
+/**
+ * A series that walks `SHAPE`.
+ *
+ * Each step moves far enough that the chart cannot mistake it for noise, and a
+ * level step moves by a fraction of a per cent — visible as a line that is not
+ * ruler-straight, small enough to stay inside the band the chart calls flat.
+ *
+ * Deterministic, not random: a chart that reshuffles itself every render reads
+ * as a bug even when the numbers are admittedly fake.
+ */
+function phased(points, { base, step, seed }) {
+  const steps = sharePhases(points - 1)
+  const values = [base]
+
+  steps.forEach((trend, index) => {
+    const previous = values[index]
+    const wobble = Math.sin((index + seed) * 1.7)
+    let next
+    if (trend === 'rising') next = previous + step + wobble * step * 0.12
+    // Falls are a little shallower than climbs, so the series does not walk
+    // itself down to nothing over twelve months.
+    else if (trend === 'falling') next = previous - step * 0.85 + wobble * step * 0.1
+    else next = previous + wobble * previous * 0.004
+    values.push(Math.max(1, Math.round(next)))
   })
+
+  return values
 }
 
 /**
@@ -291,34 +325,16 @@ function shaped(points, { start, peak, end, seed }) {
  */
 export const GROWTH = {
   users: {
-    daily: {
-      labels: DAY_KEYS,
-      values: shaped(7, { start: 90, peak: 168, end: 112, seed: 1 }),
-    },
-    weekly: {
-      // Four weeks of the past month. `'weeks'` rather than a list, because
-      // "1-hafta" is built from the index and the word, not looked up.
-      labels: 'weeks',
-      values: shaped(4, { start: 520, peak: 940, end: 660, seed: 2 }),
-    },
-    monthly: {
-      labels: MONTH_KEYS,
-      values: shaped(12, { start: 1240, peak: 3480, end: 2260, seed: 3 }),
-    },
+    daily: { labels: DAY_KEYS, values: phased(7, { base: 90, step: 26, seed: 1 }) },
+    // Five, not four: a month spans five calendar weeks, and four steps is the
+    // fewest that can show all four phases of the shape.
+    weekly: { labels: 'weeks', values: phased(5, { base: 520, step: 150, seed: 2 }) },
+    monthly: { labels: MONTH_KEYS, values: phased(12, { base: 1200, step: 260, seed: 3 }) },
   },
   listings: {
-    daily: {
-      labels: DAY_KEYS,
-      values: shaped(7, { start: 46, peak: 92, end: 58, seed: 4 }),
-    },
-    weekly: {
-      labels: 'weeks',
-      values: shaped(4, { start: 260, peak: 470, end: 315, seed: 5 }),
-    },
-    monthly: {
-      labels: MONTH_KEYS,
-      values: shaped(12, { start: 720, peak: 1860, end: 1180, seed: 6 }),
-    },
+    daily: { labels: DAY_KEYS, values: phased(7, { base: 46, step: 14, seed: 4 }) },
+    weekly: { labels: 'weeks', values: phased(5, { base: 260, step: 78, seed: 5 }) },
+    monthly: { labels: MONTH_KEYS, values: phased(12, { base: 700, step: 150, seed: 6 }) },
   },
 }
 
