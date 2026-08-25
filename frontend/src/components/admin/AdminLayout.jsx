@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { LogOut, Menu, Settings, User, X } from 'lucide-react'
+import { LogOut, Menu, Settings, SlidersHorizontal, User, X } from 'lucide-react'
 import { useDismiss } from '../../hooks/useDismiss'
 import { useRef } from 'react'
-import ThemeToggle from '../ThemeToggle'
 import UserAvatar from '../dashboard/UserAvatar'
-import { AdminNavList } from './AdminSidebar'
+import { AdminNavList, AdminSidebarFooter } from './AdminSidebar'
+import { AdminSettingsProvider, useAdmin } from '../../context/AdminSettingsContext'
 import { ADMIN_ROUTES } from '../../routes/adminPaths'
 
 // The signed-in administrator. Fake, like everything else in this module —
@@ -14,6 +14,7 @@ import { ADMIN_ROUTES } from '../../routes/adminPaths'
 const CURRENT_ADMIN = { name: 'Samandar Hodiev', role: 'Super Admin' }
 
 function AdminProfileMenu() {
+  const { t } = useAdmin()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   useDismiss(ref, open, () => setOpen(false))
@@ -46,7 +47,7 @@ function AdminProfileMenu() {
         >
           <button type="button" role="menuitem" className={item} onClick={() => setOpen(false)}>
             <User aria-hidden="true" size={15} className="shrink-0" />
-            Profile
+            {t('header.profile')}
           </button>
           <Link
             to={ADMIN_ROUTES.settings}
@@ -55,7 +56,7 @@ function AdminProfileMenu() {
             className={item}
           >
             <Settings aria-hidden="true" size={15} className="shrink-0" />
-            Settings
+            {t('header.settings')}
           </Link>
           <button
             type="button"
@@ -64,7 +65,7 @@ function AdminProfileMenu() {
             className={`${item} mt-1 border-t border-border pt-2 text-error hover:bg-error/10`}
           >
             <LogOut aria-hidden="true" size={15} className="shrink-0" />
-            Logout
+            {t('header.logout')}
           </button>
         </div>
       ) : null}
@@ -83,7 +84,8 @@ function AdminProfileMenu() {
  * It reuses the tokens, the avatar and the theme toggle, so it looks like the
  * same product without being the same screen.
  */
-function AdminLayout() {
+function AdminShell() {
+  const { t, theme } = useAdmin()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const location = useLocation()
 
@@ -94,7 +96,13 @@ function AdminLayout() {
   }, [location.pathname])
 
   return (
-    <div className="flex min-h-screen bg-background">
+    // The theme is a class on this element rather than on <html>, so the admin
+    // area can be dark while the public site is light. See `.rh-dark` and
+    // `.rh-light` in index.css.
+    <div
+      id="admin-root"
+      className={`flex min-h-screen bg-background ${theme === 'dark' ? 'rh-dark' : 'rh-light'}`}
+    >
       {/* Desktop column. Fixed width, its own scroll, so a long navigation
           never pushes the page. */}
       <aside className="hidden w-60 shrink-0 border-r border-border bg-surface lg:block 2xl:w-64">
@@ -102,12 +110,16 @@ function AdminLayout() {
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
             <span className="text-sm font-semibold text-text-primary">RentHouse</span>
             <span className="rounded-full bg-primary-light px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-hover dark:text-primary">
-              Admin
+              {t('brand.admin')}
             </span>
           </div>
           <div className="chat-scroll min-h-0 flex-1 overflow-y-auto">
             <AdminNavList />
           </div>
+          {/* Below the navigation and pinned there, so the two are visibly
+              different kinds of thing: one moves you around the dashboard, the
+              other configures it or leaves it. */}
+          <AdminSidebarFooter />
         </div>
       </aside>
 
@@ -116,7 +128,7 @@ function AdminLayout() {
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            aria-label="Open navigation"
+            aria-label={t('nav.open')}
             className="flex size-9 items-center justify-center rounded-md text-text-secondary hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:hidden"
           >
             <Menu aria-hidden="true" size={18} />
@@ -125,12 +137,11 @@ function AdminLayout() {
           <Link to={ADMIN_ROUTES.dashboard} className="flex min-w-0 items-center gap-2">
             <span className="truncate text-sm font-semibold text-text-primary">RentHouse</span>
             <span className="hidden rounded-full bg-primary-light px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-hover dark:text-primary sm:inline lg:hidden">
-              Admin
+              {t('brand.admin')}
             </span>
           </Link>
 
           <div className="ml-auto flex items-center gap-1">
-            <ThemeToggle />
             <AdminProfileMenu />
           </div>
         </header>
@@ -153,7 +164,7 @@ function AdminLayout() {
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                aria-label="Close navigation"
+                aria-label={t('nav.close')}
                 className="flex size-8 items-center justify-center rounded-md text-text-muted hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <X aria-hidden="true" size={16} />
@@ -162,10 +173,23 @@ function AdminLayout() {
             <div className="chat-scroll min-h-0 flex-1 overflow-y-auto">
               <AdminNavList onNavigate={() => setDrawerOpen(false)} />
             </div>
+            <AdminSidebarFooter onNavigate={() => setDrawerOpen(false)} />
           </div>
         </div>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * The provider sits outside the shell so everything inside — including the
+ * shell's own chrome — reads the same theme and language.
+ */
+function AdminLayout() {
+  return (
+    <AdminSettingsProvider>
+      <AdminShell />
+    </AdminSettingsProvider>
   )
 }
 

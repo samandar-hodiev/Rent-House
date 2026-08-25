@@ -1,6 +1,7 @@
 import { Bell, Building2, Flag, ShieldAlert, UserPlus } from 'lucide-react'
 import EmptyState from '../../components/EmptyState'
-import { AdminCard, PageHeading, formatDateTime } from '../../components/admin/adminUi'
+import { AdminCard, PageHeading, useAdminFormat } from '../../components/admin/adminUi'
+import { useAdmin } from '../../context/AdminSettingsContext'
 import { NOTIFICATIONS } from '../../mock/admin'
 
 const ICONS = {
@@ -11,13 +12,18 @@ const ICONS = {
 }
 
 function AdminNotificationsPage() {
+  const { t } = useAdmin()
+  const { formatDateTime } = useAdminFormat()
   const unread = NOTIFICATIONS.filter((item) => !item.read).length
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeading
-        title="Notifications"
-        description={`${unread} unread of ${NOTIFICATIONS.length}.`}
+        title={t('page.notifications.title')}
+        description={t('page.notifications.description', {
+          unread,
+          total: NOTIFICATIONS.length,
+        })}
       />
 
       <AdminCard>
@@ -25,8 +31,8 @@ function AdminNotificationsPage() {
           <div className="p-4">
             <EmptyState
               icon={<Bell aria-hidden="true" size={28} />}
-              title="Nothing new"
-              description="Notifications about users, listings and reports appear here."
+              title={t('empty.notifications')}
+              description={t('empty.notificationsHint')}
             />
           </div>
         ) : (
@@ -53,7 +59,7 @@ function AdminNotificationsPage() {
                       </span>
                       {item.read ? null : (
                         <span
-                          aria-label="Unread"
+                          aria-label={t('notifications.unread')}
                           className="size-1.5 shrink-0 rounded-full bg-primary"
                         />
                       )}

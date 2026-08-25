@@ -94,7 +94,6 @@ export default {
   'dashboard.settingsLanguage': 'Language',
   'dashboard.settingsAppearance': 'Appearance',
   'dashboard.avatar': 'Avatar',
-  'dashboard.avatarHint': 'Image upload will be added in a later step.',
   'dashboard.saveChanges': 'Save changes',
   'apartmentDetails.noPhoneTitle': 'Calling is not available',
   'apartmentDetails.noPhoneBody': '{name} has not added a phone number. You can only get in touch through chat.',

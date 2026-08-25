@@ -29,8 +29,10 @@
   --color-chart-monthly: #d97706;
 }
 
-/* Class-based dark mode: ThemeContext toggles `.dark` on <html>. */
-@custom-variant dark (&:where(.dark, .dark *));
+/* Class-based dark mode: ThemeContext toggles `.dark` on <html>, and the admin
+   area sets `.rh-dark` on its own root so it can be dark while the public site
+   is light, or the other way round. */
+@custom-variant dark (&:where(.dark, .dark *, .rh-dark, .rh-dark *));
 
 /* Dark palette — same token names, so components keep using the semantic
    classes (bg-surface, text-text-primary, border-border...) unchanged.
@@ -56,6 +58,58 @@ html.dark {
   --color-chart-weekly: #34d399;
   --color-chart-monthly: #fbbf24;
 }
+
+/* A theme scoped to a subtree rather than to the document.
+ *
+ * The admin dashboard chooses its own appearance, and that choice must not
+ * reach the public site — the two are different surfaces for different people
+ * and each remembers its own setting.
+ *
+ * The class is doubled to raise specificity above `html.dark`: without it, a
+ * light admin area inside a dark document would lose to the document's own
+ * block and stay dark. */
+.rh-dark.rh-dark {
+  --color-background: #0b1220;
+  --color-surface: #131c2e;
+  --color-surface-secondary: #1e293b;
+
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+
+  --color-border: #29354a;
+
+  --color-primary: #10b981;
+  --color-primary-hover: #34d399;
+  --color-primary-light: #0d3b2e;
+
+  /* Lifted, not inverted: the light-mode hues are too dark to read against a
+     navy ground, so each series moves up a step while keeping its identity. */
+  --color-chart-daily: #60a5fa;
+  --color-chart-weekly: #34d399;
+  --color-chart-monthly: #fbbf24;
+}
+
+.rh-light.rh-light {
+  --color-background: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-secondary: #f1f5f9;
+
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #334155;
+  --color-text-muted: #64748b;
+
+  --color-border: #e2e8f0;
+
+  --color-primary: #059669;
+  --color-primary-hover: #047857;
+  --color-primary-light: #d1fae5;
+
+  --color-chart-daily: #2563eb;
+  --color-chart-weekly: #059669;
+  --color-chart-monthly: #f59e0b;
+}
+
 
 body {
   @apply bg-background text-text-primary font-sans antialiased;

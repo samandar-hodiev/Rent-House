@@ -1,15 +1,23 @@
 import {
-  AdminCard, AdminTable, Cell, PageHeading, Row, StatusBadge, formatDateTime,
+  AdminCard, AdminTable, Cell, PageHeading, Row, StatusBadge, useAdminFormat,
 } from '../../components/admin/adminUi'
+import { useAdmin } from '../../context/AdminSettingsContext'
 import { AUDIT_LOGS } from '../../mock/admin'
 
 function AdminAuditLogsPage() {
+  const { t } = useAdmin()
+  const { formatDateTime } = useAdminFormat()
   return (
     <div className="flex flex-col gap-5">
-      <PageHeading title="Audit Logs" description="What administrators have done." />
+      <PageHeading title={t('page.audit.title')} description={t('page.audit.description')} />
 
       <AdminCard>
-        <AdminTable headers={['Admin', 'Action', 'Target', 'Date', 'IP', 'Status']}>
+        <AdminTable
+          headers={[
+            t('table.admin'), t('table.action'), t('table.target'), t('table.date'),
+            t('table.ip'), t('table.status'),
+          ]}
+        >
           {AUDIT_LOGS.map((log) => (
             <Row key={log.id}>
               <Cell className="whitespace-nowrap font-medium text-text-primary">

@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
-  Bell, BarChart3, ChevronDown, ChevronUp, ClipboardList, LayoutDashboard,
-  MessageSquare, Settings, Shield, Building2, Flag, Users,
+  Bell, BarChart3, ChevronDown, ChevronUp, ClipboardList, LayoutDashboard, LogOut,
+  MessageSquare, Settings, Shield, SlidersHorizontal, Building2, Flag, Users,
 } from 'lucide-react'
 import { ADMIN_ROUTES } from '../../routes/adminPaths'
+import { useAdmin } from '../../context/AdminSettingsContext'
 
 const ICON = 16
 
@@ -12,41 +13,41 @@ const ICON = 16
 // by both the desktop column and the mobile drawer, so the two can never offer
 // different things.
 export const ADMIN_NAV = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, to: ADMIN_ROUTES.dashboard, end: true },
+  { key: 'nav.dashboard', icon: LayoutDashboard, to: ADMIN_ROUTES.dashboard, end: true },
   {
-    key: 'users', label: 'Users', icon: Users,
-    children: [{ label: 'All Users', to: ADMIN_ROUTES.users }],
+    key: 'nav.users', icon: Users,
+    children: [{ key: 'nav.allUsers', to: ADMIN_ROUTES.users }],
   },
   {
-    key: 'listings', label: 'Listings', icon: Building2,
+    key: 'nav.listings', icon: Building2,
     children: [
-      { label: 'All Listings', to: ADMIN_ROUTES.listings, end: true },
-      { label: 'Pending', to: ADMIN_ROUTES.listingsPending },
-      { label: 'Active', to: ADMIN_ROUTES.listingsActive },
-      { label: 'Closed', to: ADMIN_ROUTES.listingsClosed },
-      { label: 'Drafts', to: ADMIN_ROUTES.listingsDrafts },
-      { label: 'Deleted', to: ADMIN_ROUTES.listingsDeleted },
+      { key: 'nav.allListings', to: ADMIN_ROUTES.listings, end: true },
+      { key: 'nav.pending', to: ADMIN_ROUTES.listingsPending },
+      { key: 'nav.active', to: ADMIN_ROUTES.listingsActive },
+      { key: 'nav.closed', to: ADMIN_ROUTES.listingsClosed },
+      { key: 'nav.drafts', to: ADMIN_ROUTES.listingsDrafts },
+      { key: 'nav.deleted', to: ADMIN_ROUTES.listingsDeleted },
     ],
   },
-  { key: 'chats', label: 'Chats', icon: MessageSquare, to: ADMIN_ROUTES.chats },
-  { key: 'reports', label: 'Reports', icon: Flag, to: ADMIN_ROUTES.reports },
-  { key: 'analytics', label: 'Analytics', icon: BarChart3, to: ADMIN_ROUTES.analytics },
-  { key: 'notifications', label: 'Notifications', icon: Bell, to: ADMIN_ROUTES.notifications },
+  { key: 'nav.chats', icon: MessageSquare, to: ADMIN_ROUTES.chats },
+  { key: 'nav.reports', icon: Flag, to: ADMIN_ROUTES.reports },
+  { key: 'nav.analytics', icon: BarChart3, to: ADMIN_ROUTES.analytics },
+  { key: 'nav.notifications', icon: Bell, to: ADMIN_ROUTES.notifications },
   {
-    key: 'admin-management', label: 'Admin Management', icon: Shield,
+    key: 'nav.adminManagement', icon: Shield,
     children: [
-      { label: 'Admins', to: ADMIN_ROUTES.admins },
-      { label: 'Roles & Permissions', to: ADMIN_ROUTES.roles },
+      { key: 'nav.admins', to: ADMIN_ROUTES.admins },
+      { key: 'nav.roles', to: ADMIN_ROUTES.roles },
     ],
   },
-  { key: 'audit', label: 'Audit Logs', icon: ClipboardList, to: ADMIN_ROUTES.auditLogs },
+  { key: 'nav.auditLogs', icon: ClipboardList, to: ADMIN_ROUTES.auditLogs },
   {
-    key: 'settings', label: 'Settings', icon: Settings,
+    key: 'nav.settings', icon: Settings,
     children: [
-      { label: 'General', to: ADMIN_ROUTES.settings, end: true },
-      { label: 'Listings', to: ADMIN_ROUTES.settingsListings },
-      { label: 'Chat', to: ADMIN_ROUTES.settingsChat },
-      { label: 'Security', to: ADMIN_ROUTES.settingsSecurity },
+      { key: 'nav.general', to: ADMIN_ROUTES.settings, end: true },
+      { key: 'nav.listings', to: ADMIN_ROUTES.settingsListings },
+      { key: 'nav.chat', to: ADMIN_ROUTES.settingsChat },
+      { key: 'nav.security', to: ADMIN_ROUTES.settingsSecurity },
     ],
   },
 ]
@@ -60,6 +61,7 @@ const CHILD_BASE =
   'flex w-full items-center rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
 
 function NavGroup({ item, onNavigate }) {
+  const { t } = useAdmin()
   const location = useLocation()
   const Icon = item.icon
   // Open when the reader is already inside it, so arriving by URL does not
@@ -80,7 +82,7 @@ function NavGroup({ item, onNavigate }) {
         className={`${BASE} ${IDLE}`}
       >
         <Icon aria-hidden="true" size={ICON} className="shrink-0" />
-        <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+        <span className="min-w-0 flex-1 truncate text-left">{t(item.key)}</span>
         {expanded ? (
           <ChevronUp aria-hidden="true" size={14} className="shrink-0 text-text-muted" />
         ) : (
@@ -98,7 +100,7 @@ function NavGroup({ item, onNavigate }) {
                 onClick={onNavigate}
                 className={({ isActive }) => `${CHILD_BASE} ${isActive ? ACTIVE : IDLE}`}
               >
-                <span className="min-w-0 truncate">{child.label}</span>
+                <span className="min-w-0 truncate">{t(child.key)}</span>
               </NavLink>
             </li>
           ))}
@@ -110,8 +112,9 @@ function NavGroup({ item, onNavigate }) {
 
 /** The admin navigation. Shared by the fixed column and the mobile drawer. */
 export function AdminNavList({ onNavigate }) {
+  const { t } = useAdmin()
   return (
-    <nav aria-label="Admin navigation" className="flex flex-col gap-1 p-3">
+    <nav aria-label={t('nav.label')} className="flex flex-col gap-1 p-3">
       {ADMIN_NAV.map((item) =>
         item.children ? (
           <NavGroup key={item.key} item={item} onNavigate={onNavigate} />
@@ -124,11 +127,47 @@ export function AdminNavList({ onNavigate }) {
             className={({ isActive }) => `${BASE} ${isActive ? ACTIVE : IDLE}`}
           >
             <item.icon aria-hidden="true" size={ICON} className="shrink-0" />
-            <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+            <span className="min-w-0 flex-1 truncate text-left">{t(item.key)}</span>
           </NavLink>
         ),
       )}
     </nav>
+  )
+}
+
+/**
+ * What sits under the navigation: configuring the dashboard, and leaving it.
+ *
+ * Separated by a rule because neither is a section of the dashboard — one
+ * changes how it looks and reads, the other ends the session. Log out is last,
+ * as it is everywhere else in the application.
+ */
+export function AdminSidebarFooter({ onNavigate }) {
+  const { t } = useAdmin()
+
+  return (
+    <div className="shrink-0 border-t border-border p-3">
+      <NavLink
+        to={ADMIN_ROUTES.dashboardSettings}
+        onClick={onNavigate}
+        className={({ isActive }) => `${BASE} ${isActive ? ACTIVE : IDLE}`}
+      >
+        <SlidersHorizontal aria-hidden="true" size={ICON} className="shrink-0" />
+        <span className="min-w-0 flex-1 truncate text-left">{t('nav.dashboardSettings')}</span>
+      </NavLink>
+
+      {/* No session to end yet — admin authentication is not part of this
+          stage — so this is the control in its place, not a working sign-out
+          pretending to be one. */}
+      <button
+        type="button"
+        onClick={onNavigate}
+        className={`${BASE} ${IDLE} hover:text-error`}
+      >
+        <LogOut aria-hidden="true" size={ICON} className="shrink-0" />
+        <span className="min-w-0 flex-1 truncate text-left">{t('nav.logout')}</span>
+      </button>
+    </div>
   )
 }
 

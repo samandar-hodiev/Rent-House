@@ -3,14 +3,18 @@ import { Search, Users } from 'lucide-react'
 import EmptyState from '../../components/EmptyState'
 import UserAvatar from '../../components/dashboard/UserAvatar'
 import {
-  AdminCard, AdminTable, Cell, MockButton, PageHeading, Row, StatusBadge, ViewLink, formatDate,
+  AdminCard, AdminTable, Cell, MockButton, PageHeading, Row, StatusBadge, ViewLink,
+  useAdminFormat,
 } from '../../components/admin/adminUi'
+import { useAdmin } from '../../context/AdminSettingsContext'
 import { USERS } from '../../mock/admin'
 import { adminUserPath } from '../../routes/adminPaths'
 
 const PER_PAGE = 8
 
 function AdminUsersPage() {
+  const { t } = useAdmin()
+  const { formatDate } = useAdminFormat()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [page, setPage] = useState(1)
@@ -32,7 +36,10 @@ function AdminUsersPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeading title="All Users" description={`${USERS.length} registered accounts.`} />
+      <PageHeading
+        title={t('page.users.title')}
+        description={t('page.users.description', { count: USERS.length })}
+      />
 
       <AdminCard>
         <div className="flex flex-col gap-3 border-b border-border p-3 sm:flex-row sm:items-center">
@@ -48,8 +55,8 @@ function AdminUsersPage() {
                 setQuery(event.target.value)
                 setPage(1)
               }}
-              placeholder="Search by name, email or phone"
-              aria-label="Search users"
+              placeholder={t('users.search')}
+              aria-label={t('users.search')}
               className="h-9 w-full rounded-md border border-border bg-surface pl-9 pr-3 text-sm text-text-primary placeholder:text-xs placeholder:text-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             />
           </div>
@@ -60,24 +67,27 @@ function AdminUsersPage() {
               setStatus(event.target.value)
               setPage(1)
             }}
-            aria-label="Filter by status"
+            aria-label={t('table.status')}
             className="h-9 shrink-0 rounded-md border border-border bg-surface px-2.5 text-sm text-text-primary focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <option value="all">All statuses</option>
-            <option value="active">Active</option>
-            <option value="blocked">Blocked</option>
+            <option value="all">{t('users.allStatuses')}</option>
+            <option value="active">{t('users.statusActive')}</option>
+            <option value="blocked">{t('users.statusBlocked')}</option>
           </select>
         </div>
 
         <AdminTable
-          headers={['User', 'Email', 'Phone', 'Listings', 'Status', 'Registered', 'Actions']}
+          headers={[
+            t('table.user'), t('table.email'), t('table.phone'), t('table.listings'),
+            t('table.status'), t('table.registered'), t('table.actions'),
+          ]}
           empty={
             rows.length === 0 ? (
               <div className="p-4">
                 <EmptyState
                   icon={<Users aria-hidden="true" size={28} />}
-                  title="No users found"
-                  description="Try a different search or clear the status filter."
+                  title={t('users.notFound')}
+                  description={t('users.notFoundHint')}
                 />
               </div>
             ) : null
@@ -102,7 +112,7 @@ function AdminUsersPage() {
                 <span className="flex items-center gap-1.5">
                   <ViewLink to={adminUserPath(user.id)} />
                   <MockButton tone="danger">
-                    {user.status === 'blocked' ? 'Unblock' : 'Block'}
+                    {t(user.status === 'blocked' ? 'action.unblock' : 'action.block')}
                   </MockButton>
                 </span>
               </Cell>
@@ -113,15 +123,19 @@ function AdminUsersPage() {
         {rows.length > 0 ? (
           <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5">
             <p className="text-xs text-text-muted">
-              {(current - 1) * PER_PAGE + 1}–{Math.min(current * PER_PAGE, visible.length)} of{' '}
+              {(current - 1) * PER_PAGE + 1}–{Math.min(current * PER_PAGE, visible.length)} /{' '}
               {visible.length}
             </p>
             <span className="flex items-center gap-1.5">
-              <MockButton onClick={() => setPage(Math.max(1, current - 1))}>Previous</MockButton>
+              <MockButton onClick={() => setPage(Math.max(1, current - 1))}>
+                {t('action.previous')}
+              </MockButton>
               <span className="px-1 text-xs tabular-nums text-text-secondary">
                 {current} / {pages}
               </span>
-              <MockButton onClick={() => setPage(Math.min(pages, current + 1))}>Next</MockButton>
+              <MockButton onClick={() => setPage(Math.min(pages, current + 1))}>
+                {t('action.next')}
+              </MockButton>
             </span>
           </div>
         ) : null}

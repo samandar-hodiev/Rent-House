@@ -42,6 +42,7 @@ import AdminAdminsPage from './pages/admin/AdminAdminsPage'
 import AdminRolesPage from './pages/admin/AdminRolesPage'
 import AdminAuditLogsPage from './pages/admin/AdminAuditLogsPage'
 import AdminSettingsPage from './pages/admin/AdminSettingsPage'
+import AdminDashboardSettingsPage from './pages/admin/AdminDashboardSettingsPage'
 import { ADMIN_ROUTES } from './routes/adminPaths'
 import { LISTING_STATUS } from './data/listingStatus'
 import { ROUTES } from './routes/paths'
@@ -104,27 +105,27 @@ function App() {
 
                         <Route
                           path="listings"
-                          element={<AdminListingsPage title="All Listings" />}
+                          element={<AdminListingsPage titleKey="nav.allListings" />}
                         />
                         <Route
                           path="listings/pending"
-                          element={<AdminListingsPage status={LISTING_STATUS.pending} title="Pending" />}
+                          element={<AdminListingsPage status={LISTING_STATUS.pending} titleKey="nav.pending" />}
                         />
                         <Route
                           path="listings/active"
-                          element={<AdminListingsPage status={LISTING_STATUS.active} title="Active" />}
+                          element={<AdminListingsPage status={LISTING_STATUS.active} titleKey="nav.active" />}
                         />
                         <Route
                           path="listings/closed"
-                          element={<AdminListingsPage status={LISTING_STATUS.closed} title="Closed" />}
+                          element={<AdminListingsPage status={LISTING_STATUS.closed} titleKey="nav.closed" />}
                         />
                         <Route
                           path="listings/drafts"
-                          element={<AdminListingsPage status={LISTING_STATUS.draft} title="Drafts" />}
+                          element={<AdminListingsPage status={LISTING_STATUS.draft} titleKey="nav.drafts" />}
                         />
                         <Route
                           path="listings/deleted"
-                          element={<AdminListingsPage status={LISTING_STATUS.deleted} title="Deleted" />}
+                          element={<AdminListingsPage status={LISTING_STATUS.deleted} titleKey="nav.deleted" />}
                         />
                         <Route path="listings/detail/:id" element={<AdminListingDetailPage />} />
 
@@ -137,18 +138,23 @@ function App() {
                         <Route path="roles" element={<AdminRolesPage />} />
                         <Route path="audit-logs" element={<AdminAuditLogsPage />} />
 
-                        <Route path="settings" element={<AdminSettingsPage panel="general" title="General" />} />
+                        {/* The dashboard's own appearance and language, which
+                            are not marketplace configuration and live apart
+                            from Settings for that reason. */}
+                        <Route path="dashboard-settings" element={<AdminDashboardSettingsPage />} />
+
+                        <Route path="settings" element={<AdminSettingsPage panel="general" titleKey="nav.general" />} />
                         <Route
                           path="settings/listings"
-                          element={<AdminSettingsPage panel="listings" title="Listings" />}
+                          element={<AdminSettingsPage panel="listings" titleKey="nav.listings" />}
                         />
                         <Route
                           path="settings/chat"
-                          element={<AdminSettingsPage panel="chat" title="Chat" />}
+                          element={<AdminSettingsPage panel="chat" titleKey="nav.chat" />}
                         />
                         <Route
                           path="settings/security"
-                          element={<AdminSettingsPage panel="security" title="Security" />}
+                          element={<AdminSettingsPage panel="security" titleKey="nav.security" />}
                         />
                       </Route>
 

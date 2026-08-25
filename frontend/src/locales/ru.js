@@ -94,7 +94,6 @@ export default {
   'dashboard.settingsLanguage': 'Язык',
   'dashboard.settingsAppearance': 'Оформление',
   'dashboard.avatar': 'Аватар',
-  'dashboard.avatarHint': 'Загрузка изображения появится на следующем этапе.',
   'dashboard.saveChanges': 'Сохранить изменения',
   'apartmentDetails.noPhoneTitle': 'Позвонить нельзя',
   'apartmentDetails.noPhoneBody': '{name} не добавил номер телефона. Связаться можно только через чат.',

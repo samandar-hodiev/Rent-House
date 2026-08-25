@@ -1,21 +1,21 @@
 import { Building2 } from 'lucide-react'
 import EmptyState from '../../components/EmptyState'
 import {
-  AdminCard, AdminTable, Cell, LISTING_LABEL, PageHeading, Row, StatusBadge, ViewLink,
-  formatDate, formatMoney,
+  AdminCard, AdminTable, Cell, PageHeading, Row, StatusBadge, ViewLink, useAdminFormat,
 } from '../../components/admin/adminUi'
+import { useAdmin } from '../../context/AdminSettingsContext'
 import { listingsByStatus } from '../../mock/admin'
 import { adminListingPath } from '../../routes/adminPaths'
 
 // Empty-state wording per state: "no pending listings" and "nothing deleted"
 // are different pieces of news, and one generic line would say neither.
-const EMPTY_TEXT = {
-  null: ['No listings yet', 'Listings will appear here once owners publish them.'],
-  pending: ['No pending listings', 'Nothing is waiting for moderation right now.'],
-  active: ['No active listings', 'No listing is currently published.'],
-  closed: ['No closed listings', 'Nothing has been closed yet.'],
-  draft: ['No drafts', 'Owners have not left any unfinished listings.'],
-  deleted: ['No deleted listings', 'Nothing has been removed.'],
+const EMPTY_KEY = {
+  null: 'allListings',
+  pending: 'pending',
+  active: 'active',
+  closed: 'closed',
+  draft: 'draft',
+  deleted: 'deleted',
 }
 
 /**
@@ -25,27 +25,32 @@ const EMPTY_TEXT = {
  * and by nothing else, so six components would be five copies waiting to drift
  * apart.
  */
-function AdminListingsPage({ status = null, title }) {
+function AdminListingsPage({ status = null, titleKey }) {
+  const { t } = useAdmin()
+  const { formatDate, formatMoney, formatNumber } = useAdminFormat()
   const listings = listingsByStatus(status)
-  const [emptyTitle, emptyHint] = EMPTY_TEXT[status ?? 'null']
+  const empty = EMPTY_KEY[status ?? 'null']
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeading
-        title={title}
-        description={`${listings.length} ${listings.length === 1 ? 'listing' : 'listings'}.`}
+        title={t(titleKey)}
+        description={t('page.listings.count', { count: listings.length })}
       />
 
       <AdminCard>
         <AdminTable
-          headers={['Listing', 'Owner', 'District', 'Price', 'Status', 'Views', 'Created', 'Actions']}
+          headers={[
+            t('table.listing'), t('table.owner'), t('table.district'), t('table.price'),
+            t('table.status'), t('table.views'), t('table.created'), t('table.actions'),
+          ]}
           empty={
             listings.length === 0 ? (
               <div className="p-4">
                 <EmptyState
                   icon={<Building2 aria-hidden="true" size={28} />}
-                  title={emptyTitle}
-                  description={emptyHint}
+                  title={t(`empty.${empty}`)}
+                  description={t(`empty.${empty}Hint`)}
                 />
               </div>
             ) : null
@@ -72,10 +77,10 @@ function AdminListingsPage({ status = null, title }) {
                 {formatMoney(listing.price, listing.currency)}
               </Cell>
               <Cell>
-                <StatusBadge status={listing.status} label={LISTING_LABEL[listing.status]} />
+                <StatusBadge status={listing.status} />
               </Cell>
               <Cell className="tabular-nums text-text-secondary">
-                {listing.views.toLocaleString('en-US')}
+                {formatNumber(listing.views)}
               </Cell>
               <Cell className="whitespace-nowrap text-text-secondary">
                 {formatDate(listing.createdAt)}

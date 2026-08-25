@@ -94,7 +94,6 @@ export default {
   'dashboard.settingsLanguage': 'Til',
   'dashboard.settingsAppearance': "Ko'rinish",
   'dashboard.avatar': 'Avatar',
-  'dashboard.avatarHint': "Rasm yuklash keyingi bosqichda qo'shiladi.",
   'dashboard.saveChanges': "O'zgarishlarni saqlash",
   'apartmentDetails.noPhoneTitle': "Qo'ng'iroq qilib bo'lmaydi",
   'apartmentDetails.noPhoneBody': "{name} telefon raqamini qo'shmagan. Faqat chat orqali bog'lanishingiz mumkin.",

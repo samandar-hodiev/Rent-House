@@ -1,6 +1,7 @@
 import { AdminCard, PageHeading, StatCard } from '../../components/admin/adminUi'
 import { BarList, LineChart } from '../../components/admin/AdminChart'
-import { GROWTH, OVERVIEW, TOP_DISTRICTS } from '../../mock/admin'
+import { useAdmin } from '../../context/AdminSettingsContext'
+import { DISTRICT_STATS, GROWTH, OVERVIEW } from '../../mock/admin'
 
 function Group({ title, items }) {
   return (
@@ -16,55 +17,69 @@ function Group({ title, items }) {
 }
 
 function AdminAnalyticsPage() {
+  const { t } = useAdmin()
+  const trendLabel = (trend) => t(`chart.${trend}`)
+
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading title="Analytics" description="Figures across the whole marketplace." />
+      <PageHeading
+        title={t('page.analytics.title')}
+        description={t('page.analytics.description')}
+      />
 
       <Group
-        title="Users"
+        title={t('group.users')}
         items={[
-          ['Total Users', OVERVIEW.totalUsers],
-          ['New Users', OVERVIEW.newUsersToday],
-          ['Active Users', OVERVIEW.activeUsers],
-          ['Blocked Users', OVERVIEW.blockedUsers],
+          [t('stat.totalUsers'), OVERVIEW.totalUsers],
+          [t('stat.newUsers'), OVERVIEW.newUsersToday],
+          [t('stat.activeUsers'), OVERVIEW.activeUsers],
+          [t('stat.blockedUsers'), OVERVIEW.blockedUsers],
         ]}
       />
 
       <Group
-        title="Listings"
+        title={t('group.listings')}
         items={[
-          ['Total Listings', OVERVIEW.totalListings],
-          ['Active', OVERVIEW.activeListings],
-          ['Pending', OVERVIEW.pendingListings],
-          ['Closed', OVERVIEW.closedListings],
-          ['Drafts', OVERVIEW.drafts],
+          [t('stat.totalListings'), OVERVIEW.totalListings],
+          [t('status.active'), OVERVIEW.activeListings],
+          [t('status.pending'), OVERVIEW.pendingListings],
+          [t('status.closed'), OVERVIEW.closedListings],
+          [t('stat.drafts'), OVERVIEW.drafts],
         ]}
       />
 
       <Group
-        title="Engagement"
+        title={t('group.engagement')}
         items={[
-          ['Views', OVERVIEW.views],
-          ['Favorites', OVERVIEW.favorites],
-          ['Chats', OVERVIEW.chats],
-          ['Listing Contacts', OVERVIEW.contacts],
+          [t('stat.views'), OVERVIEW.views],
+          [t('stat.favorites'), OVERVIEW.favorites],
+          [t('stat.chats'), OVERVIEW.chats],
+          [t('stat.contacts'), OVERVIEW.contacts],
         ]}
       />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <AdminCard title="Users Growth">
+        <AdminCard title={t('chart.usersGrowth')}>
           <div className="p-4">
-            <LineChart {...GROWTH.users.monthly} ariaLabel="Users growth by month" />
+            <LineChart
+              {...GROWTH.users.monthly}
+              ariaLabel={t('chart.usersGrowth')}
+              trendLabel={trendLabel}
+            />
           </div>
         </AdminCard>
-        <AdminCard title="Listings Growth">
+        <AdminCard title={t('chart.listingsGrowth')}>
           <div className="p-4">
-            <LineChart {...GROWTH.listings.monthly} ariaLabel="Listings growth by month" />
+            <LineChart
+              {...GROWTH.listings.monthly}
+              ariaLabel={t('chart.listingsGrowth')}
+              trendLabel={trendLabel}
+            />
           </div>
         </AdminCard>
-        <AdminCard title="District statistics">
+        <AdminCard title={t('chart.districtStats')}>
           <div className="p-4">
-            <BarList items={TOP_DISTRICTS} />
+            <BarList items={DISTRICT_STATS} scroll />
           </div>
         </AdminCard>
       </div>

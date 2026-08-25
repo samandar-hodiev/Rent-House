@@ -1,16 +1,27 @@
 import UserAvatar from '../../components/dashboard/UserAvatar'
 import {
-  AdminCard, AdminTable, Cell, MockButton, PageHeading, Row, StatusBadge, formatDateTime,
+  AdminCard, AdminTable, Cell, MockButton, PageHeading, Row, StatusBadge, useAdminFormat,
 } from '../../components/admin/adminUi'
+import { useAdmin } from '../../context/AdminSettingsContext'
 import { ADMINS } from '../../mock/admin'
 
 function AdminAdminsPage() {
+  const { t } = useAdmin()
+  const { formatDateTime } = useAdminFormat()
   return (
     <div className="flex flex-col gap-5">
-      <PageHeading title="Admins" description={`${ADMINS.length} administrator accounts.`} />
+      <PageHeading
+        title={t('page.admins.title')}
+        description={t('page.admins.description', { count: ADMINS.length })}
+      />
 
       <AdminCard>
-        <AdminTable headers={['Admin', 'Email', 'Role', 'Status', 'Last Active', 'Actions']}>
+        <AdminTable
+          headers={[
+            t('table.admin'), t('table.email'), t('table.role'), t('table.status'),
+            t('table.lastActive'), t('table.actions'),
+          ]}
+        >
           {ADMINS.map((admin) => (
             <Row key={admin.id}>
               <Cell>
@@ -29,8 +40,8 @@ function AdminAdminsPage() {
               </Cell>
               <Cell>
                 <span className="flex items-center gap-1.5">
-                  <MockButton>Edit</MockButton>
-                  <MockButton tone="danger">Suspend</MockButton>
+                  <MockButton>{t('action.edit')}</MockButton>
+                  <MockButton tone="danger">{t('action.suspend')}</MockButton>
                 </span>
               </Cell>
             </Row>

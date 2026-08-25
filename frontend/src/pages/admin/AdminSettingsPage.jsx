@@ -1,12 +1,13 @@
 import { NavLink } from 'react-router-dom'
 import { AdminCard, MockButton, PageHeading } from '../../components/admin/adminUi'
+import { useAdmin } from '../../context/AdminSettingsContext'
 import { ADMIN_ROUTES } from '../../routes/adminPaths'
 
 const TABS = [
-  { label: 'General', to: ADMIN_ROUTES.settings, end: true },
-  { label: 'Listings', to: ADMIN_ROUTES.settingsListings },
-  { label: 'Chat', to: ADMIN_ROUTES.settingsChat },
-  { label: 'Security', to: ADMIN_ROUTES.settingsSecurity },
+  { key: 'nav.general', to: ADMIN_ROUTES.settings, end: true },
+  { key: 'nav.listings', to: ADMIN_ROUTES.settingsListings },
+  { key: 'nav.chat', to: ADMIN_ROUTES.settingsChat },
+  { key: 'nav.security', to: ADMIN_ROUTES.settingsSecurity },
 ]
 
 function Field({ label, hint, children }) {
@@ -38,63 +39,84 @@ function Toggle({ label, hint, defaultChecked = false }) {
   )
 }
 
-const PANELS = {
-  general: (
-    <div className="flex flex-col gap-4 p-4">
-      <Field label="Site name">
-        <input className={INPUT} defaultValue="RentHouse" />
-      </Field>
-      <Field label="Support email">
-        <input className={INPUT} defaultValue="support@renthouse.uz" />
-      </Field>
-      <Field label="Default language" hint="Used for new accounts.">
-        <select className={INPUT} defaultValue="uz">
-          <option value="uz">O'zbekcha</option>
-          <option value="ru">Русский</option>
-          <option value="en">English</option>
-        </select>
-      </Field>
-      <Toggle label="Maintenance mode" hint="Shows a notice instead of the marketplace." />
-    </div>
-  ),
-  listings: (
-    <div className="flex flex-col gap-4 p-4">
-      <Toggle
-        label="Require moderation before publishing"
-        hint="New listings arrive as Pending instead of going live."
-        defaultChecked
-      />
-      <Field label="Maximum images per listing">
-        <input className={INPUT} type="number" defaultValue={20} />
-      </Field>
-      <Field label="Auto-close after (days)" hint="A listing with no activity is closed.">
-        <input className={INPUT} type="number" defaultValue={90} />
-      </Field>
-      <Toggle label="Allow drafts" hint="Owners can save without publishing." defaultChecked />
-    </div>
-  ),
-  chat: (
-    <div className="flex flex-col gap-4 p-4">
-      <Toggle label="Allow attachments" hint="Images, documents and voice notes." defaultChecked />
-      <Field label="Maximum attachment size (MB)">
-        <input className={INPUT} type="number" defaultValue={20} />
-      </Field>
-      <Toggle label="Allow message editing" defaultChecked />
-      <Toggle label="Notify admins about reported chats" defaultChecked />
-    </div>
-  ),
-  security: (
-    <div className="flex flex-col gap-4 p-4">
-      <Toggle label="Two-factor authentication for admins" defaultChecked />
-      <Field label="Session timeout (minutes)">
-        <input className={INPUT} type="number" defaultValue={60} />
-      </Field>
-      <Field label="Allowed admin IP range" hint="Leave empty to allow any address.">
-        <input className={INPUT} placeholder="81.192.0.0/16" />
-      </Field>
-      <Toggle label="Record audit logs" defaultChecked />
-    </div>
-  ),
+// A function rather than a constant: the labels come from the dictionary, and
+// a module-level object would be built once with whichever language happened to
+// be active when the file first ran.
+function panelFor(panel, t) {
+  switch (panel) {
+    case 'listings':
+      return (
+        <div className="flex flex-col gap-4 p-4">
+          <Toggle
+            label={t('settings.requireModeration')}
+            hint={t('settings.requireModerationHint')}
+            defaultChecked
+          />
+          <Field label={t('settings.maxImages')}>
+            <input className={INPUT} type="number" defaultValue={20} />
+          </Field>
+          <Field label={t('settings.autoClose')} hint={t('settings.autoCloseHint')}>
+            <input className={INPUT} type="number" defaultValue={90} />
+          </Field>
+          <Toggle
+            label={t('settings.allowDrafts')}
+            hint={t('settings.allowDraftsHint')}
+            defaultChecked
+          />
+        </div>
+      )
+    case 'chat':
+      return (
+        <div className="flex flex-col gap-4 p-4">
+          <Toggle
+            label={t('settings.allowAttachments')}
+            hint={t('settings.allowAttachmentsHint')}
+            defaultChecked
+          />
+          <Field label={t('settings.maxAttachment')}>
+            <input className={INPUT} type="number" defaultValue={20} />
+          </Field>
+          <Toggle label={t('settings.allowEditing')} defaultChecked />
+          <Toggle label={t('settings.notifyReported')} defaultChecked />
+        </div>
+      )
+    case 'security':
+      return (
+        <div className="flex flex-col gap-4 p-4">
+          <Toggle label={t('settings.twoFactor')} defaultChecked />
+          <Field label={t('settings.sessionTimeout')}>
+            <input className={INPUT} type="number" defaultValue={60} />
+          </Field>
+          <Field label={t('settings.ipRange')} hint={t('settings.ipRangeHint')}>
+            <input className={INPUT} placeholder="81.192.0.0/16" />
+          </Field>
+          <Toggle label={t('settings.auditLogs')} defaultChecked />
+        </div>
+      )
+    default:
+      return (
+        <div className="flex flex-col gap-4 p-4">
+          <Field label={t('settings.siteName')}>
+            <input className={INPUT} defaultValue="RentHouse" />
+          </Field>
+          <Field label={t('settings.supportEmail')}>
+            <input className={INPUT} defaultValue="support@renthouse.uz" />
+          </Field>
+          {/* The language new accounts start in — a marketplace setting, and a
+              different thing from the admin's own language under Dashboard
+              Settings. Changing this one would not move a single label on this
+              page. */}
+          <Field label={t('settings.defaultLanguage')} hint={t('settings.defaultLanguageHint')}>
+            <select className={INPUT} defaultValue="uz">
+              <option value="uz">O'zbekcha</option>
+              <option value="ru">Русский</option>
+              <option value="en">English</option>
+            </select>
+          </Field>
+          <Toggle label={t('settings.maintenance')} hint={t('settings.maintenanceHint')} />
+        </div>
+      )
+  }
 }
 
 /**
@@ -103,10 +125,12 @@ const PANELS = {
  * Nothing is saved: the task is the interface, and a form that pretended to
  * persist would be worse than one that plainly does not.
  */
-function AdminSettingsPage({ panel = 'general', title }) {
+function AdminSettingsPage({ panel = 'general', titleKey }) {
+  const { t } = useAdmin()
+
   return (
     <div className="flex flex-col gap-5">
-      <PageHeading title="Settings" description="Marketplace configuration." />
+      <PageHeading title={t('page.settings.title')} description={t('page.settings.description')} />
 
       <div className="flex flex-wrap gap-1">
         {TABS.map((tab) => (
@@ -122,16 +146,16 @@ function AdminSettingsPage({ panel = 'general', title }) {
               }`
             }
           >
-            {tab.label}
+            {t(tab.key)}
           </NavLink>
         ))}
       </div>
 
-      <AdminCard title={title} className="max-w-2xl">
-        {PANELS[panel]}
+      <AdminCard title={t(titleKey)} className="max-w-2xl">
+        {panelFor(panel, t)}
         <div className="flex justify-end gap-2 border-t border-border p-4">
-          <MockButton>Cancel</MockButton>
-          <MockButton tone="primary">Save changes</MockButton>
+          <MockButton>{t('action.cancel')}</MockButton>
+          <MockButton tone="primary">{t('action.save')}</MockButton>
         </div>
       </AdminCard>
     </div>

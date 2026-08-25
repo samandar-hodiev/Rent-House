@@ -3,8 +3,9 @@ import { MessageSquare, ShieldAlert } from 'lucide-react'
 import EmptyState from '../../components/EmptyState'
 import UserAvatar from '../../components/dashboard/UserAvatar'
 import {
-  AdminCard, AdminTable, Cell, MockButton, PageHeading, Row, StatusBadge, formatDateTime,
+  AdminCard, AdminTable, Cell, MockButton, PageHeading, Row, StatusBadge, useAdminFormat,
 } from '../../components/admin/adminUi'
+import { useAdmin } from '../../context/AdminSettingsContext'
 import { CHATS, CHAT_MESSAGES } from '../../mock/admin'
 
 /**
@@ -16,25 +17,33 @@ import { CHATS, CHAT_MESSAGES } from '../../mock/admin'
  * answering before it is asked.
  */
 function AdminChatsPage() {
+  const { t } = useAdmin()
+  const { formatDateTime } = useAdminFormat()
   const [openId, setOpenId] = useState(null)
   const conversation = CHATS.find((chat) => chat.id === openId) ?? null
   const messages = conversation ? (CHAT_MESSAGES[conversation.id] ?? []) : []
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeading title="Chats" description={`${CHATS.length} conversations.`} />
+      <PageHeading
+        title={t('page.chats.title')}
+        description={t('page.chats.description', { count: CHATS.length })}
+      />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
         <AdminCard>
           <AdminTable
-            headers={['Buyer', 'Seller', 'Listing', 'Last Message', 'Date', 'Status', 'Actions']}
+            headers={[
+              t('table.buyer'), t('table.seller'), t('table.listing'), t('table.lastMessage'),
+              t('table.date'), t('table.status'), t('table.actions'),
+            ]}
             empty={
               CHATS.length === 0 ? (
                 <div className="p-4">
                   <EmptyState
                     icon={<MessageSquare aria-hidden="true" size={28} />}
-                    title="No conversations"
-                    description="Conversations between buyers and owners will appear here."
+                    title={t('empty.chats')}
+                    description={t('empty.chatsHint')}
                   />
                 </div>
               ) : null
@@ -59,14 +68,14 @@ function AdminChatsPage() {
                 </Cell>
                 <Cell><StatusBadge status={chat.status} /></Cell>
                 <Cell>
-                  <MockButton onClick={() => setOpenId(chat.id)}>View</MockButton>
+                  <MockButton onClick={() => setOpenId(chat.id)}>{t('action.view')}</MockButton>
                 </Cell>
               </Row>
             ))}
           </AdminTable>
         </AdminCard>
 
-        <AdminCard title="Conversation preview">
+        <AdminCard title={t('chats.preview')}>
           {conversation ? (
             <div className="flex flex-col">
               <div className="flex items-center gap-2.5 border-b border-border p-3">
@@ -84,7 +93,7 @@ function AdminChatsPage() {
               <ul className="chat-scroll flex max-h-80 flex-col gap-2 overflow-y-auto p-3">
                 {messages.length === 0 ? (
                   <li className="py-6 text-center text-sm text-text-muted">
-                    No messages in this conversation.
+                    {t('chats.noMessages')}
                   </li>
                 ) : (
                   messages.map((message) => (
@@ -115,12 +124,12 @@ function AdminChatsPage() {
 
               <p className="flex items-center gap-2 border-t border-border p-3 text-xs text-text-muted">
                 <ShieldAlert aria-hidden="true" size={14} className="shrink-0" />
-                Read-only. Admins cannot send messages on behalf of a user.
+                {t('chats.readOnly')}
               </p>
             </div>
           ) : (
             <p className="p-6 text-center text-sm text-text-muted">
-              Select a conversation to preview it.
+              {t('chats.selectHint')}
             </p>
           )}
         </AdminCard>

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { LISTING_STATUS, LISTING_STATUS_CLASS } from '../../data/listingStatus'
+import { LISTING_STATUS_CLASS } from '../../data/listingStatus'
+import { useAdmin } from '../../context/AdminSettingsContext'
 
 /**
  * The small pieces every admin screen is built from.
@@ -32,6 +33,7 @@ export function AdminCard({ title, action, children, className = '' }) {
 
 /** One figure on the dashboard. */
 export function StatCard({ icon, label, value, hint }) {
+  const { formatNumber } = useAdminFormat()
   return (
     <div className="flex items-start gap-3 rounded-xl border border-border bg-surface p-4">
       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-light text-primary-hover dark:text-primary">
@@ -40,7 +42,7 @@ export function StatCard({ icon, label, value, hint }) {
       <div className="min-w-0">
         <p className="truncate text-xs text-text-muted">{label}</p>
         <p className="mt-0.5 text-xl font-semibold tabular-nums text-text-primary">
-          {typeof value === 'number' ? value.toLocaleString('en-US') : value}
+          {typeof value === 'number' ? formatNumber(value) : value}
         </p>
         {hint ? <p className="mt-0.5 truncate text-[11px] text-text-muted">{hint}</p> : null}
       </div>
@@ -64,24 +66,19 @@ const BADGE_TINTS = {
   failed: 'bg-error/10 text-error',
 }
 
-export function StatusBadge({ status, label }) {
+export function StatusBadge({ status }) {
+  const { t } = useAdmin()
   const tint = LISTING_STATUS_CLASS[status] ?? BADGE_TINTS[status] ?? BADGE_TINTS.inactive
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${tint}`}
+      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${tint}`}
     >
-      {label ?? status}
+      {/* Every state a badge can show — a listing's and a user's alike — has a
+          `status.*` entry, so the badge translates itself and no caller has to
+          pass a label. */}
+      {t(`status.${status}`)}
     </span>
   )
-}
-
-/** Uzbek labels for the listing states, matching the owner-side vocabulary. */
-export const LISTING_LABEL = {
-  [LISTING_STATUS.active]: 'Active',
-  [LISTING_STATUS.pending]: 'Pending',
-  [LISTING_STATUS.closed]: 'Closed',
-  [LISTING_STATUS.draft]: 'Draft',
-  [LISTING_STATUS.deleted]: 'Deleted',
 }
 
 /**
@@ -127,12 +124,13 @@ export function Cell({ children, className = '' }) {
 
 /** The one action every table row offers. */
 export function ViewLink({ to }) {
+  const { t } = useAdmin()
   return (
     <Link
       to={to}
       className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-text-primary transition-colors hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
-      View
+      {t('action.view')}
     </Link>
   )
 }
@@ -169,25 +167,42 @@ export function PageHeading({ title, description, action }) {
   )
 }
 
-export function formatDate(iso) {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
+// The admin language decides how dates and numbers read, so a month name is in
+// the language the rest of the page is in. Uzbek has no widely supported CLDR
+// data in every browser; `uz-UZ` falls back on its own when it is missing,
+// which is better than pinning everyone to English.
+const DATE_LOCALE = { uz: 'uz-UZ', ru: 'ru-RU', en: 'en-GB' }
 
-export function formatDateTime(iso) {
-  return new Date(iso).toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+/**
+ * Dates and money in the admin's chosen language.
+ *
+ * A hook rather than plain functions because the formatting depends on a
+ * setting, and reading that setting is what a hook is for. Every admin screen
+ * that prints a date takes it from here, so one language switch moves all of
+ * them together.
+ */
+export function useAdminFormat() {
+  const { t, locale } = useAdmin()
+  const tag = DATE_LOCALE[locale] ?? DATE_LOCALE.en
 
-export function formatMoney(amount, currency) {
-  return currency === 'USD'
-    ? `$${amount.toLocaleString('en-US')}`
-    : `${amount.toLocaleString('en-US')} so'm`
+  return {
+    formatDate: (iso) =>
+      new Date(iso).toLocaleDateString(tag, {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }),
+    formatDateTime: (iso) =>
+      new Date(iso).toLocaleString(tag, {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    formatNumber: (value) => value.toLocaleString(tag),
+    formatMoney: (amount, currency) =>
+      currency === 'USD'
+        ? `$${amount.toLocaleString(tag)}`
+        : `${amount.toLocaleString(tag)} ${t('format.sum')}`,
+  }
 }

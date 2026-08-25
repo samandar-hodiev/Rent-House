@@ -248,10 +248,16 @@ export const OVERVIEW = {
  * Generated from a seed rather than random, so the line is the same on every
  * render — a chart that reshuffles itself each time it is looked at reads as a
  * bug even when the numbers are admittedly fake.
+ *
+ * `step` may be negative or zero. The chart colours itself by which way the
+ * line went, and a generator that could only climb would leave two of those
+ * three colours as code nobody ever sees.
  */
 function series(points, base, step, seed) {
+  // The wobble stays visible on a flat line, where the step alone would be 0.
+  const amplitude = (Math.abs(step) || base * 0.03) * 0.35
   return Array.from({ length: points }, (_, index) => {
-    const wobble = Math.sin((index + seed) * 1.7) * step * 0.35
+    const wobble = Math.sin((index + seed) * 1.7) * amplitude
     return Math.max(0, Math.round(base + index * step + wobble))
   })
 }
@@ -259,14 +265,16 @@ function series(points, base, step, seed) {
 export const GROWTH = {
   users: {
     daily: { labels: ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'], values: series(7, 90, 12, 1) },
-    weekly: { labels: ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'], values: series(6, 520, 74, 2) },
+    // Flat: registrations held steady week to week.
+    weekly: { labels: ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'], values: series(6, 520, 0, 2) },
     monthly: {
       labels: ['Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg'],
       values: series(6, 1800, 320, 3),
     },
   },
   listings: {
-    daily: { labels: ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'], values: series(7, 40, 8, 4) },
+    // Falling: fewer listings posted each day this week.
+    daily: { labels: ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'], values: series(7, 76, -9, 4) },
     weekly: { labels: ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'], values: series(6, 260, 44, 5) },
     monthly: {
       labels: ['Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg'],
@@ -275,11 +283,31 @@ export const GROWTH = {
   },
 }
 
-export const TOP_DISTRICTS = [
-  { name: 'Chilonzor', listings: 1284 },
-  { name: 'Yunusobod', listings: 1042 },
-  { name: 'Sergeli', listings: 861 },
-  { name: 'Mirzo Ulug\'bek', listings: 744 },
-  { name: 'Yakkasaroy', listings: 512 },
-  { name: 'Shayxontohur', listings: 398 },
+/**
+ * Active listings per district, for the dashboard's district chart.
+ *
+ * All twelve of Tashkent's districts, not a top six: a district with few
+ * listings is as much a fact about the market as one with many, and a chart
+ * that silently drops the quiet ones invites the wrong conclusion.
+ *
+ * Declared unsorted and ordered at render time, so replacing this array with an
+ * API response needs no ordering guarantee from the server.
+ */
+export const DISTRICT_STATS = [
+  { name: 'Chilonzor', activeListings: 1284 },
+  { name: 'Yunusobod', activeListings: 1042 },
+  { name: 'Sergeli', activeListings: 861 },
+  { name: 'Mirzo Ulug\'bek', activeListings: 744 },
+  { name: 'Yakkasaroy', activeListings: 512 },
+  { name: 'Shayxontohur', activeListings: 398 },
+  { name: 'Mirobod', activeListings: 356 },
+  { name: 'Olmazor', activeListings: 321 },
+  { name: 'Uchtepa', activeListings: 287 },
+  { name: 'Yashnobod', activeListings: 254 },
+  { name: 'Yangihayot', activeListings: 198 },
+  { name: 'Bektemir', activeListings: 143 },
 ]
+
+/** Busiest first. Sorted here so the order follows the data, not the array. */
+export const districtsByActivity = () =>
+  [...DISTRICT_STATS].sort((a, b) => b.activeListings - a.activeListings)

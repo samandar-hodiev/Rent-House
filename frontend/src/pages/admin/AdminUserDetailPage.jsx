@@ -2,9 +2,8 @@ import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import EmptyState from '../../components/EmptyState'
 import UserAvatar from '../../components/dashboard/UserAvatar'
-import {
-  AdminCard, MockButton, StatusBadge, formatDate, formatDateTime,
-} from '../../components/admin/adminUi'
+import { AdminCard, MockButton, StatusBadge, useAdminFormat } from '../../components/admin/adminUi'
+import { useAdmin } from '../../context/AdminSettingsContext'
 import { USERS } from '../../mock/admin'
 import { ADMIN_ROUTES } from '../../routes/adminPaths'
 
@@ -18,24 +17,26 @@ function Field({ label, value }) {
 }
 
 function AdminUserDetailPage() {
+  const { t } = useAdmin()
+  const { formatDate, formatDateTime } = useAdminFormat()
   const { id } = useParams()
   const user = USERS.find((item) => item.id === id)
 
   if (!user) {
     return (
       <EmptyState
-        title="User not found"
-        description="This account does not exist, or the link is out of date."
+        title={t('users.notFound')}
+        description={t('users.notFoundHint')}
       />
     )
   }
 
   const stats = [
-    ['Total Listings', user.stats.totalListings],
-    ['Active Listings', user.stats.activeListings],
-    ['Closed Listings', user.stats.closedListings],
-    ['Drafts', user.stats.drafts],
-    ['Chats', user.stats.chats],
+    ['users.totalListings', user.stats.totalListings],
+    ['users.activeListings', user.stats.activeListings],
+    ['users.closedListings', user.stats.closedListings],
+    ['users.drafts', user.stats.drafts],
+    ['users.chats', user.stats.chats],
   ]
 
   return (
@@ -45,7 +46,7 @@ function AdminUserDetailPage() {
         className="flex w-fit items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <ArrowLeft aria-hidden="true" size={15} />
-        All Users
+        {t('nav.allUsers')}
       </Link>
 
       <AdminCard>
@@ -62,25 +63,25 @@ function AdminUserDetailPage() {
           </div>
           <span className="flex shrink-0 gap-1.5">
             <MockButton tone="danger">
-              {user.status === 'blocked' ? 'Unblock user' : 'Block user'}
+              {t(user.status === 'blocked' ? 'users.unblockUser' : 'users.blockUser')}
             </MockButton>
           </span>
         </div>
 
         <dl className="grid grid-cols-2 gap-4 border-t border-border p-4 sm:grid-cols-4">
-          <Field label="Phone" value={user.phone} />
-          <Field label="Status" value={user.status} />
-          <Field label="Registered" value={formatDate(user.registeredAt)} />
-          <Field label="Last active" value={formatDateTime(user.lastActiveAt)} />
+          <Field label={t('table.phone')} value={user.phone} />
+          <Field label={t('table.status')} value={t(`status.${user.status}`)} />
+          <Field label={t('table.registered')} value={formatDate(user.registeredAt)} />
+          <Field label={t('users.lastActive')} value={formatDateTime(user.lastActiveAt)} />
         </dl>
       </AdminCard>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <AdminCard title="Statistics">
+        <AdminCard title={t('users.statistics')}>
           <dl className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-3">
-            {stats.map(([label, value]) => (
-              <div key={label}>
-                <dt className="text-xs text-text-muted">{label}</dt>
+            {stats.map(([key, value]) => (
+              <div key={key}>
+                <dt className="text-xs text-text-muted">{t(key)}</dt>
                 <dd className="mt-0.5 text-lg font-semibold tabular-nums text-text-primary">
                   {value}
                 </dd>
@@ -89,7 +90,7 @@ function AdminUserDetailPage() {
           </dl>
         </AdminCard>
 
-        <AdminCard title="Activity">
+        <AdminCard title={t('users.activity')}>
           <ol className="flex flex-col gap-3 p-4">
             {user.timeline.map((entry) => (
               <li key={entry.at} className="flex gap-3">
