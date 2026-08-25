@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { LogOut, Menu, Settings, SlidersHorizontal, User, X } from 'lucide-react'
+import { LogOut, Menu, Settings, ShieldCheck, SlidersHorizontal, User, X } from 'lucide-react'
 import { useDismiss } from '../../hooks/useDismiss'
 import { useRef } from 'react'
 import UserAvatar from '../dashboard/UserAvatar'
 import { AdminNavList, AdminSidebarFooter } from './AdminSidebar'
-import { AdminSettingsProvider, useAdmin } from '../../context/AdminSettingsContext'
+import { ADMIN_ROLE, AdminSettingsProvider, useAdmin } from '../../context/AdminSettingsContext'
 import { ADMIN_ROUTES } from '../../routes/adminPaths'
 
 // The signed-in administrator. Fake, like everything else in this module —
 // there is no admin authentication yet, and inventing one was explicitly out
 // of scope.
-const CURRENT_ADMIN = { name: 'Samandar Hodiev', role: 'Super Admin' }
+const CURRENT_ADMIN = { name: 'Samandar Hodiev' }
 
 function AdminProfileMenu() {
-  const { t } = useAdmin()
+  const { t, role, setRole } = useAdmin()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   useDismiss(ref, open, () => setOpen(false))
@@ -36,7 +36,7 @@ function AdminProfileMenu() {
           <span className="block truncate text-sm font-medium text-text-primary">
             {CURRENT_ADMIN.name}
           </span>
-          <span className="block truncate text-[11px] text-text-muted">{CURRENT_ADMIN.role}</span>
+          <span className="block truncate text-[11px] text-text-muted">{t(`role.${role}`)}</span>
         </span>
       </button>
 
@@ -58,6 +58,30 @@ function AdminProfileMenu() {
             <Settings aria-hidden="true" size={15} className="shrink-0" />
             {t('header.settings')}
           </Link>
+          {/* Until admin sign-in exists there is nobody to be, so the two
+              roles are offered as a preview. It is the only way to see what a
+              super admin's sidebar looks like after the owner has configured
+              it, and it goes when the session provides the role instead. */}
+          <p className="mt-1 border-t border-border px-3 pb-1 pt-2 text-[11px] font-medium text-text-muted">
+            {t('role.preview')}
+          </p>
+          {Object.values(ADMIN_ROLE).map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="menuitemradio"
+              aria-checked={role === option}
+              onClick={() => {
+                setRole(option)
+                setOpen(false)
+              }}
+              className={`${item} ${role === option ? 'font-medium text-primary-hover dark:text-primary' : ''}`}
+            >
+              <ShieldCheck aria-hidden="true" size={15} className="shrink-0" />
+              {t(`role.${option}`)}
+            </button>
+          ))}
+
           <button
             type="button"
             role="menuitem"

@@ -43,6 +43,7 @@ import AdminRolesPage from './pages/admin/AdminRolesPage'
 import AdminAuditLogsPage from './pages/admin/AdminAuditLogsPage'
 import AdminSettingsPage from './pages/admin/AdminSettingsPage'
 import AdminDashboardSettingsPage from './pages/admin/AdminDashboardSettingsPage'
+import AdminSidebarControlPage from './pages/admin/AdminSidebarControlPage'
 import { ADMIN_ROUTES } from './routes/adminPaths'
 import { LISTING_STATUS } from './data/listingStatus'
 import { ROUTES } from './routes/paths'
@@ -137,6 +138,9 @@ function App() {
                         <Route path="admins" element={<AdminAdminsPage />} />
                         <Route path="roles" element={<AdminRolesPage />} />
                         <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+
+                        {/* The owner's; the page turns a super admin away. */}
+                        <Route path="sidebar-control" element={<AdminSidebarControlPage />} />
 
                         {/* The dashboard's own appearance and language, which
                             are not marketplace configuration and live apart

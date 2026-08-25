@@ -156,6 +156,37 @@ export function MockButton({ children, tone = 'neutral', onClick }) {
   )
 }
 
+/**
+ * An on/off switch.
+ *
+ * A real `role="switch"` button rather than a styled checkbox: it announces its
+ * state, takes the keyboard the way a button does, and carries the same green
+ * the rest of the dashboard uses for "on". The label is supplied by the caller
+ * through `labelledBy`, so the row's own heading names it and there is no
+ * second copy of the text for a screen reader to read twice.
+ */
+export function Switch({ checked, onChange, labelledBy }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-labelledby={labelledBy}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${
+        checked ? 'bg-primary hover:bg-primary-hover' : 'bg-border hover:bg-text-muted'
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`inline-block size-3.5 rounded-full bg-white shadow-sm transition-transform ${
+          checked ? 'translate-x-[18px]' : 'translate-x-[3px]'
+        }`}
+      />
+    </button>
+  )
+}
+
 /** Page title and, optionally, a line under it. */
 export function PageHeading({ title, description, action }) {
   return (

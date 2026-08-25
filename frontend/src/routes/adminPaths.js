@@ -25,6 +25,7 @@ export const ADMIN_ROUTES = {
   roles: `${BASE}/roles`,
   auditLogs: `${BASE}/audit-logs`,
 
+  sidebarControl: `${BASE}/sidebar-control`,
   dashboardSettings: `${BASE}/dashboard-settings`,
 
   settings: `${BASE}/settings`,

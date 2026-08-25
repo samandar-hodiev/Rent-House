@@ -1,25 +1,32 @@
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
-  Bell, BarChart3, ChevronDown, ChevronUp, ClipboardList, LayoutDashboard, LogOut,
+  Bell, BarChart3, ChevronDown, ChevronUp, ClipboardList, LayoutDashboard, ListChecks, LogOut,
   MessageSquare, Settings, Shield, SlidersHorizontal, Building2, Flag, Users,
 } from 'lucide-react'
 import { ADMIN_ROUTES } from '../../routes/adminPaths'
-import { useAdmin } from '../../context/AdminSettingsContext'
+import { ADMIN_ROLE, useAdmin } from '../../context/AdminSettingsContext'
 
 const ICON = 16
 
 // The navigation, exactly as the specification lists it. One declaration, read
 // by both the desktop column and the mobile drawer, so the two can never offer
 // different things.
+// The navigation, exactly as the specification lists it. One declaration, read
+// by both the desktop column and the mobile drawer, so the two can never offer
+// different things.
+//
+// `id` is what the owner's sidebar configuration switches on. An entry marked
+// `alwaysVisible` has no switch and cannot be hidden — `ownerOnly` entries are
+// only ever shown to the owner.
 export const ADMIN_NAV = [
-  { key: 'nav.dashboard', icon: LayoutDashboard, to: ADMIN_ROUTES.dashboard, end: true },
+  { id: 'dashboard', key: 'nav.dashboard', icon: LayoutDashboard, to: ADMIN_ROUTES.dashboard, end: true },
   {
-    key: 'nav.users', icon: Users,
+    id: 'users', key: 'nav.users', icon: Users,
     children: [{ key: 'nav.allUsers', to: ADMIN_ROUTES.users }],
   },
   {
-    key: 'nav.listings', icon: Building2,
+    id: 'listings', key: 'nav.listings', icon: Building2,
     children: [
       { key: 'nav.allListings', to: ADMIN_ROUTES.listings, end: true },
       { key: 'nav.pending', to: ADMIN_ROUTES.listingsPending },
@@ -29,20 +36,30 @@ export const ADMIN_NAV = [
       { key: 'nav.deleted', to: ADMIN_ROUTES.listingsDeleted },
     ],
   },
-  { key: 'nav.chats', icon: MessageSquare, to: ADMIN_ROUTES.chats },
-  { key: 'nav.reports', icon: Flag, to: ADMIN_ROUTES.reports },
-  { key: 'nav.analytics', icon: BarChart3, to: ADMIN_ROUTES.analytics },
-  { key: 'nav.notifications', icon: Bell, to: ADMIN_ROUTES.notifications },
+  { id: 'chats', key: 'nav.chats', icon: MessageSquare, to: ADMIN_ROUTES.chats },
+  { id: 'reports', key: 'nav.reports', icon: Flag, to: ADMIN_ROUTES.reports },
+  { id: 'analytics', key: 'nav.analytics', icon: BarChart3, to: ADMIN_ROUTES.analytics },
+  { id: 'notifications', key: 'nav.notifications', icon: Bell, to: ADMIN_ROUTES.notifications },
   {
-    key: 'nav.adminManagement', icon: Shield,
+    id: 'adminManagement', key: 'nav.adminManagement', icon: Shield,
     children: [
       { key: 'nav.admins', to: ADMIN_ROUTES.admins },
       { key: 'nav.roles', to: ADMIN_ROUTES.roles },
     ],
   },
-  { key: 'nav.auditLogs', icon: ClipboardList, to: ADMIN_ROUTES.auditLogs },
+  // The switch board itself: the owner's, and never switchable. Hiding it would
+  // hide the only way to bring anything back.
   {
-    key: 'nav.settings', icon: Settings,
+    id: 'sidebarControl',
+    key: 'nav.sidebarControl',
+    icon: ListChecks,
+    to: ADMIN_ROUTES.sidebarControl,
+    ownerOnly: true,
+    alwaysVisible: true,
+  },
+  { id: 'auditLogs', key: 'nav.auditLogs', icon: ClipboardList, to: ADMIN_ROUTES.auditLogs },
+  {
+    id: 'settings', key: 'nav.settings', icon: Settings,
     children: [
       { key: 'nav.general', to: ADMIN_ROUTES.settings, end: true },
       { key: 'nav.listings', to: ADMIN_ROUTES.settingsListings },
@@ -51,6 +68,21 @@ export const ADMIN_NAV = [
     ],
   },
 ]
+
+/**
+ * The sections the owner can switch, in sidebar order.
+ *
+ * Derived from the navigation rather than listed again, so the switch board and
+ * the sidebar cannot drift apart — a section added to one appears in the other.
+ */
+export const CONFIGURABLE_NAV = ADMIN_NAV.filter((item) => !item.alwaysVisible)
+
+/** Whether one entry belongs in this sidebar. */
+export function isNavVisible(item, { role, sidebar }) {
+  if (item.ownerOnly && role !== ADMIN_ROLE.owner) return false
+  if (item.alwaysVisible) return true
+  return sidebar[item.id] !== false
+}
 
 const BASE =
   'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
@@ -112,10 +144,15 @@ function NavGroup({ item, onNavigate }) {
 
 /** The admin navigation. Shared by the fixed column and the mobile drawer. */
 export function AdminNavList({ onNavigate }) {
-  const { t } = useAdmin()
+  const { t, role, sidebar } = useAdmin()
+  // Filtered in one place, from one configuration. A group and its children go
+  // together: hiding a section that still listed its own pages underneath would
+  // hide nothing at all.
+  const visible = ADMIN_NAV.filter((item) => isNavVisible(item, { role, sidebar }))
+
   return (
     <nav aria-label={t('nav.label')} className="flex flex-col gap-1 p-3">
-      {ADMIN_NAV.map((item) =>
+      {visible.map((item) =>
         item.children ? (
           <NavGroup key={item.key} item={item} onNavigate={onNavigate} />
         ) : (

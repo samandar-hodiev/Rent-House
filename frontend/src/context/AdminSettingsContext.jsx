@@ -7,6 +7,35 @@ import { ADMIN_DEFAULT_LOCALE, ADMIN_TRANSLATIONS } from '../locales/admin'
 // dashboard to Russian also switched the shop window.
 const THEME_KEY = 'renthouse_admin_theme'
 const LOCALE_KEY = 'renthouse_admin_locale'
+const ROLE_KEY = 'renthouse_admin_role'
+const SIDEBAR_KEY = 'renthouse_admin_sidebar'
+
+export const ADMIN_ROLE = { owner: 'owner', superAdmin: 'superAdmin' }
+
+/**
+ * Which sections the sidebar offers.
+ *
+ * One object, read by the sidebar and written by the owner's Sidebar control
+ * page. The keys are the `id` of the matching entry in `ADMIN_NAV`, so adding a
+ * section to the navigation is the only place a new section has to be named.
+ *
+ * Not every entry appears here. "Sidebar boshqaruvi" is the switch board itself
+ * and would let its owner hide the way back to it; "Panel sozlamalari" and
+ * "Chiqish" are how the dashboard is configured and left. Those three are
+ * marked `alwaysVisible` in the navigation and never reach this object.
+ */
+export const DEFAULT_SIDEBAR = {
+  dashboard: true,
+  users: true,
+  listings: true,
+  chats: false,
+  reports: true,
+  analytics: true,
+  notifications: true,
+  adminManagement: false,
+  auditLogs: false,
+  settings: false,
+}
 
 const AdminSettingsContext = createContext(null)
 
@@ -17,6 +46,24 @@ function read(key, allowed, fallback) {
     return allowed.includes(stored) ? stored : fallback
   } catch {
     return fallback
+  }
+}
+
+// Stored as JSON, and merged over the defaults rather than trusted whole: a
+// section added to the dashboard after somebody saved their configuration must
+// arrive with its default rather than as `undefined`.
+function readSidebar() {
+  if (typeof window === 'undefined') return DEFAULT_SIDEBAR
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(SIDEBAR_KEY) ?? 'null')
+    if (!stored || typeof stored !== 'object') return DEFAULT_SIDEBAR
+    const merged = { ...DEFAULT_SIDEBAR }
+    for (const key of Object.keys(DEFAULT_SIDEBAR)) {
+      if (typeof stored[key] === 'boolean') merged[key] = stored[key]
+    }
+    return merged
+  } catch {
+    return DEFAULT_SIDEBAR
   }
 }
 
@@ -39,6 +86,14 @@ export function AdminSettingsProvider({ children }) {
   const [locale, setLocaleState] = useState(() =>
     read(LOCALE_KEY, Object.keys(ADMIN_TRANSLATIONS), ADMIN_DEFAULT_LOCALE),
   )
+  // Who is looking. There is no admin sign-in yet, so this is a preview of the
+  // two roles rather than an identity — the header lets you switch between
+  // them. When authentication arrives, this is the one line that changes: the
+  // role comes from the session instead, and everything reading it stays put.
+  const [role, setRoleState] = useState(() =>
+    read(ROLE_KEY, Object.values(ADMIN_ROLE), ADMIN_ROLE.owner),
+  )
+  const [sidebar, setSidebarState] = useState(readSidebar)
 
   const persist = (key, value) => {
     try {
@@ -56,6 +111,20 @@ export function AdminSettingsProvider({ children }) {
   const setLocale = useCallback((next) => {
     setLocaleState(next)
     persist(LOCALE_KEY, next)
+  }, [])
+
+  const setRole = useCallback((next) => {
+    setRoleState(next)
+    persist(ROLE_KEY, next)
+  }, [])
+
+  /** Show or hide one section. The owner's switch board is the only caller. */
+  const setSidebarItem = useCallback((id, enabled) => {
+    setSidebarState((current) => {
+      const next = { ...current, [id]: enabled }
+      persist(SIDEBAR_KEY, JSON.stringify(next))
+      return next
+    })
   }, [])
 
   // The admin area is a document of its own as far as language is concerned, so
@@ -79,8 +148,8 @@ export function AdminSettingsProvider({ children }) {
   )
 
   const value = useMemo(
-    () => ({ theme, setTheme, locale, setLocale, t }),
-    [theme, setTheme, locale, setLocale, t],
+    () => ({ theme, setTheme, locale, setLocale, t, role, setRole, sidebar, setSidebarItem }),
+    [theme, setTheme, locale, setLocale, t, role, setRole, sidebar, setSidebarItem],
   )
 
   return <AdminSettingsContext.Provider value={value}>{children}</AdminSettingsContext.Provider>
