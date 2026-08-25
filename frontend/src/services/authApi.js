@@ -47,6 +47,33 @@ export function login({ identifier, password }) {
   return request('/auth/login', { method: 'POST', body: { identifier, password } })
 }
 
+/**
+ * Asks for a password-reset link.
+ *
+ * Always resolves. The server answers the same way whether or not the address
+ * belongs to an account — telling them apart would make this endpoint a way to
+ * ask which addresses are registered — so there is nothing here to branch on.
+ */
+export function requestPasswordReset(email) {
+  return request('/auth/password/forgot', { method: 'POST', body: { email } })
+}
+
+/**
+ * Checks a reset link before the form is shown.
+ *
+ * Rejects with an ApiError for an unknown, expired or already-used token, which
+ * is what lets the page offer "get a new link" instead of a form that would
+ * fail on submit.
+ */
+export function validateResetToken(token, { signal } = {}) {
+  return request(`/auth/password/reset?token=${encodeURIComponent(token)}`, { signal })
+}
+
+/** Sets a new password and spends the link. */
+export function resetPassword({ token, password }) {
+  return request('/auth/password/reset', { method: 'POST', body: { token, password } })
+}
+
 /** Loads the account behind a token; used to restore a session after reload. */
 export function fetchCurrentUser(token) {
   return request('/auth/me', { token })

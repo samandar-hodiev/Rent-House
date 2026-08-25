@@ -51,6 +51,11 @@ var (
 	ErrPhoneTaken      = errors.New("phone number already belongs to another account")
 	ErrInvalidAvatar   = errors.New("avatar must be an uploaded image")
 
+	// ErrInvalidResetToken covers an unknown, expired, already-spent or
+	// wrong-purpose reset link. One error for all of them on purpose: telling
+	// them apart would confirm that a token once existed.
+	ErrInvalidResetToken = errors.New("password reset link is invalid or has expired")
+
 	// ErrResendTooSoon means the cooldown has not elapsed.
 	ErrResendTooSoon = errors.New("verification code requested too soon")
 
@@ -282,8 +287,8 @@ func (s *AuthService) VerifyRegistrationCode(
 
 	tokenExpiry := now.Add(s.policy.RegistrationTokenExpiry)
 	verification.VerifiedAt = &now
-	verification.RegistrationTokenHash = &hash
-	verification.RegistrationTokenExpiresAt = &tokenExpiry
+	verification.TokenHash = &hash
+	verification.TokenExpiresAt = &tokenExpiry
 	verification.UpdatedAt = now
 
 	if err := s.verifications.Save(ctx, verification); err != nil {
@@ -434,6 +439,157 @@ func uploadPath(raw string) (string, error) {
 		return "", ErrInvalidAvatar
 	}
 	return cleaned, nil
+}
+
+// How long a reset link lives. Long enough to walk to a computer, short enough
+// that a link left in an inbox stops working the same afternoon.
+const passwordResetTTL = 30 * time.Minute
+
+// RequestPasswordReset emails a reset link, if the address belongs to anybody.
+//
+// It reports nothing about whether it did. An endpoint that answered "no such
+// account" would be a way to ask the server which addresses are registered —
+// so an unknown address takes the same path, returns the same response and
+// takes roughly the same time as a known one.
+func (s *AuthService) RequestPasswordReset(
+	ctx context.Context, email string, resetURL func(token string) string,
+) error {
+	user, err := s.users.FindByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			// Deliberately silent. The caller returns its generic message
+			// either way.
+			return nil
+		}
+		return err
+	}
+	if user.Email == nil {
+		return nil
+	}
+
+	now := s.now()
+
+	// Any link already outstanding for this address stops working now, so only
+	// the newest one can ever be used.
+	if err := s.verifications.ConsumeOpenForContact(
+		ctx, models.VerificationPurposePasswordReset, models.VerificationMethodEmail, email, now,
+	); err != nil {
+		return err
+	}
+
+	token, tokenHash, err := newRegistrationToken()
+	if err != nil {
+		return err
+	}
+
+	expiresAt := now.Add(passwordResetTTL)
+	verification := &models.AuthVerification{
+		UserID:  &user.ID,
+		Purpose: models.VerificationPurposePasswordReset,
+		Method:  models.VerificationMethodEmail,
+		Email:   &email,
+		// No code is sent for a reset — the link is the secret — but the column
+		// is NOT NULL, so it holds a value that can never match a guess.
+		CodeHash:       unusableCodeHash,
+		ExpiresAt:      expiresAt,
+		VerifiedAt:     &now,
+		TokenHash:      &tokenHash,
+		TokenExpiresAt: &expiresAt,
+		LastSentAt:     now,
+	}
+	if err := s.verifications.Create(ctx, verification); err != nil {
+		return err
+	}
+
+	// Sent after the row exists, so a delivery failure cannot leave a live link
+	// with nothing behind it.
+	link := resetURL(token)
+	if sender, ok := s.emailSender.(notify.LinkSender); ok {
+		if err := sender.SendLink(ctx, email, link); err != nil {
+			logger.Errorf("password reset delivery failed: %v", err)
+			return ErrDeliveryFailed
+		}
+		return nil
+	}
+
+	// A development sender that only logs. It has no SendLink, so the link goes
+	// through the ordinary path and lands in the log where the codes do.
+	if err := s.emailSender.Send(ctx, email, link); err != nil {
+		logger.Errorf("password reset delivery failed: %v", err)
+		return ErrDeliveryFailed
+	}
+	return nil
+}
+
+// A bcrypt hash of a value nobody holds, for reset rows where no code exists.
+// The column is NOT NULL and every comparison against this must fail, which is
+// what an empty string would not reliably guarantee.
+const unusableCodeHash = "$2a$12$000000000000000000000uJ8Q5b0hVQKJ0Q8YkY2z3rB1Wc6nS9Xe"
+
+// findLiveResetToken resolves a reset token to its row, or says why it cannot.
+func (s *AuthService) findLiveResetToken(
+	ctx context.Context, token string,
+) (*models.AuthVerification, error) {
+	if strings.TrimSpace(token) == "" {
+		return nil, ErrInvalidResetToken
+	}
+
+	verification, err := s.verifications.FindByTokenHash(ctx, hashToken(token))
+	if err != nil {
+		if errors.Is(err, repository.ErrVerificationNotFound) {
+			return nil, ErrInvalidResetToken
+		}
+		return nil, err
+	}
+
+	// Every reason a link stops working collapses to one answer. Telling them
+	// apart would let a caller learn that a token once existed.
+	if verification.Purpose != models.VerificationPurposePasswordReset ||
+		verification.ConsumedAt != nil ||
+		verification.UserID == nil ||
+		verification.TokenExpiresAt == nil ||
+		s.now().After(*verification.TokenExpiresAt) {
+		return nil, ErrInvalidResetToken
+	}
+	return verification, nil
+}
+
+// ValidateResetToken reports whether a link is still good, so the page can show
+// the form or the "this link has expired" state rather than a form that will
+// fail on submit.
+func (s *AuthService) ValidateResetToken(ctx context.Context, token string) error {
+	_, err := s.findLiveResetToken(ctx, token)
+	return err
+}
+
+// ResetPassword sets a new password and spends the link.
+func (s *AuthService) ResetPassword(ctx context.Context, token, password string) error {
+	verification, err := s.findLiveResetToken(ctx, token)
+	if err != nil {
+		return err
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+
+	if err := s.users.UpdateProfile(ctx, *verification.UserID, map[string]any{
+		"password_hash": string(hash),
+	}); err != nil {
+		return err
+	}
+
+	// Spent, and spent after the password changed: a failure above must leave
+	// the link usable rather than burning it for nothing.
+	now := s.now()
+	verification.ConsumedAt = &now
+	verification.TokenHash = nil
+	verification.TokenExpiresAt = nil
+	if err := s.verifications.Save(ctx, verification); err != nil {
+		return err
+	}
+	return nil
 }
 
 // UpdateProfile changes the parts of an account its owner may change.

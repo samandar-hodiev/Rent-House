@@ -83,6 +83,25 @@ func (c *codeCatcher) Send(_ context.Context, destination, code string) error {
 	return nil
 }
 
+// last returns whatever was sent to an address — a code, or a reset link.
+func (c *codeCatcher) lastSent(t *testing.T, destination string) string {
+	t.Helper()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	sent, ok := c.last[destination]
+	if !ok {
+		t.Fatalf("nothing was sent to %s", destination)
+	}
+	return sent
+}
+
+// lastOrEmpty is the same without failing, for asserting that nothing was sent.
+func (c *codeCatcher) lastOrEmpty(destination string) string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.last[destination]
+}
+
 func (c *codeCatcher) codeFor(t *testing.T, destination string) string {
 	t.Helper()
 	c.mu.Lock()
@@ -134,7 +153,7 @@ func newHarness(t *testing.T) *harness {
 		repository.NewVerificationRepository(db),
 		tokens, codes, codes, policy,
 	)
-	h := NewAuthHandler(authService)
+	h := NewAuthHandler(authService, "http://localhost:5173")
 
 	router := gin.New()
 	auth := router.Group("/api/v1/auth")
@@ -147,6 +166,11 @@ func newHarness(t *testing.T) *harness {
 	// Mirrors cmd/server, so a profile test cannot pass because the route was
 	// missing rather than because the rule held.
 	router.PATCH("/api/v1/me", middleware.Auth(tokens), h.UpdateProfile)
+
+	// Password reset, mirroring cmd/server.
+	auth.POST("/password/forgot", h.ForgotPassword)
+	auth.GET("/password/reset", h.ValidateResetToken)
+	auth.POST("/password/reset", h.ResetPassword)
 
 	t.Cleanup(func() {
 		if sqlDB, err := db.DB(); err == nil {
@@ -725,7 +749,7 @@ func TestCompleteRegistrationRejectsAnExpiredToken(t *testing.T) {
 	regToken := h.verifyCode(t, id, code)
 
 	if err := h.db.Model(&models.AuthVerification{}).Where("id = ?", id).
-		Update("registration_token_expires_at", time.Now().Add(-time.Minute)).Error; err != nil {
+		Update("token_expires_at", time.Now().Add(-time.Minute)).Error; err != nil {
 		t.Fatalf("expire token: %v", err)
 	}
 
@@ -1090,7 +1114,7 @@ func TestProviderRejectionIsReportedAsADeliveryFailure(t *testing.T) {
 	)
 
 	router := gin.New()
-	router.POST("/api/v1/auth/register/request", NewAuthHandler(failing).RequestRegistrationCode)
+	router.POST("/api/v1/auth/register/request", NewAuthHandler(failing, "http://localhost:5173").RequestRegistrationCode)
 
 	email := uniqueEmail()
 	body, _ := json.Marshal(map[string]string{"method": "email", "email": email})

@@ -48,8 +48,11 @@ type AuthVerification struct {
 	VerifiedAt *time.Time `gorm:"column:verified_at" json:"verified_at,omitempty"`
 	ConsumedAt *time.Time `gorm:"column:consumed_at" json:"consumed_at,omitempty"`
 
-	RegistrationTokenHash      *string    `gorm:"column:registration_token_hash;type:varchar(64)" json:"-"`
-	RegistrationTokenExpiresAt *time.Time `gorm:"column:registration_token_expires_at" json:"-"`
+	// A hashed, single-use, short-lived secret issued once a contact has been
+	// proved. Registration hands it back to the client to finish signing up;
+	// password reset puts it in a link. `Purpose` says which.
+	TokenHash      *string    `gorm:"column:token_hash;type:varchar(64)" json:"-"`
+	TokenExpiresAt *time.Time `gorm:"column:token_expires_at" json:"-"`
 
 	LastSentAt time.Time `gorm:"column:last_sent_at;not null;default:now()" json:"last_sent_at"`
 
@@ -81,5 +84,5 @@ func (v *AuthVerification) IsVerified() bool { return v.VerifiedAt != nil }
 
 // IsTokenExpired reports whether the registration token's window has closed.
 func (v *AuthVerification) IsTokenExpired(now time.Time) bool {
-	return v.RegistrationTokenExpiresAt == nil || now.After(*v.RegistrationTokenExpiresAt)
+	return v.TokenExpiresAt == nil || now.After(*v.TokenExpiresAt)
 }

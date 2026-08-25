@@ -56,7 +56,7 @@ func (r *VerificationRepository) FindByID(ctx context.Context, id uuid.UUID) (*m
 func (r *VerificationRepository) FindByTokenHash(ctx context.Context, hash string) (*models.AuthVerification, error) {
 	var v models.AuthVerification
 	if err := r.db.WithContext(ctx).
-		Where("registration_token_hash = ?", hash).First(&v).Error; err != nil {
+		Where("token_hash = ?", hash).First(&v).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrVerificationNotFound
 		}

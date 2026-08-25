@@ -17,6 +17,8 @@ import WishlistPage from './pages/WishlistPage'
 import MessageNotifications from './components/chat/MessageNotifications'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import ProfilePage from './pages/ProfilePage'
 import OwnerDashboardPage from './pages/OwnerDashboardPage'
 import DashboardPage from './pages/DashboardPage'
@@ -156,6 +158,11 @@ function App() {
                           routes therefore sit outside RootLayout entirely. */}
                       <Route path={ROUTES.login} element={<LoginPage />} />
                       <Route path={ROUTES.register} element={<RegisterPage />} />
+                      {/* Password reset, by email. Public for the same reason
+                          sign-in is: somebody who has forgotten their password
+                          has nothing to authenticate with. */}
+                      <Route path={ROUTES.forgotPassword} element={<ForgotPasswordPage />} />
+                      <Route path={ROUTES.resetPassword} element={<ResetPasswordPage />} />
 
                       {/* Account area: its own shell (no public search bar, no
                           login/register buttons) instead of RootLayout, and

@@ -4,7 +4,10 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -18,10 +21,15 @@ import (
 // AuthHandler serves the authentication endpoints.
 type AuthHandler struct {
 	auth *service.AuthService
+	// Where the frontend lives, for the link in a password-reset email. Taken
+	// from configuration rather than from the request: a `Host` header is the
+	// caller's to set, and building a reset link from it would let somebody
+	// send a real token to a domain of their choosing.
+	appOrigin string
 }
 
-func NewAuthHandler(auth *service.AuthService) *AuthHandler {
-	return &AuthHandler{auth: auth}
+func NewAuthHandler(auth *service.AuthService, appOrigin string) *AuthHandler {
+	return &AuthHandler{auth: auth, appOrigin: strings.TrimRight(appOrigin, "/")}
 }
 
 // RequestRegistrationCode handles POST /api/v1/auth/register/request.
@@ -157,7 +165,75 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	response.OK(c, "Login successful", result)
 }
 
-// Me handles GET /api/v1/auth/me and runs behind the auth middleware.
+// ForgotPassword handles POST /api/v1/auth/password/forgot.
+//
+// Always answers the same way. Whether the address belongs to an account is
+// exactly what an attacker would use this endpoint to find out, so the response
+// says only that a link will be sent if it does.
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req dto.ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+	req.Normalize()
+
+	// The link points at the frontend, whose address the API knows from the
+	// origins it is configured to accept — the same list CORS uses, so there is
+	// one answer to "where does the app live" rather than two.
+	err := h.auth.RequestPasswordReset(c.Request.Context(), req.Email, func(token string) string {
+		return fmt.Sprintf("%s/reset-password?token=%s", h.appOrigin, url.QueryEscape(token))
+	})
+	if err != nil && !errors.Is(err, service.ErrDeliveryFailed) {
+		logger.Errorf("password reset request: %v", err)
+	}
+
+	// Even a delivery failure answers the same way: reporting it would say the
+	// address exists.
+	response.OK(c, "If that email belongs to a RentHouse account, a reset link has been sent", nil)
+}
+
+// ValidateResetToken handles GET /api/v1/auth/password/reset?token=…
+//
+// So the page can show the form or the "this link has expired" state, rather
+// than a form that fails the moment it is submitted.
+func (h *AuthHandler) ValidateResetToken(c *gin.Context) {
+	if err := h.auth.ValidateResetToken(c.Request.Context(), c.Query("token")); err != nil {
+		if errors.Is(err, service.ErrInvalidResetToken) {
+			response.Error(c, http.StatusBadRequest, "invalid_token",
+				"This password reset link is invalid or has expired")
+			return
+		}
+		logger.Errorf("validate reset token: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error", "Something went wrong")
+		return
+	}
+	response.OK(c, "Token is valid", nil)
+}
+
+// ResetPassword handles POST /api/v1/auth/password/reset.
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req dto.ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+
+	if err := h.auth.ResetPassword(c.Request.Context(), req.Token, req.Password); err != nil {
+		if errors.Is(err, service.ErrInvalidResetToken) {
+			response.Error(c, http.StatusBadRequest, "invalid_token",
+				"This password reset link is invalid or has expired")
+			return
+		}
+		logger.Errorf("reset password: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not update the password")
+		return
+	}
+
+	response.OK(c, "Password updated", nil)
+}
+
 // UpdateProfile handles PATCH /api/v1/me.
 //
 // The account edited is the one the token names. There is no id in the path or
@@ -210,6 +286,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	response.OK(c, "Profile updated", user)
 }
 
+// Me handles GET /api/v1/auth/me and runs behind the auth middleware.
 func (h *AuthHandler) Me(c *gin.Context) {
 	// The identity comes from the verified token, never from the request body
 	// or a query parameter.

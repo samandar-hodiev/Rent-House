@@ -130,8 +130,6 @@ func (r *LoginRequest) Normalize() {
 	}
 }
 
-// UserResponse is the public view of a user. It has no password field of any
-// kind, which is what makes it safe to return.
 // UpdateProfileRequest is the body of PATCH /api/v1/me.
 //
 // Every field is a pointer so "not sent" and "sent empty" are different things:
@@ -180,6 +178,26 @@ func (r *UpdateProfileRequest) Normalize() {
 	}
 }
 
+// ForgotPasswordRequest is the body of POST /api/v1/auth/password/forgot.
+type ForgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email,max=255"`
+}
+
+func (r *ForgotPasswordRequest) Normalize() {
+	r.Email = strings.ToLower(strings.TrimSpace(r.Email))
+}
+
+// ResetPasswordRequest is the body of POST /api/v1/auth/password/reset.
+//
+// The same minimum the registration form enforces, so an account cannot end up
+// with a password weaker than one it could have been created with.
+type ResetPasswordRequest struct {
+	Token    string `json:"token"    binding:"required"`
+	Password string `json:"password" binding:"required,min=8,max=72"`
+}
+
+// UserResponse is the public view of a user. It has no password field of any
+// kind, which is what makes it safe to return.
 type UserResponse struct {
 	ID        string  `json:"id"`
 	FirstName string  `json:"first_name"`

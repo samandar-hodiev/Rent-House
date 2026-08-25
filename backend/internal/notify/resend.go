@@ -85,7 +85,20 @@ func (s *ResendSender) Send(ctx context.Context, destination, code string) error
 	if strings.TrimSpace(subject) == "" {
 		subject = defaultEmailSubject
 	}
+	return s.post(ctx, destination, subject, text, htmlBody, "OTP")
+}
 
+// SendLink delivers a password-reset link through the same provider.
+func (s *ResendSender) SendLink(ctx context.Context, destination, link string) error {
+	text, htmlBody := renderResetEmail(link)
+	return s.post(ctx, destination, resetEmailSubject, text, htmlBody, "reset")
+}
+
+// post is the request both messages make. `kind` appears only in the log line,
+// so an operator can tell a code from a link without either being written down.
+func (s *ResendSender) post(
+	ctx context.Context, destination, subject, text, htmlBody, kind string,
+) error {
 	payload := resendRequest{
 		From:    s.cfg.From,
 		To:      []string{destination},
@@ -118,7 +131,8 @@ func (s *ResendSender) Send(ctx context.Context, destination, code string) error
 		// logs and then replaces with a generic message — it never reaches the
 		// browser, and it never contains the code.
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		logger.Errorf("email OTP request: recipient=%s provider=resend status=rejected http=%d",
+		logger.Errorf("email %s request: recipient=%s provider=resend status=rejected http=%d",
+			kind,
 			maskEmail(destination), resp.StatusCode)
 		return fmt.Errorf("resend: %s", describeStatus(resp.StatusCode, strings.TrimSpace(string(detail))))
 	}
@@ -138,7 +152,8 @@ func (s *ResendSender) Send(ctx context.Context, destination, code string) error
 	payloadBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 	_ = json.Unmarshal(payloadBody, &accepted)
 
-	logger.Infof("email OTP request: recipient=%s provider=resend status=accepted message_id=%s",
+	logger.Infof("email %s request: recipient=%s provider=resend status=accepted message_id=%s",
+		kind,
 		maskEmail(destination), accepted.ID)
 	return nil
 }

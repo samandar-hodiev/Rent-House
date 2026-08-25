@@ -18,6 +18,17 @@ type Sender interface {
 	Send(ctx context.Context, destination, code string) error
 }
 
+// LinkSender is implemented by senders that can deliver a link rather than a
+// verification code — today, the two email providers.
+//
+// An optional interface rather than a second method on Sender, in the same
+// shape as Simulated below: the SMS senders have nothing to do with password
+// reset, and widening the interface they all implement would oblige them to
+// grow a method that could only ever return an error.
+type LinkSender interface {
+	SendLink(ctx context.Context, destination, link string) error
+}
+
 // Simulated is implemented by senders that do not actually deliver anything.
 // The API reports this to the client so no screen can claim "code sent" when
 // the code only went to a log file.

@@ -97,6 +97,26 @@ func (s *SMTPSender) Send(ctx context.Context, destination, code string) error {
 	return nil
 }
 
+// SendLink delivers a password-reset link.
+//
+// The same transport and the same logging as Send — only the message differs,
+// so a change to how mail is delivered cannot apply to one and miss the other.
+func (s *SMTPSender) SendLink(ctx context.Context, destination, link string) error {
+	text, htmlBody := renderResetEmail(link)
+	message := s.compose(destination, resetEmailSubject, text, htmlBody)
+
+	if err := s.deliver(ctx, destination, message); err != nil {
+		logger.Errorf("email reset request: recipient=%s provider=smtp status=rejected error=%v",
+			maskEmail(destination), err)
+		return fmt.Errorf("smtp: %w", err)
+	}
+	// The address is masked and the link never appears: a reset link in a log
+	// is a password in a log.
+	logger.Infof("email reset request: recipient=%s provider=smtp status=accepted host=%s",
+		maskEmail(destination), s.cfg.Host)
+	return nil
+}
+
 // buildMessage assembles a multipart/alternative message: the HTML for clients
 // that render it, the plain text for those that do not and for spam filters
 // that prefer a message to carry both.
@@ -107,7 +127,13 @@ func (s *SMTPSender) buildMessage(destination, code string) []byte {
 	if strings.TrimSpace(subject) == "" {
 		subject = defaultEmailSubject
 	}
+	return s.compose(destination, subject, text, htmlBody)
+}
 
+// compose builds the envelope both messages share. Only subject and content
+// differ between a verification code and a reset link, so only those are
+// parameters.
+func (s *SMTPSender) compose(destination, subject, text, htmlBody string) []byte {
 	// The subject is Uzbek and carries non-ASCII, so it is encoded rather than
 	// sent raw — an unencoded header is what turns "tasdiqlash" into mojibake.
 	boundary := fmt.Sprintf("renthouse-%d", time.Now().UnixNano())

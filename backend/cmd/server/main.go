@@ -207,7 +207,13 @@ func newRouter(
 		delivery.sms, delivery.email,
 		cfg.OTP,
 	)
-	authHandler := handler.NewAuthHandler(authService)
+	// The first allowed origin is where the app is served from, and so where a
+	// password-reset link must point.
+	appOrigin := ""
+	if len(cfg.AllowedOrigins) > 0 {
+		appOrigin = cfg.AllowedOrigins[0]
+	}
+	authHandler := handler.NewAuthHandler(authService, appOrigin)
 
 	auth := v1.Group("/auth")
 	{
@@ -221,6 +227,12 @@ func newRouter(
 
 		// Protected.
 		auth.GET("/me", middleware.Auth(tokens), authHandler.Me)
+
+		// Password reset, by email. Public: somebody who has forgotten their
+		// password has no token to present.
+		auth.POST("/password/forgot", authHandler.ForgotPassword)
+		auth.GET("/password/reset", authHandler.ValidateResetToken)
+		auth.POST("/password/reset", authHandler.ResetPassword)
 	}
 
 	// Listings. Same layering as auth: handler -> service -> repository -> db.

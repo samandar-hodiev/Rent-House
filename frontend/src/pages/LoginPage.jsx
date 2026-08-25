@@ -101,7 +101,7 @@ function LoginPage() {
 
         <div className="-mt-1 flex justify-end">
           <Link
-            to={ROUTES.login}
+            to={ROUTES.forgotPassword}
             className="text-[0.8125rem] font-medium text-text-muted transition-colors hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             {t('auth.forgotPassword')}

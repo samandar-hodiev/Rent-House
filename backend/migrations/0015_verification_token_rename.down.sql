@@ -1,0 +1,2 @@
+ALTER TABLE auth_verifications RENAME COLUMN token_hash TO registration_token_hash;
+ALTER TABLE auth_verifications RENAME COLUMN token_expires_at TO registration_token_expires_at;

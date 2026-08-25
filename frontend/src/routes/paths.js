@@ -6,6 +6,8 @@ export const ROUTES = {
   wishlist: '/wishlist',
   login: '/login',
   register: '/register',
+  forgotPassword: '/forgot-password',
+  resetPassword: '/reset-password',
   profile: '/profile',
   dashboard: '/dashboard',
   dashboardProfile: '/dashboard/profile',
