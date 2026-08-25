@@ -19,7 +19,9 @@ export function AdminCard({ title, action, children, className = '' }) {
     // `min-w-0` because these sit in grids and a grid item's default minimum is
     // its content: a table wider than its column would otherwise push the whole
     // row past the page instead of scrolling inside itself.
-    <section className={`min-w-0 rounded-xl border border-border bg-surface ${className}`}>
+    <section
+      className={`flex min-w-0 flex-col rounded-xl border border-border bg-surface ${className}`}
+    >
       {title ? (
         <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold text-text-primary">{title}</h2>

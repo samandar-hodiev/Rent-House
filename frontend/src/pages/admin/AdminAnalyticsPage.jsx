@@ -18,7 +18,6 @@ function Group({ title, items }) {
 
 function AdminAnalyticsPage() {
   const { t } = useAdmin()
-  const trendLabel = (trend) => t(`chart.${trend}`)
 
   return (
     <div className="flex flex-col gap-6">
@@ -60,25 +59,27 @@ function AdminAnalyticsPage() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <AdminCard title={t('chart.usersGrowth')}>
-          <div className="p-4">
+          <div className="flex min-h-[20rem] flex-1 flex-col p-4">
             <LineChart
               {...GROWTH.users.monthly}
               ariaLabel={t('chart.usersGrowth')}
-              trendLabel={trendLabel}
+              tooltipKey="chart.newUsers"
+              t={t}
             />
           </div>
         </AdminCard>
         <AdminCard title={t('chart.listingsGrowth')}>
-          <div className="p-4">
+          <div className="flex min-h-[20rem] flex-1 flex-col p-4">
             <LineChart
               {...GROWTH.listings.monthly}
               ariaLabel={t('chart.listingsGrowth')}
-              trendLabel={trendLabel}
+              tooltipKey="chart.newListings"
+              t={t}
             />
           </div>
         </AdminCard>
         <AdminCard title={t('chart.districtStats')}>
-          <div className="p-4">
+          <div className="flex min-h-0 flex-1 flex-col p-4">
             <BarList items={DISTRICT_STATS} scroll />
           </div>
         </AdminCard>

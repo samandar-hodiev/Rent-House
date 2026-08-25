@@ -88,7 +88,7 @@ export default {
   'dashboard.settingsMenu': 'Sozlamalar menyusi',
   'dashboard.language': 'Til',
   'dashboard.theme': "Ko'rinish",
-  'theme.toggleToDark': "Tund rejimga o'tish",
+  'theme.toggleToDark': "Tun rejimiga o'tish",
   'theme.toggleToLight': "Yorug' rejimga o'tish",
   'dashboard.settingsProfile': 'Profilni tahrirlash',
   'dashboard.settingsLanguage': 'Til',
@@ -110,7 +110,7 @@ export default {
   'dashboard.phoneInvalid': "To'g'ri telefon raqam kiriting, masalan +998 90 123 45 67.",
   'dashboard.contactRequired': "Hisobda kamida bitta bog'lanish usuli qolishi kerak.",
   'dashboard.themeLight': "Yorug'",
-  'dashboard.themeDark': 'Tund',
+  'dashboard.themeDark': 'Tun',
   'dashboard.themeSystem': "Tizim bo'yicha",
 
   // User account dashboard (UI only — no auth/backend yet).

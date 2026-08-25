@@ -242,43 +242,82 @@ export const OVERVIEW = {
   contacts: 4120,
 }
 
+// The axis labels each range uses. Keys rather than words, so the chart reads
+// in whichever language the admin picked; the chart resolves them.
+const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => `chart.day.${d}`)
+const MONTH_ORDER = [
+  'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug',
+]
+const MONTH_KEYS = MONTH_ORDER.map((m) => `chart.month.${m}`)
+
 /**
- * A series for the growth charts.
+ * A series that climbs, levels off, then falls away.
  *
- * Generated from a seed rather than random, so the line is the same on every
- * render — a chart that reshuffles itself each time it is looked at reads as a
- * bug even when the numbers are admittedly fake.
+ * The chart colours each step by its direction, so a series that only ever
+ * climbed would leave two of the three colours as code nobody sees. Every
+ * range carries all three phases instead: roughly the first 40% rising, the
+ * next quarter flat, the rest declining.
  *
- * `step` may be negative or zero. The chart colours itself by which way the
- * line went, and a generator that could only climb would leave two of those
- * three colours as code nobody ever sees.
+ * Deterministic, not random — a chart that reshuffles itself every render
+ * reads as a bug even when the numbers are admittedly fake.
  */
-function series(points, base, step, seed) {
-  // The wobble stays visible on a flat line, where the step alone would be 0.
-  const amplitude = (Math.abs(step) || base * 0.03) * 0.35
+function shaped(points, { start, peak, end, seed }) {
+  const last = points - 1
+  const riseEnd = Math.round(last * 0.4)
+  const flatEnd = Math.round(last * 0.65)
+
   return Array.from({ length: points }, (_, index) => {
-    const wobble = Math.sin((index + seed) * 1.7) * amplitude
-    return Math.max(0, Math.round(base + index * step + wobble))
+    let value
+    if (index <= riseEnd) {
+      value = start + ((peak - start) * index) / riseEnd
+    } else if (index <= flatEnd) {
+      value = peak
+    } else {
+      value = peak + ((end - peak) * (index - flatEnd)) / (last - flatEnd)
+    }
+    // The wobble stays small enough on the plateau that a step never crosses
+    // the band the chart uses to call a stretch flat — otherwise the middle of
+    // the line would flicker green and red instead of reading as steady.
+    const amplitude = index > riseEnd && index <= flatEnd ? peak * 0.006 : peak * 0.02
+    return Math.max(0, Math.round(value + Math.sin((index + seed) * 1.7) * amplitude))
   })
 }
 
+/**
+ * The growth charts, one series per range.
+ *
+ * Shaped here rather than in the component: this is the part a real endpoint
+ * replaces, and everything downstream reads `{ labels, values }` either way.
+ */
 export const GROWTH = {
   users: {
-    daily: { labels: ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'], values: series(7, 90, 12, 1) },
-    // Flat: registrations held steady week to week.
-    weekly: { labels: ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'], values: series(6, 520, 0, 2) },
+    daily: {
+      labels: DAY_KEYS,
+      values: shaped(7, { start: 90, peak: 168, end: 112, seed: 1 }),
+    },
+    weekly: {
+      // Four weeks of the past month. `'weeks'` rather than a list, because
+      // "1-hafta" is built from the index and the word, not looked up.
+      labels: 'weeks',
+      values: shaped(4, { start: 520, peak: 940, end: 660, seed: 2 }),
+    },
     monthly: {
-      labels: ['Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg'],
-      values: series(6, 1800, 320, 3),
+      labels: MONTH_KEYS,
+      values: shaped(12, { start: 1240, peak: 3480, end: 2260, seed: 3 }),
     },
   },
   listings: {
-    // Falling: fewer listings posted each day this week.
-    daily: { labels: ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'], values: series(7, 76, -9, 4) },
-    weekly: { labels: ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'], values: series(6, 260, 44, 5) },
+    daily: {
+      labels: DAY_KEYS,
+      values: shaped(7, { start: 46, peak: 92, end: 58, seed: 4 }),
+    },
+    weekly: {
+      labels: 'weeks',
+      values: shaped(4, { start: 260, peak: 470, end: 315, seed: 5 }),
+    },
     monthly: {
-      labels: ['Mar', 'Apr', 'May', 'Iyn', 'Iyl', 'Avg'],
-      values: series(6, 900, 180, 6),
+      labels: MONTH_KEYS,
+      values: shaped(12, { start: 720, peak: 1860, end: 1180, seed: 6 }),
     },
   },
 }

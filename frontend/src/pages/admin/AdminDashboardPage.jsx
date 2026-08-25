@@ -47,10 +47,6 @@ function AdminDashboardPage() {
     { icon: <UserPlus size={17} />, key: 'newUsersToday', value: OVERVIEW.newUsersToday },
   ]
 
-  // The chart names its own direction, so the colour is never the only thing
-  // carrying the meaning.
-  const trendLabel = (trend) => t(`chart.${trend}`)
-
   return (
     <div className="flex flex-col gap-5">
       <PageHeading
@@ -64,19 +60,20 @@ function AdminDashboardPage() {
         ))}
       </div>
 
-      {/* `items-start`: a chart card is shorter than the district list, and
-          letting it stretch to match left a band of empty card under the
-          line. */}
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
+      {/* The row stretches, which is the grid default: all three cards end at
+          the same line. The district list is the tallest of them, and the two
+          charts grow into that height rather than leaving it empty. */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <AdminCard
           title={t('chart.usersGrowth')}
           action={<RangeTabs value={userRange} onChange={setUserRange} t={t} />}
         >
-          <div className="p-4">
+          <div className="flex min-h-[20rem] flex-1 flex-col p-4">
             <LineChart
               {...GROWTH.users[userRange]}
               ariaLabel={t('chart.usersGrowth')}
-              trendLabel={trendLabel}
+              tooltipKey="chart.newUsers"
+              t={t}
             />
           </div>
         </AdminCard>
@@ -85,17 +82,18 @@ function AdminDashboardPage() {
           title={t('chart.listingsGrowth')}
           action={<RangeTabs value={listingRange} onChange={setListingRange} t={t} />}
         >
-          <div className="p-4">
+          <div className="flex min-h-[20rem] flex-1 flex-col p-4">
             <LineChart
               {...GROWTH.listings[listingRange]}
               ariaLabel={t('chart.listingsGrowth')}
-              trendLabel={trendLabel}
+              tooltipKey="chart.newListings"
+              t={t}
             />
           </div>
         </AdminCard>
 
         <AdminCard title={t('chart.topDistricts')}>
-          <div className="p-4">
+          <div className="flex min-h-0 flex-1 flex-col p-4">
             <BarList items={DISTRICT_STATS} scroll />
           </div>
         </AdminCard>
