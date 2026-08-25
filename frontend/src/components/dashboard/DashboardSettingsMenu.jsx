@@ -75,8 +75,19 @@ function DashboardSettingsMenu({ onNavigate }) {
                 onClick={() => setLocale(language.code)}
                 aria-pressed={locale === language.code}
                 className={optionClass(locale === language.code)}
+                // The full name is what the option means; the code is what it
+                // says. Announced in full for anyone who cannot see the flag.
+                title={language.label}
+                aria-label={language.label}
               >
-                {language.label}
+                {/* Flag and code rather than "O'zbekcha", "Русский",
+                    "English". This popover is exactly as wide as the sidebar
+                    it hangs off — 224px — and three full names in a row do not
+                    fit, so they pushed past its edge. The names are the longest
+                    thing in here and the only thing that had to give; the
+                    sidebar's width is not the problem and is left alone. */}
+                <span aria-hidden="true">{language.flag}</span>
+                <span aria-hidden="true">{language.code.toUpperCase()}</span>
               </button>
             ))}
           </div>
