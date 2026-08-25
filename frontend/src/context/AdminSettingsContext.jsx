@@ -19,16 +19,19 @@ export const ADMIN_ROLE = { owner: 'owner', superAdmin: 'superAdmin' }
  * page. The keys are the `id` of the matching entry in `ADMIN_NAV`, so adding a
  * section to the navigation is the only place a new section has to be named.
  *
+ * It describes the super admin's sidebar. The owner is offered every section
+ * regardless, so that configuring somebody else's dashboard can never remove a
+ * section from your own.
+ *
  * Not every entry appears here. "Sidebar boshqaruvi" is the switch board itself
- * and would let its owner hide the way back to it; "Panel sozlamalari" and
- * "Chiqish" are how the dashboard is configured and left. Those three are
- * marked `alwaysVisible` in the navigation and never reach this object.
+ * and is the owner's alone; "Panel sozlamalari" and "Chiqish" are how the
+ * dashboard is configured and left. Those three never reach this object.
  */
 export const DEFAULT_SIDEBAR = {
   dashboard: true,
   users: true,
   listings: true,
-  chats: false,
+  chats: true,
   reports: true,
   analytics: true,
   notifications: true,
@@ -118,6 +121,12 @@ export function AdminSettingsProvider({ children }) {
     persist(ROLE_KEY, next)
   }, [])
 
+  /** Back to the defaults above, in one step. */
+  const resetSidebar = useCallback(() => {
+    setSidebarState(DEFAULT_SIDEBAR)
+    persist(SIDEBAR_KEY, JSON.stringify(DEFAULT_SIDEBAR))
+  }, [])
+
   /** Show or hide one section. The owner's switch board is the only caller. */
   const setSidebarItem = useCallback((id, enabled) => {
     setSidebarState((current) => {
@@ -148,8 +157,10 @@ export function AdminSettingsProvider({ children }) {
   )
 
   const value = useMemo(
-    () => ({ theme, setTheme, locale, setLocale, t, role, setRole, sidebar, setSidebarItem }),
-    [theme, setTheme, locale, setLocale, t, role, setRole, sidebar, setSidebarItem],
+    () => ({
+      theme, setTheme, locale, setLocale, t, role, setRole, sidebar, setSidebarItem, resetSidebar,
+    }),
+    [theme, setTheme, locale, setLocale, t, role, setRole, sidebar, setSidebarItem, resetSidebar],
   )
 
   return <AdminSettingsContext.Provider value={value}>{children}</AdminSettingsContext.Provider>

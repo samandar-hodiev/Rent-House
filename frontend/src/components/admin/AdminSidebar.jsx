@@ -77,9 +77,17 @@ export const ADMIN_NAV = [
  */
 export const CONFIGURABLE_NAV = ADMIN_NAV.filter((item) => !item.alwaysVisible)
 
-/** Whether one entry belongs in this sidebar. */
+/**
+ * Whether one entry belongs in this sidebar.
+ *
+ * The switches describe the super admin's sidebar, not the owner's. An owner
+ * configuring what somebody else is offered must not lose the section they are
+ * configuring it from — hiding "Sozlamalar" for a super admin cannot be allowed
+ * to take Sozlamalar away from the person who decided it.
+ */
 export function isNavVisible(item, { role, sidebar }) {
-  if (item.ownerOnly && role !== ADMIN_ROLE.owner) return false
+  if (role === ADMIN_ROLE.owner) return true
+  if (item.ownerOnly) return false
   if (item.alwaysVisible) return true
   return sidebar[item.id] !== false
 }
