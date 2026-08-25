@@ -10,7 +10,24 @@ const LOCALE_KEY = 'renthouse_admin_locale'
 const ROLE_KEY = 'renthouse_admin_role'
 const SIDEBAR_KEY = 'renthouse_admin_sidebar'
 
-export const ADMIN_ROLE = { owner: 'owner', superAdmin: 'superAdmin' }
+/**
+ * Every role an admin can hold, in one place.
+ *
+ * The header shows whichever the current admin has — there is no role name
+ * written into the interface anywhere. Only the owner is treated differently by
+ * the sidebar; everyone else is offered whatever the owner configured, so a
+ * role added here needs no other change to behave correctly.
+ *
+ * When admin sign-in exists these become the ids the session reports, and the
+ * display names stay where they are now: in the dictionary, one entry each.
+ */
+export const ADMIN_ROLE = {
+  owner: 'owner',
+  superAdmin: 'superAdmin',
+  moderator: 'moderator',
+  support: 'support',
+  analyst: 'analyst',
+}
 
 /**
  * Which sections the sidebar offers.
@@ -156,11 +173,17 @@ export function AdminSettingsProvider({ children }) {
     [locale],
   )
 
+  // Resolved once, here, so every place that shows the role shows the same
+  // words. Nothing downstream decides what a role is called.
+  const roleLabel = t(`role.${role}`)
+
   const value = useMemo(
     () => ({
-      theme, setTheme, locale, setLocale, t, role, setRole, sidebar, setSidebarItem, resetSidebar,
+      theme, setTheme, locale, setLocale, t,
+      role, roleLabel, setRole, sidebar, setSidebarItem, resetSidebar,
     }),
-    [theme, setTheme, locale, setLocale, t, role, setRole, sidebar, setSidebarItem, resetSidebar],
+    [theme, setTheme, locale, setLocale, t,
+      role, roleLabel, setRole, sidebar, setSidebarItem, resetSidebar],
   )
 
   return <AdminSettingsContext.Provider value={value}>{children}</AdminSettingsContext.Provider>

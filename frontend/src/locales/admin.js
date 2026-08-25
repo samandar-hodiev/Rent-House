@@ -9,7 +9,6 @@
 // Only the interface is here. Names, listing titles and other data are data,
 // and are shown as stored.
 const en = {
-  'brand.admin': 'Admin',
 
   'nav.dashboard': 'Dashboard',
   'nav.users': 'Users',
@@ -53,6 +52,9 @@ const en = {
   'sidebarControl.hint.settings': 'Show settings and everything under it.',
   'role.owner': 'Owner',
   'role.superAdmin': 'Super Admin',
+  'role.moderator': 'Moderator',
+  'role.support': 'Support',
+  'role.analyst': 'Analyst',
   'role.preview': 'View as',
   'nav.logout': 'Log out',
   'nav.open': 'Open navigation',
@@ -299,7 +301,6 @@ const en = {
 }
 
 const uz = {
-  'brand.admin': 'Admin',
 
   'nav.dashboard': 'Boshqaruv paneli',
   'nav.users': 'Foydalanuvchilar',
@@ -343,6 +344,9 @@ const uz = {
   'sidebarControl.hint.settings': "Sozlamalarni va uning ichidagilarni ko'rsatish.",
   'role.owner': 'Owner',
   'role.superAdmin': 'Super Admin',
+  'role.moderator': 'Moderator',
+  'role.support': 'Qo‘llab-quvvatlash',
+  'role.analyst': 'Analitik',
   'role.preview': "Ko'rinish",
   'nav.logout': 'Chiqish',
   'nav.open': 'Menyuni ochish',
@@ -589,7 +593,6 @@ const uz = {
 }
 
 const ru = {
-  'brand.admin': 'Админ',
 
   'nav.dashboard': 'Панель',
   'nav.users': 'Пользователи',
@@ -633,6 +636,9 @@ const ru = {
   'sidebarControl.hint.settings': 'Показывать настройки и всё внутри них.',
   'role.owner': 'Owner',
   'role.superAdmin': 'Super Admin',
+  'role.moderator': 'Модератор',
+  'role.support': 'Поддержка',
+  'role.analyst': 'Аналитик',
   'role.preview': 'Смотреть как',
   'nav.logout': 'Выйти',
   'nav.open': 'Открыть меню',

@@ -14,7 +14,7 @@ import { ADMIN_ROUTES } from '../../routes/adminPaths'
 const CURRENT_ADMIN = { name: 'Samandar Hodiev' }
 
 function AdminProfileMenu() {
-  const { t, role, setRole } = useAdmin()
+  const { t, role, roleLabel, setRole } = useAdmin()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   useDismiss(ref, open, () => setOpen(false))
@@ -36,7 +36,7 @@ function AdminProfileMenu() {
           <span className="block truncate text-sm font-medium text-text-primary">
             {CURRENT_ADMIN.name}
           </span>
-          <span className="block truncate text-[11px] text-text-muted">{t(`role.${role}`)}</span>
+          <span className="block truncate text-[11px] text-text-muted">{roleLabel}</span>
         </span>
       </button>
 
@@ -109,7 +109,7 @@ function AdminProfileMenu() {
  * same product without being the same screen.
  */
 function AdminShell() {
-  const { t, theme } = useAdmin()
+  const { t, theme, roleLabel } = useAdmin()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const location = useLocation()
 
@@ -133,8 +133,12 @@ function AdminShell() {
         <div className="sticky top-0 flex h-screen flex-col">
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
             <span className="text-sm font-semibold text-text-primary">RentHouse</span>
-            <span className="rounded-full bg-primary-light px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-hover dark:text-primary">
-              {t('brand.admin')}
+            {/* The role, next to the wordmark: which dashboard you are in and
+                who you are in it, in one mark. The shield is the same one the
+                role menu uses, so the two read as the same thing. */}
+            <span className="flex items-center gap-1 rounded-full bg-primary-light px-2 py-0.5 text-[11px] font-semibold text-primary-hover dark:text-primary">
+              <ShieldCheck aria-hidden="true" size={11} className="shrink-0" />
+              {roleLabel}
             </span>
           </div>
           <div className="chat-scroll min-h-0 flex-1 overflow-y-auto">
@@ -160,8 +164,9 @@ function AdminShell() {
 
           <Link to={ADMIN_ROUTES.dashboard} className="flex min-w-0 items-center gap-2">
             <span className="truncate text-sm font-semibold text-text-primary">RentHouse</span>
-            <span className="hidden rounded-full bg-primary-light px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-hover dark:text-primary sm:inline lg:hidden">
-              {t('brand.admin')}
+            <span className="hidden items-center gap-1 rounded-full bg-primary-light px-2 py-0.5 text-[11px] font-semibold text-primary-hover dark:text-primary sm:flex lg:hidden">
+              <ShieldCheck aria-hidden="true" size={11} className="shrink-0" />
+              {roleLabel}
             </span>
           </Link>
 
