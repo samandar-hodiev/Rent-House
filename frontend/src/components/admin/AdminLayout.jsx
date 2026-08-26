@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { LogOut, Menu, Settings, ShieldCheck, SlidersHorizontal, User, X } from 'lucide-react'
+import {
+  Crown, Gavel, LifeBuoy, LogOut, Menu, PieChart, Settings, ShieldCheck, SlidersHorizontal,
+  User, X,
+} from 'lucide-react'
 import { useDismiss } from '../../hooks/useDismiss'
 import { useRef } from 'react'
 import UserAvatar from '../dashboard/UserAvatar'
@@ -12,6 +15,28 @@ import { ADMIN_ROUTES } from '../../routes/adminPaths'
 // there is no admin authentication yet, and inventing one was explicitly out
 // of scope.
 const CURRENT_ADMIN = { name: 'Samandar Hodiev' }
+
+/**
+ * A mark per role, so the icon says something the label already says twice
+ * over — a crown for the person who owns the place, a shield for the one with
+ * every key, a gavel for the one who judges what gets published, a life ring
+ * for the one who answers people, a chart for the one who only reads.
+ *
+ * Keyed by the same ids as `ADMIN_ROLE`, and used everywhere a role appears, so
+ * the badge beside the wordmark and the entry in the menu never disagree.
+ */
+const ROLE_ICON = {
+  [ADMIN_ROLE.owner]: Crown,
+  [ADMIN_ROLE.superAdmin]: ShieldCheck,
+  [ADMIN_ROLE.moderator]: Gavel,
+  [ADMIN_ROLE.support]: LifeBuoy,
+  [ADMIN_ROLE.analyst]: PieChart,
+}
+
+/** Falls back to the shield rather than to nothing, if a role arrives unmapped. */
+function roleIcon(role) {
+  return ROLE_ICON[role] ?? ShieldCheck
+}
 
 function AdminProfileMenu() {
   const { t, role, roleLabel, setRole } = useAdmin()
@@ -65,22 +90,25 @@ function AdminProfileMenu() {
           <p className="mt-1 border-t border-border px-3 pb-1 pt-2 text-[11px] font-medium text-text-muted">
             {t('role.preview')}
           </p>
-          {Object.values(ADMIN_ROLE).map((option) => (
-            <button
-              key={option}
-              type="button"
-              role="menuitemradio"
-              aria-checked={role === option}
-              onClick={() => {
-                setRole(option)
-                setOpen(false)
-              }}
-              className={`${item} ${role === option ? 'font-medium text-primary-hover dark:text-primary' : ''}`}
-            >
-              <ShieldCheck aria-hidden="true" size={15} className="shrink-0" />
-              {t(`role.${option}`)}
-            </button>
-          ))}
+          {Object.values(ADMIN_ROLE).map((option) => {
+            const Icon = roleIcon(option)
+            return (
+              <button
+                key={option}
+                type="button"
+                role="menuitemradio"
+                aria-checked={role === option}
+                onClick={() => {
+                  setRole(option)
+                  setOpen(false)
+                }}
+                className={`${item} ${role === option ? 'font-medium text-primary-hover dark:text-primary' : ''}`}
+              >
+                <Icon aria-hidden="true" size={15} className="shrink-0" />
+                {t(`role.${option}`)}
+              </button>
+            )
+          })}
 
           <button
             type="button"
@@ -109,7 +137,8 @@ function AdminProfileMenu() {
  * same product without being the same screen.
  */
 function AdminShell() {
-  const { t, theme, roleLabel } = useAdmin()
+  const { t, theme, role, roleLabel } = useAdmin()
+  const RoleIcon = roleIcon(role)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const location = useLocation()
 
@@ -137,7 +166,7 @@ function AdminShell() {
                 who you are in it, in one mark. The shield is the same one the
                 role menu uses, so the two read as the same thing. */}
             <span className="flex items-center gap-1 rounded-full bg-primary-light px-2 py-0.5 text-[11px] font-semibold text-primary-hover dark:text-primary">
-              <ShieldCheck aria-hidden="true" size={11} className="shrink-0" />
+              <RoleIcon aria-hidden="true" size={11} className="shrink-0" />
               {roleLabel}
             </span>
           </div>
@@ -165,7 +194,7 @@ function AdminShell() {
           <Link to={ADMIN_ROUTES.dashboard} className="flex min-w-0 items-center gap-2">
             <span className="truncate text-sm font-semibold text-text-primary">RentHouse</span>
             <span className="hidden items-center gap-1 rounded-full bg-primary-light px-2 py-0.5 text-[11px] font-semibold text-primary-hover dark:text-primary sm:flex lg:hidden">
-              <ShieldCheck aria-hidden="true" size={11} className="shrink-0" />
+              <RoleIcon aria-hidden="true" size={11} className="shrink-0" />
               {roleLabel}
             </span>
           </Link>
