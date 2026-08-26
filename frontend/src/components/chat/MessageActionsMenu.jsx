@@ -4,10 +4,10 @@ import { CheckSquare, CornerUpLeft, MoreVertical, Pencil, Trash2 } from 'lucide-
 import { useLocale } from '../../context/LocaleContext'
 import { useDismiss } from '../../hooks/useDismiss'
 
-const MENU_WIDTH = 176
+const MENU_WIDTH = 158
 // Enough for the four items and the rule above the last one. Measured after
 // mount; this only decides which way it opens on the first frame.
-const ESTIMATED_HEIGHT = 168
+const ESTIMATED_HEIGHT = 132
 const GAP = 4
 const EDGE = 8
 
@@ -101,10 +101,13 @@ function MessageActionsMenu({ isMine, isText, onSurface, onReply, onSelect, onEd
     action()
   }
 
+  // 13px and a 1.5-unit gap: the labels are two or three words each and were
+  // laid out like a page menu. Small enough to read as a quick action, large
+  // enough to still be read at a glance.
   const item =
-    'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary'
+    'flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[13px] leading-5 text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary'
   const destructiveItem =
-    'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-error transition-colors hover:bg-error/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary'
+    'flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[13px] leading-5 text-error transition-colors hover:bg-error/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary'
 
   return (
     <>
@@ -155,19 +158,19 @@ function MessageActionsMenu({ isMine, isText, onSurface, onReply, onSelect, onEd
                   included: adding to what you already said is as ordinary as
                   answering someone else. */}
               <button type="button" role="menuitem" onClick={run(onReply)} className={item}>
-                <CornerUpLeft aria-hidden="true" size={15} className="shrink-0" />
+                <CornerUpLeft aria-hidden="true" size={14} className="shrink-0" />
                 {t('chat.reply')}
               </button>
 
               {/* The way into selection mode, from either side's messages. */}
               <button type="button" role="menuitem" onClick={run(onSelect)} className={item}>
-                <CheckSquare aria-hidden="true" size={15} className="shrink-0" />
+                <CheckSquare aria-hidden="true" size={14} className="shrink-0" />
                 {t('chat.selectMessages')}
               </button>
 
               {isMine && isText ? (
                 <button type="button" role="menuitem" onClick={run(onEdit)} className={item}>
-                  <Pencil aria-hidden="true" size={15} className="shrink-0" />
+                  <Pencil aria-hidden="true" size={14} className="shrink-0" />
                   {t('chat.edit')}
                 </button>
               ) : null}
@@ -181,7 +184,7 @@ function MessageActionsMenu({ isMine, isText, onSurface, onReply, onSelect, onEd
                   onClick={run(onDelete)}
                   className={`${destructiveItem} mt-1 border-t border-border pt-2`}
                 >
-                  <Trash2 aria-hidden="true" size={15} className="shrink-0" />
+                  <Trash2 aria-hidden="true" size={14} className="shrink-0" />
                   {t('chat.delete')}
                 </button>
               ) : null}
