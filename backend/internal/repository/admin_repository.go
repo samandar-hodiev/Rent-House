@@ -159,6 +159,11 @@ func (r *AdminRepository) CountOwners(ctx context.Context) (int64, error) {
 type AdminUserRow struct {
 	models.User
 	Listings int64 `gorm:"column:listings"`
+	// The block in force, if any. Null for an active account, and null for a
+	// blocked one only if the row predates this table.
+	BlockReason   *string    `gorm:"column:block_reason"`
+	BlockedAt     *time.Time `gorm:"column:blocked_at"`
+	BlockedByName *string    `gorm:"column:blocked_by_name"`
 }
 
 // UserQuery is what the administrator's list is filtered and paged by.
@@ -193,14 +198,17 @@ func (r *AdminRepository) Users(ctx context.Context, query UserQuery) ([]AdminUs
 		if looksLikePhone(search) {
 			digits = onlyDigits(search)
 		}
+		// Every column is qualified. The list joins `admins` to fetch who
+		// blocked whom, and that table has an `email` of its own — an
+		// unqualified one is ambiguous and PostgreSQL rejects the whole query.
 		if digits != "" {
 			base = base.Where(
-				"first_name ILIKE ? OR last_name ILIKE ? OR email ILIKE ? OR phone ILIKE ?",
+				"users.first_name ILIKE ? OR users.last_name ILIKE ? OR users.email ILIKE ? OR users.phone ILIKE ?",
 				pattern, pattern, pattern, "%"+digits+"%",
 			)
 		} else {
 			base = base.Where(
-				"first_name ILIKE ? OR last_name ILIKE ? OR email ILIKE ?",
+				"users.first_name ILIKE ? OR users.last_name ILIKE ? OR users.email ILIKE ?",
 				pattern, pattern, pattern,
 			)
 		}
@@ -222,8 +230,18 @@ func (r *AdminRepository) Users(ctx context.Context, query UserQuery) ([]AdminUs
 
 	var rows []AdminUserRow
 	err := base.
+		// One join to the block that is still in force — the partial unique
+		// index guarantees there is at most one — so a blocked account arrives
+		// with the reason it was blocked for rather than needing a second
+		// request per row.
+		Joins("LEFT JOIN admin_user_blocks b ON b.user_id = users.id AND b.unblocked_at IS NULL").
+		Joins("LEFT JOIN admins ab ON ab.id = b.blocked_by").
 		// Deleted listings are not listings any more, so they are not counted.
-		Select("users.*, (SELECT count(*) FROM apartments a WHERE a.owner_id = users.id AND a.status <> 'deleted') AS listings").
+		Select(`users.*,
+			(SELECT count(*) FROM apartments a WHERE a.owner_id = users.id AND a.status <> 'deleted') AS listings,
+			b.reason AS block_reason,
+			b.blocked_at AS blocked_at,
+			ab.name AS blocked_by_name`).
 		Order("users.created_at DESC").
 		Limit(limit).
 		Offset((page - 1) * limit).
@@ -234,18 +252,66 @@ func (r *AdminRepository) Users(ctx context.Context, query UserQuery) ([]AdminUs
 	return rows, total, nil
 }
 
-// SetUserStatus blocks or unblocks a marketplace account.
-func (r *AdminRepository) SetUserStatus(ctx context.Context, id uuid.UUID, status string) error {
-	result := r.db.WithContext(ctx).Model(&models.User{}).
-		Where("id = ?", id).
-		Updates(map[string]any{"status": status, "updated_at": time.Now()})
-	if result.Error != nil {
-		return fmt.Errorf("set user status: %w", result.Error)
-	}
-	if result.RowsAffected == 0 {
-		return ErrUserNotFound
-	}
-	return nil
+// BlockUser marks an account blocked and records why.
+//
+// Both writes happen in one transaction. Separately, a failure between them
+// would leave an account blocked with no reason on record, or a reason with no
+// block — and the reason is the whole point of asking for one.
+func (r *AdminRepository) BlockUser(
+	ctx context.Context, userID, adminID uuid.UUID, reason string,
+) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&models.User{}).
+			Where("id = ?", userID).
+			Updates(map[string]any{"status": models.UserStatusBlocked, "updated_at": time.Now()})
+		if result.Error != nil {
+			return fmt.Errorf("block user: %w", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return ErrUserNotFound
+		}
+
+		block := &models.AdminUserBlock{
+			UserID: userID, BlockedBy: &adminID, Reason: reason,
+		}
+		if err := tx.Create(block).Error; err != nil {
+			// The partial unique index refuses a second open block. Blocking an
+			// already-blocked account is not an error worth failing on — the
+			// account is blocked, which is what the caller wanted.
+			if isUniqueViolation(err) {
+				return nil
+			}
+			return fmt.Errorf("record block: %w", err)
+		}
+		return nil
+	})
+}
+
+// UnblockUser lifts a block and closes its record.
+//
+// The row is stamped, never deleted: what somebody was blocked for stays
+// answerable after the block is lifted.
+func (r *AdminRepository) UnblockUser(ctx context.Context, userID, adminID uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		now := time.Now()
+		result := tx.Model(&models.User{}).
+			Where("id = ?", userID).
+			Updates(map[string]any{"status": models.UserStatusActive, "updated_at": now})
+		if result.Error != nil {
+			return fmt.Errorf("unblock user: %w", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return ErrUserNotFound
+		}
+
+		err := tx.Model(&models.AdminUserBlock{}).
+			Where("user_id = ? AND unblocked_at IS NULL", userID).
+			Updates(map[string]any{"unblocked_at": now, "unblocked_by": adminID}).Error
+		if err != nil {
+			return fmt.Errorf("close block record: %w", err)
+		}
+		return nil
+	})
 }
 
 // UpdateProfile writes what an administrator may change about themselves.

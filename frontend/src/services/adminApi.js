@@ -32,6 +32,10 @@ export function toManagedUser(data) {
     status: data.status,
     listings: data.listings ?? 0,
     registeredAt: data.registered_at,
+    // Present only while a block is in force.
+    blockReason: data.block_reason ?? null,
+    blockedAt: data.blocked_at ?? null,
+    blockedBy: data.blocked_by_name ?? null,
   }
 }
 
@@ -127,14 +131,17 @@ export async function fetchUsers({ search, status, page = 1, limit = 10, token, 
   }
 }
 
-/** Blocks or unblocks a marketplace account. */
-export async function setUserStatus(id, status, { token, signal } = {}) {
-  return request(`/admin/users/${id}/status`, {
-    method: 'PATCH',
-    body: { status },
-    token,
-    signal,
-  })
+/**
+ * Blocks or unblocks a marketplace account.
+ *
+ * Blocking carries a reason. The server requires one too — this endpoint is
+ * reachable without the form, and a block with nothing on record is what asking
+ * for a reason exists to prevent.
+ */
+export async function setUserStatus(id, status, { reason, token, signal } = {}) {
+  const body = { status }
+  if (reason !== undefined) body.reason = reason
+  return request(`/admin/users/${id}/status`, { method: 'PATCH', body, token, signal })
 }
 
 /** The calling administrator's own name and picture. Nothing else is editable. */

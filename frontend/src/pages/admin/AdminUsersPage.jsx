@@ -38,6 +38,8 @@ function AdminUsersPage() {
   const [data, setData] = useState({ users: [], total: 0, page: 1, totalPages: 1 })
   const [state, setState] = useState('loading')
   const [confirming, setConfirming] = useState(null)
+  const [reason, setReason] = useState('')
+  const [reasonTouched, setReasonTouched] = useState(false)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState(null)
 
@@ -85,14 +87,32 @@ function AdminUsersPage() {
     return () => controller.abort()
   }, [load, reloads])
 
+  const closeDialog = () => {
+    setConfirming(null)
+    setReason('')
+    setReasonTouched(false)
+    setActionError(null)
+  }
+
   const apply = async () => {
     if (busy || !confirming) return
+    const blocking = confirming.status !== 'blocked'
+
+    // Checked here as well as by the disabled button: a form can be submitted
+    // by keyboard before React has re-rendered the control.
+    if (blocking && reason.trim().length < 3) {
+      setReasonTouched(true)
+      return
+    }
+
     setBusy(true)
     setActionError(null)
     try {
-      const next = confirming.status === 'blocked' ? 'active' : 'blocked'
-      await setUserStatus(confirming.id, next, { token })
-      setConfirming(null)
+      await setUserStatus(confirming.id, blocking ? 'blocked' : 'active', {
+        reason: blocking ? reason.trim() : undefined,
+        token,
+      })
+      closeDialog()
       // Refetched rather than patched in place: the filter may no longer match
       // this row, and the page it belongs on is the server's to decide.
       setReloads((n) => n + 1)
@@ -195,7 +215,30 @@ function AdminUsersPage() {
                   <Cell className="tabular-nums text-text-secondary">
                     {formatNumber(user.listings)}
                   </Cell>
-                  <Cell><StatusBadge status={user.status} /></Cell>
+                  {/* The reason sits under the badge rather than in a column
+                      of its own: it only exists for blocked accounts, and a
+                      column that is empty for most rows costs every row its
+                      width. The date and the administrator are in the title,
+                      where they are available without crowding the table. */}
+                  <Cell>
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <StatusBadge status={user.status} />
+                      {blocked && user.blockReason ? (
+                        <span
+                          title={[
+                            user.blockReason,
+                            user.blockedAt ? formatDate(user.blockedAt) : null,
+                            user.blockedBy,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                          className="block max-w-[220px] truncate text-[11px] text-text-muted"
+                        >
+                          {user.blockReason}
+                        </span>
+                      ) : null}
+                    </span>
+                  </Cell>
                   <Cell className="whitespace-nowrap text-text-secondary">
                     {formatDate(user.registeredAt)}
                   </Cell>
@@ -205,7 +248,11 @@ function AdminUsersPage() {
                         give it back. */}
                     <MockButton
                       tone={blocked ? 'warning' : 'danger'}
-                      onClick={() => setConfirming(user)}
+                      onClick={() => {
+                        setConfirming(user)
+                        setReason('')
+                        setReasonTouched(false)
+                      }}
                     >
                       {t(blocked ? 'users.unblockUser' : 'users.blockUser')}
                     </MockButton>
@@ -252,23 +299,47 @@ function AdminUsersPage() {
             { name: confirming.name },
           )}
           confirmLabel={t(
-            confirming.status === 'blocked' ? 'users.unblockUser' : 'users.blockUser',
+            confirming.status === 'blocked' ? 'users.unblockUser' : 'users.blockConfirm',
           )}
           tone={confirming.status === 'blocked' ? 'warning' : 'danger'}
           busy={busy}
-          onCancel={() => {
-            setConfirming(null)
-            setActionError(null)
-          }}
+          confirmDisabled={confirming.status !== 'blocked' && reason.trim().length < 3}
+          onCancel={closeDialog}
           onConfirm={apply}
-        />
+        >
+          {confirming.status === 'blocked' ? null : (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium text-text-primary">
+                {t('users.blockReason')} <span className="text-error">*</span>
+              </span>
+              {/* A textarea, not an input: a reason is a sentence, and a
+                  single-line field would hide the end of it as it is typed. */}
+              <textarea
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                onBlur={() => setReasonTouched(true)}
+                rows={3}
+                maxLength={500}
+                autoFocus
+                placeholder={t('users.blockReasonPlaceholder')}
+                className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              />
+              {reasonTouched && reason.trim().length < 3 ? (
+                <span role="alert" className="text-xs text-error">
+                  {t('users.blockReasonRequired')}
+                </span>
+              ) : null}
+            </label>
+          )}
+
+          {actionError ? (
+            <p role="alert" className="mt-3 rounded-md bg-error/10 px-3 py-2 text-xs text-error">
+              {actionError}
+            </p>
+          ) : null}
+        </AdminConfirmDialog>
       ) : null}
 
-      {actionError ? (
-        <p role="alert" className="rounded-md bg-error/10 px-3 py-2 text-sm text-error">
-          {actionError}
-        </p>
-      ) : null}
     </div>
   )
 }

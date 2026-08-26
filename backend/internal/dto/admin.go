@@ -105,8 +105,13 @@ func (r *UpdateAdminProfileRequest) Normalize() {
 }
 
 // UpdateUserStatusRequest is the body of PATCH /api/v1/admin/users/:id/status.
+//
+// The reason is only meaningful when blocking, so it is not required by the
+// binding — the service requires it for that status and ignores it for the
+// other, which keeps "what makes a valid request" in one place.
 type UpdateUserStatusRequest struct {
 	Status string `json:"status" binding:"required,oneof=active blocked"`
+	Reason string `json:"reason" binding:"omitempty,max=500"`
 }
 
 // AdminUserResponse is a marketplace account as the administrator's table shows
@@ -121,19 +126,30 @@ type AdminUserResponse struct {
 	Status       string    `json:"status"`
 	Listings     int64     `json:"listings"`
 	RegisteredAt time.Time `json:"registered_at"`
+
+	// Present only while a block is in force, and only for accounts blocked
+	// since blocking started being explained.
+	BlockReason   *string    `json:"block_reason"`
+	BlockedAt     *time.Time `json:"blocked_at"`
+	BlockedByName *string    `json:"blocked_by_name"`
 }
 
 // NewAdminUserResponse maps one row. The password hash has no field to land in.
-func NewAdminUserResponse(user *models.User, listings int64) AdminUserResponse {
+func NewAdminUserResponse(
+	user *models.User, listings int64, reason *string, blockedAt *time.Time, blockedBy *string,
+) AdminUserResponse {
 	return AdminUserResponse{
-		ID:           user.ID.String(),
-		Name:         strings.TrimSpace(user.FirstName + " " + user.LastName),
-		Email:        user.Email,
-		Phone:        user.Phone,
-		AvatarURL:    user.AvatarURL,
-		Status:       user.Status,
-		Listings:     listings,
-		RegisteredAt: user.CreatedAt,
+		ID:            user.ID.String(),
+		Name:          strings.TrimSpace(user.FirstName + " " + user.LastName),
+		Email:         user.Email,
+		Phone:         user.Phone,
+		AvatarURL:     user.AvatarURL,
+		Status:        user.Status,
+		Listings:      listings,
+		RegisteredAt:  user.CreatedAt,
+		BlockReason:   reason,
+		BlockedAt:     blockedAt,
+		BlockedByName: blockedBy,
 	}
 }
 

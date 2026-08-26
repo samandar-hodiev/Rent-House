@@ -32,6 +32,9 @@ var (
 	ErrOwnerAlreadyExists = errors.New("an owner already exists")
 	ErrInvalidAdminRole   = errors.New("invalid admin role")
 	ErrInvalidAdminStatus = errors.New("invalid admin status")
+	// ErrBlockReasonRequired is returned when an account is blocked without
+	// saying why.
+	ErrBlockReasonRequired = errors.New("a block reason is required")
 )
 
 // adminSessionTTL is how long a dashboard session lasts. Shorter than the
@@ -316,22 +319,48 @@ func (s *AdminService) Users(
 	return &UserPage{Users: rows, Total: total, Page: page, Limit: limit}, nil
 }
 
+// Blocking has to be explained. The minimum is short enough not to be a
+// hurdle and long enough that "x" is not an explanation.
+const minBlockReasonLength = 3
+
 // SetUserStatus blocks or unblocks a marketplace account.
 //
 // Any administrator may do it — moderating the marketplace is what the role is
 // for — but only an administrator: the middleware has already established that
 // the caller is one.
-func (s *AdminService) SetUserStatus(ctx context.Context, id uuid.UUID, status string) error {
-	if status != models.UserStatusActive && status != models.UserStatusBlocked {
+//
+// Blocking requires a reason, checked here rather than only in the browser: the
+// endpoint is reachable without the form, and a block with no reason on record
+// is exactly what this feature exists to prevent.
+func (s *AdminService) SetUserStatus(
+	ctx context.Context, actor *models.Admin, id uuid.UUID, status, reason string,
+) error {
+	switch status {
+	case models.UserStatusBlocked:
+		trimmed := strings.TrimSpace(reason)
+		if len(trimmed) < minBlockReasonLength {
+			return ErrBlockReasonRequired
+		}
+		if err := s.admins.BlockUser(ctx, id, actor.ID, trimmed); err != nil {
+			if errors.Is(err, repository.ErrUserNotFound) {
+				return ErrAdminNotFound
+			}
+			return err
+		}
+		return nil
+
+	case models.UserStatusActive:
+		if err := s.admins.UnblockUser(ctx, id, actor.ID); err != nil {
+			if errors.Is(err, repository.ErrUserNotFound) {
+				return ErrAdminNotFound
+			}
+			return err
+		}
+		return nil
+
+	default:
 		return ErrInvalidAdminStatus
 	}
-	if err := s.admins.SetUserStatus(ctx, id, status); err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return ErrAdminNotFound
-		}
-		return err
-	}
-	return nil
 }
 
 // UpdateProfile changes the calling administrator's own name and picture.

@@ -313,7 +313,9 @@ func (h *AdminHandler) Users(c *gin.Context) {
 	users := make([]dto.AdminUserResponse, 0, len(result.Users))
 	for i := range result.Users {
 		row := &result.Users[i]
-		users = append(users, dto.NewAdminUserResponse(&row.User, row.Listings))
+		users = append(users, dto.NewAdminUserResponse(
+			&row.User, row.Listings, row.BlockReason, row.BlockedAt, row.BlockedByName,
+		))
 	}
 
 	totalPages := int((result.Total + int64(result.Limit) - 1) / int64(result.Limit))
@@ -332,6 +334,12 @@ func (h *AdminHandler) Users(c *gin.Context) {
 
 // SetUserStatus handles PATCH /api/v1/admin/users/:id/status.
 func (h *AdminHandler) SetUserStatus(c *gin.Context) {
+	actor, ok := middleware.AdminFrom(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
+		return
+	}
+
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil || id == uuid.Nil {
 		response.Error(c, http.StatusBadRequest, "invalid_id", "Invalid user id")
@@ -344,8 +352,13 @@ func (h *AdminHandler) SetUserStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.admins.SetUserStatus(c.Request.Context(), id, req.Status); err != nil {
+	if err := h.admins.SetUserStatus(
+		c.Request.Context(), actor, id, req.Status, req.Reason,
+	); err != nil {
 		switch {
+		case errors.Is(err, service.ErrBlockReasonRequired):
+			response.Error(c, http.StatusBadRequest, "reason_required",
+				"A reason is required to block an account")
 		case errors.Is(err, service.ErrAdminNotFound):
 			response.Error(c, http.StatusNotFound, "not_found", "User not found")
 		case errors.Is(err, service.ErrInvalidAdminStatus):

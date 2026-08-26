@@ -11,6 +11,10 @@ import { useAdmin } from '../../context/AdminSettingsContext'
  * is what `tone` is for — the wording changes per caller, the behaviour does
  * not.
  *
+ * `children` render between the description and the buttons, for a confirmation
+ * that also has to ask something — blocking an account needs a reason, and a
+ * second dialog component for that would be this one with a textarea in it.
+ *
  * Portalled into the admin root rather than the document body, so it inherits
  * the dashboard's own theme: the theme is a class on `#admin-root`, and a
  * dialog outside it would come out in the public site's colours.
@@ -23,6 +27,8 @@ function AdminConfirmDialog({
   onConfirm,
   tone = 'danger',
   busy = false,
+  confirmDisabled = false,
+  children,
 }) {
   const { t } = useAdmin()
   const dialogRef = useRef(null)
@@ -64,6 +70,8 @@ function AdminConfirmDialog({
         </h2>
         <p className="mt-2 text-sm text-text-secondary">{description}</p>
 
+        {children ? <div className="mt-4">{children}</div> : null}
+
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
@@ -76,7 +84,7 @@ function AdminConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={busy}
+            disabled={busy || confirmDisabled}
             className={`flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60 ${confirmTone}`}
           >
             {busy ? <Loader2 aria-hidden="true" size={15} className="animate-spin" /> : null}
