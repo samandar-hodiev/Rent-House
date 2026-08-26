@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Loader2, Search, Users } from 'lucide-react'
+import { Eye, Loader2, Search, Users } from 'lucide-react'
 import EmptyState from '../../components/EmptyState'
 import UserAvatar from '../../components/dashboard/UserAvatar'
 import AdminConfirmDialog from '../../components/admin/AdminConfirmDialog'
+import AvatarDialog from '../../components/admin/AvatarDialog'
 import {
   ADMIN_SELECT, ADMIN_SELECT_STYLE, AdminCard, AdminTable, Cell, MockButton, PageHeading,
   Row, StatusBadge, useAdminFormat,
@@ -19,6 +20,29 @@ const PER_PAGE = 10
 // enough that typing a name is one request rather than eight, short enough that
 // it still feels like the list is following along.
 const SEARCH_DEBOUNCE = 300
+
+/**
+ * The avatar in a table row, with a way to see it properly.
+ *
+ * A button rather than a hover-only affordance: the eye appears on focus as
+ * well as on hover, so somebody navigating by keyboard can reach it, and a
+ * screen reader is told what it does.
+ */
+function AvatarCell({ user, label, onOpen }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={label}
+      className="group relative size-8 shrink-0 overflow-hidden rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      <UserAvatar name={user.name} src={user.avatarUrl} className="size-8" />
+      <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-slate-900/0 text-white opacity-0 transition-all duration-150 group-hover:bg-slate-900/55 group-hover:opacity-100 group-focus-visible:bg-slate-900/55 group-focus-visible:opacity-100">
+        <Eye aria-hidden="true" size={13} />
+      </span>
+    </button>
+  )
+}
 
 /**
  * Why an account was blocked, who did it, and when.
@@ -120,6 +144,8 @@ function AdminUsersPage() {
   // The account whose block is being read, which is a different question from
   // the account whose block is being changed.
   const [viewing, setViewing] = useState(null)
+  // The account whose picture is being looked at.
+  const [avatar, setAvatar] = useState(null)
   const [reason, setReason] = useState('')
   const [reasonTouched, setReasonTouched] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -285,7 +311,11 @@ function AdminUsersPage() {
                 <Row key={user.id}>
                   <Cell>
                     <span className="flex min-w-0 items-center gap-2.5">
-                      <UserAvatar name={user.name} src={user.avatarUrl} />
+                      <AvatarCell
+                        user={user}
+                        label={t('users.viewAvatar')}
+                        onOpen={() => setAvatar(user)}
+                      />
                       <span className="min-w-0 truncate font-medium text-text-primary">
                         {user.name}
                       </span>
@@ -412,6 +442,14 @@ function AdminUsersPage() {
 
       {viewing ? (
         <BlockDetailsDialog user={viewing} onClose={() => setViewing(null)} />
+      ) : null}
+
+      {avatar ? (
+        <AvatarDialog
+          name={avatar.name}
+          src={avatar.avatarUrl}
+          onClose={() => setAvatar(null)}
+        />
       ) : null}
     </div>
   )

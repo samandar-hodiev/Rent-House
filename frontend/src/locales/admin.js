@@ -265,6 +265,8 @@ const en = {
   'action.notGranted': 'Not granted',
 
   'users.search': 'Search by name, email or phone',
+  'users.viewAvatar': 'View photograph',
+  'users.noAvatar': 'This account has no photograph.',
   'users.allStatuses': 'All statuses',
   'users.statusActive': 'Active',
   'users.statusBlocked': 'Blocked',
@@ -630,6 +632,8 @@ const uz = {
   'action.notGranted': 'Ruxsat yo‘q',
 
   'users.search': 'Ism, email yoki telefon bo‘yicha qidirish',
+  'users.viewAvatar': "Rasmni ko'rish",
+  'users.noAvatar': "Bu hisobda rasm yo'q.",
   'users.allStatuses': 'Barcha holatlar',
   'users.statusActive': 'Faol',
   'users.statusBlocked': 'Bloklangan',
@@ -995,6 +999,8 @@ const ru = {
   'action.notGranted': 'Не разрешено',
 
   'users.search': 'Поиск по имени, email или телефону',
+  'users.viewAvatar': 'Посмотреть фото',
+  'users.noAvatar': 'У этого аккаунта нет фото.',
   'users.allStatuses': 'Все статусы',
   'users.statusActive': 'Активные',
   'users.statusBlocked': 'Заблокированные',
