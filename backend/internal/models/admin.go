@@ -50,6 +50,10 @@ type Admin struct {
 	// is the second of two guards rather than the only one.
 	PasswordHash string `gorm:"column:password_hash;type:varchar(255);not null" json:"-"`
 
+	// Their own picture, as a path this API serves. Optional: an account with
+	// none shows initials, which every avatar in the product already does.
+	AvatarURL *string `gorm:"column:avatar_url;type:text" json:"avatar_url,omitempty"`
+
 	Role   string `gorm:"column:role;type:varchar(20);not null" json:"role"`
 	Status string `gorm:"column:status;type:varchar(20);not null;default:active" json:"status"`
 

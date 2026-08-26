@@ -118,6 +118,14 @@ export function AdminAuthProvider({ children }) {
     clear()
   }, [token, clear])
 
+  /**
+   * Replaces the account the app is showing, after the person edits it.
+   *
+   * The server has already stored it — this is the same record coming back, so
+   * the header and the profile page agree without either refetching.
+   */
+  const updateAdmin = useCallback((next) => setAdmin(next), [])
+
   const value = useMemo(
     () => ({
       status,
@@ -127,10 +135,11 @@ export function AdminAuthProvider({ children }) {
       isOwner: admin?.role === 'owner',
       signIn,
       signOut,
+      updateAdmin,
       // For a page that learns mid-request that the session is over.
       endSession: clear,
     }),
-    [status, admin, token, signIn, signOut, clear],
+    [status, admin, token, signIn, signOut, updateAdmin, clear],
   )
 
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>

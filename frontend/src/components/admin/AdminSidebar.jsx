@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { ADMIN_ROUTES } from '../../routes/adminPaths'
 import { ADMIN_ROLE, useAdmin } from '../../context/AdminSettingsContext'
+import { useAdminLogout } from '../../context/AdminLogoutContext'
 
 const ICON = 16
 
@@ -189,6 +190,7 @@ export function AdminNavList({ onNavigate }) {
  */
 export function AdminSidebarFooter({ onNavigate }) {
   const { t } = useAdmin()
+  const { requestLogout } = useAdminLogout()
 
   return (
     <div className="shrink-0 border-t border-border p-3">
@@ -201,12 +203,14 @@ export function AdminSidebarFooter({ onNavigate }) {
         <span className="min-w-0 flex-1 truncate text-left">{t('nav.dashboardSettings')}</span>
       </NavLink>
 
-      {/* No session to end yet — admin authentication is not part of this
-          stage — so this is the control in its place, not a working sign-out
-          pretending to be one. */}
+      {/* Opens the same dialog the header's Chiqish opens, and ends the same
+          session. Two controls, one behaviour. */}
       <button
         type="button"
-        onClick={onNavigate}
+        onClick={() => {
+          onNavigate?.()
+          requestLogout()
+        }}
         className={`${BASE} ${IDLE} hover:text-error`}
       >
         <LogOut aria-hidden="true" size={ICON} className="shrink-0" />

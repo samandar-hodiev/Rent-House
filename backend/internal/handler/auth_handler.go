@@ -155,6 +155,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		case errors.Is(err, service.ErrInvalidCredentials):
 			// One message for a wrong password and for an unknown account.
 			response.Error(c, http.StatusUnauthorized, "invalid_credentials", "Invalid credentials")
+		case errors.Is(err, service.ErrAccountBlocked):
+			// Said plainly: the password was right, and the person needs to
+			// know why they still cannot get in.
+			response.Error(c, http.StatusForbidden, "account_blocked",
+				"This account has been blocked")
 		default:
 			logger.Errorf("login: %v", err)
 			response.Error(c, http.StatusInternalServerError, "internal_error", "Could not complete login")

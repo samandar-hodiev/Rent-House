@@ -29,6 +29,10 @@ export const ADMIN_ROUTES = {
   roles: `${BASE}/roles`,
   auditLogs: `${BASE}/audit-logs`,
 
+  // The signed-in administrator's own account, reached from the header menu.
+  // Distinct from Settings, which is the marketplace's configuration.
+  profile: `${BASE}/profile`,
+
   sidebarControl: `${BASE}/sidebar-control`,
   dashboardSettings: `${BASE}/dashboard-settings`,
 

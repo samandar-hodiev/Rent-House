@@ -138,18 +138,21 @@ export function ViewLink({ to }) {
 }
 
 /** A button that looks like an action but only says it was pressed. */
-export function MockButton({ children, tone = 'neutral', onClick }) {
+export function MockButton({ children, tone = 'neutral', onClick, disabled = false }) {
   const tones = {
     neutral:
       'border border-border bg-surface text-text-primary hover:bg-surface-secondary',
     primary: 'bg-primary text-white hover:bg-primary-hover',
+    // Taking access away and giving it back must not look alike.
     danger: 'border border-error/40 bg-error/10 text-error hover:bg-error/15',
+    warning: 'border border-warning/40 bg-warning/15 text-warning hover:bg-warning/25',
   }
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${tones[tone]}`}
+      disabled={disabled}
+      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 ${tones[tone]}`}
     >
       {children}
     </button>

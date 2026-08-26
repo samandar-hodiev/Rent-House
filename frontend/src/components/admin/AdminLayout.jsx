@@ -7,6 +7,7 @@ import UserAvatar from '../dashboard/UserAvatar'
 import { AdminNavList, AdminSidebarFooter } from './AdminSidebar'
 import { ADMIN_ROLE, AdminSettingsProvider, useAdmin } from '../../context/AdminSettingsContext'
 import { AdminAuthProvider, useAdminAuth } from '../../context/AdminAuthContext'
+import { AdminLogoutProvider, useAdminLogout } from '../../context/AdminLogoutContext'
 import { ADMIN_ROUTES } from '../../routes/adminPaths'
 
 // The signed-in administrator. Fake, like everything else in this module —
@@ -31,7 +32,8 @@ function roleIcon(role) {
 
 function AdminProfileMenu() {
   const { t, roleLabel } = useAdmin()
-  const { admin, signOut } = useAdminAuth()
+  const { admin } = useAdminAuth()
+  const { requestLogout } = useAdminLogout()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   useDismiss(ref, open, () => setOpen(false))
@@ -48,7 +50,7 @@ function AdminProfileMenu() {
         aria-expanded={open}
         className="flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
-        <UserAvatar name={admin?.name ?? ''} />
+        <UserAvatar name={admin?.name ?? ''} src={admin?.avatarUrl} />
         <span className="hidden min-w-0 text-left sm:block">
           <span className="block truncate text-sm font-medium text-text-primary">
             {admin?.name ?? ''}
@@ -62,10 +64,15 @@ function AdminProfileMenu() {
           role="menu"
           className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-[0_4px_16px_rgba(15,23,42,0.16)]"
         >
-          <button type="button" role="menuitem" className={item} onClick={() => setOpen(false)}>
+          <Link
+            to={ADMIN_ROUTES.profile}
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className={item}
+          >
             <User aria-hidden="true" size={15} className="shrink-0" />
             {t('header.profile')}
-          </button>
+          </Link>
           <Link
             to={ADMIN_ROUTES.settings}
             role="menuitem"
@@ -80,7 +87,9 @@ function AdminProfileMenu() {
             role="menuitem"
             onClick={() => {
               setOpen(false)
-              signOut()
+              // Asked before it happens, and asked in one place: the sidebar's
+              // Chiqish opens the same dialog and runs the same sign-out.
+              requestLogout()
             }}
             className={`${item} mt-1 border-t border-border pt-2 text-error hover:bg-error/10`}
           >
@@ -225,9 +234,18 @@ export function AdminRoot() {
   )
 }
 
-/** The signed-in dashboard: the navigation column, the header, and the page. */
+/**
+ * The signed-in dashboard: the navigation column, the header, and the page.
+ *
+ * The logout provider wraps the shell rather than the whole admin root: it
+ * needs a session to end, and the sign-in page has none.
+ */
 function AdminLayout() {
-  return <AdminShell />
+  return (
+    <AdminLogoutProvider>
+      <AdminShell />
+    </AdminLogoutProvider>
+  )
 }
 
 export default AdminLayout

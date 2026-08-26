@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -151,6 +152,149 @@ func (r *AdminRepository) CountOwners(ctx context.Context) (int64, error) {
 		return 0, fmt.Errorf("count owners: %w", err)
 	}
 	return count, nil
+}
+
+// AdminUserRow is a marketplace account as the administrator's table shows it:
+// the account plus the one number that table needs, counted by the database.
+type AdminUserRow struct {
+	models.User
+	Listings int64 `gorm:"column:listings"`
+}
+
+// UserQuery is what the administrator's list is filtered and paged by.
+type UserQuery struct {
+	Search string
+	Status string
+	Page   int
+	Limit  int
+}
+
+// Users returns one page of marketplace accounts, and how many match in total.
+//
+// Filtering, searching, counting and paging all happen in PostgreSQL. Fetching
+// every user and narrowing them in Go would work today and stop working at the
+// first thousand accounts; more to the point, the total a paginator needs is a
+// count of what matched, which the client cannot know from one page.
+func (r *AdminRepository) Users(ctx context.Context, query UserQuery) ([]AdminUserRow, int64, error) {
+	base := r.db.WithContext(ctx).Model(&models.User{})
+
+	if query.Status != "" {
+		base = base.Where("users.status = ?", query.Status)
+	}
+	if search := strings.TrimSpace(query.Search); search != "" {
+		// ILIKE rather than LIKE: an administrator looking for "Alisher" should
+		// not have to know how the name was capitalised. The phone is matched
+		// with its punctuation removed, so "90 123" finds "+998901234567".
+		pattern := "%" + strings.ToLower(search) + "%"
+		// Only a term made of digits and phone punctuation is treated as a
+		// phone number. "Test9" is a name that happens to contain a 9, and
+		// reducing it to "9" would match every phone with a 9 in it.
+		digits := ""
+		if looksLikePhone(search) {
+			digits = onlyDigits(search)
+		}
+		if digits != "" {
+			base = base.Where(
+				"first_name ILIKE ? OR last_name ILIKE ? OR email ILIKE ? OR phone ILIKE ?",
+				pattern, pattern, pattern, "%"+digits+"%",
+			)
+		} else {
+			base = base.Where(
+				"first_name ILIKE ? OR last_name ILIKE ? OR email ILIKE ?",
+				pattern, pattern, pattern,
+			)
+		}
+	}
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("count users: %w", err)
+	}
+
+	limit := query.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+	page := query.Page
+	if page <= 0 {
+		page = 1
+	}
+
+	var rows []AdminUserRow
+	err := base.
+		// Deleted listings are not listings any more, so they are not counted.
+		Select("users.*, (SELECT count(*) FROM apartments a WHERE a.owner_id = users.id AND a.status <> 'deleted') AS listings").
+		Order("users.created_at DESC").
+		Limit(limit).
+		Offset((page - 1) * limit).
+		Find(&rows).Error
+	if err != nil {
+		return nil, 0, fmt.Errorf("list users: %w", err)
+	}
+	return rows, total, nil
+}
+
+// SetUserStatus blocks or unblocks a marketplace account.
+func (r *AdminRepository) SetUserStatus(ctx context.Context, id uuid.UUID, status string) error {
+	result := r.db.WithContext(ctx).Model(&models.User{}).
+		Where("id = ?", id).
+		Updates(map[string]any{"status": status, "updated_at": time.Now()})
+	if result.Error != nil {
+		return fmt.Errorf("set user status: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+// UpdateProfile writes what an administrator may change about themselves.
+//
+// Named columns, and only the two: an administrator cannot edit their own role
+// or status here, whatever a request body says.
+func (r *AdminRepository) UpdateProfile(
+	ctx context.Context, id uuid.UUID, name string, avatarURL *string,
+) error {
+	fields := map[string]any{"name": name, "updated_at": time.Now()}
+	if avatarURL != nil {
+		fields["avatar_url"] = *avatarURL
+	}
+	result := r.db.WithContext(ctx).Model(&models.Admin{}).Where("id = ?", id).Updates(fields)
+	if result.Error != nil {
+		return fmt.Errorf("update admin profile: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return ErrAdminNotFound
+	}
+	return nil
+}
+
+// looksLikePhone reports whether a term is a phone number rather than a name:
+// digits and the punctuation numbers are written with, and nothing else.
+func looksLikePhone(value string) bool {
+	hasDigit := false
+	for _, r := range value {
+		switch {
+		case r >= '0' && r <= '9':
+			hasDigit = true
+		case r == '+' || r == ' ' || r == '-' || r == '(' || r == ')':
+		default:
+			return false
+		}
+	}
+	return hasDigit
+}
+
+// onlyDigits keeps the digits of a search term, so a phone typed with spaces,
+// brackets or a leading + still matches what is stored.
+func onlyDigits(value string) string {
+	var out strings.Builder
+	for _, r := range value {
+		if r >= '0' && r <= '9' {
+			out.WriteRune(r)
+		}
+	}
+	return out.String()
 }
 
 // Sections returns the sidebar configuration, section to enabled.

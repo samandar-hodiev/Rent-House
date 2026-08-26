@@ -52,6 +52,7 @@ type AdminResponse struct {
 	ID          string     `json:"id"`
 	Name        string     `json:"name"`
 	Email       string     `json:"email"`
+	AvatarURL   *string    `json:"avatar_url"`
 	Role        string     `json:"role"`
 	Status      string     `json:"status"`
 	CreatedAt   time.Time  `json:"created_at"`
@@ -65,6 +66,7 @@ func NewAdminResponse(admin *models.Admin) AdminResponse {
 		ID:          admin.ID.String(),
 		Name:        admin.Name,
 		Email:       admin.Email,
+		AvatarURL:   admin.AvatarURL,
 		Role:        admin.Role,
 		Status:      admin.Status,
 		CreatedAt:   admin.CreatedAt,
@@ -79,6 +81,71 @@ func NewAdminResponses(admins []models.Admin) []AdminResponse {
 		out = append(out, NewAdminResponse(&admins[i]))
 	}
 	return out
+}
+
+// UpdateAdminProfileRequest is the body of PATCH /api/v1/admin/profile.
+//
+// Name and picture only. Role and status are deliberately absent: an
+// administrator editing their own profile must not be able to promote
+// themselves, and a field that is never read cannot be exploited.
+type UpdateAdminProfileRequest struct {
+	Name string `json:"name" binding:"required,min=2,max=200"`
+	// A path produced by the upload endpoint, not an arbitrary URL — checked in
+	// the handler, because an image the client names could otherwise point
+	// anywhere and every viewer's browser would fetch it.
+	AvatarURL *string `json:"avatar_url" binding:"omitempty,max=512"`
+}
+
+func (r *UpdateAdminProfileRequest) Normalize() {
+	r.Name = strings.TrimSpace(r.Name)
+	if r.AvatarURL != nil {
+		trimmed := strings.TrimSpace(*r.AvatarURL)
+		r.AvatarURL = &trimmed
+	}
+}
+
+// UpdateUserStatusRequest is the body of PATCH /api/v1/admin/users/:id/status.
+type UpdateUserStatusRequest struct {
+	Status string `json:"status" binding:"required,oneof=active blocked"`
+}
+
+// AdminUserResponse is a marketplace account as the administrator's table shows
+// it. Built field by field, like every other response, so a column added to the
+// model later cannot leak.
+type AdminUserResponse struct {
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Email        *string   `json:"email"`
+	Phone        *string   `json:"phone"`
+	AvatarURL    *string   `json:"avatar_url"`
+	Status       string    `json:"status"`
+	Listings     int64     `json:"listings"`
+	RegisteredAt time.Time `json:"registered_at"`
+}
+
+// NewAdminUserResponse maps one row. The password hash has no field to land in.
+func NewAdminUserResponse(user *models.User, listings int64) AdminUserResponse {
+	return AdminUserResponse{
+		ID:           user.ID.String(),
+		Name:         strings.TrimSpace(user.FirstName + " " + user.LastName),
+		Email:        user.Email,
+		Phone:        user.Phone,
+		AvatarURL:    user.AvatarURL,
+		Status:       user.Status,
+		Listings:     listings,
+		RegisteredAt: user.CreatedAt,
+	}
+}
+
+// AdminUserListResponse is one page, with what a paginator needs to draw
+// itself. Total pages is computed here rather than by the client, so every
+// client agrees on where the last page is.
+type AdminUserListResponse struct {
+	Users      []AdminUserResponse `json:"users"`
+	Total      int64               `json:"total"`
+	Page       int                 `json:"page"`
+	Limit      int                 `json:"limit"`
+	TotalPages int                 `json:"total_pages"`
 }
 
 // AdminSessionResponse is returned by a successful sign-in.

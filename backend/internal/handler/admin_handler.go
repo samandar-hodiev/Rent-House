@@ -3,6 +3,8 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -12,6 +14,7 @@ import (
 	"github.com/samandar-hodiev/Rent-House/backend/internal/middleware"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/models"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/service"
+	"github.com/samandar-hodiev/Rent-House/backend/internal/storage"
 	"github.com/samandar-hodiev/Rent-House/backend/pkg/logger"
 	"github.com/samandar-hodiev/Rent-House/backend/pkg/response"
 )
@@ -20,10 +23,91 @@ import (
 // rule about who may do what lives in the service.
 type AdminHandler struct {
 	admins *service.AdminService
+	files  storage.Storage
+	// Where this server's uploads live, so an avatar can be checked to be one
+	// of them rather than an address the client made up.
+	uploadPath string
+	// The public origin uploads are reachable at. Empty means "work it out from
+	// the request", which is what development wants.
+	baseURL string
 }
 
-func NewAdminHandler(admins *service.AdminService) *AdminHandler {
-	return &AdminHandler{admins: admins}
+func NewAdminHandler(
+	admins *service.AdminService, files storage.Storage, uploadPath, baseURL string,
+) *AdminHandler {
+	return &AdminHandler{
+		admins:     admins,
+		files:      files,
+		uploadPath: uploadPath,
+		baseURL:    strings.TrimRight(baseURL, "/"),
+	}
+}
+
+// UploadAvatar handles POST /api/v1/admin/profile/avatar.
+//
+// Its own endpoint rather than the marketplace's uploader: that one requires a
+// user token, and an administrator does not have one. Same storage, same
+// allow-list, same ceiling — only the door is different.
+//
+// Uploading does not change the profile. It returns a URL, and PATCH /profile
+// saves it, so a picture chosen and then abandoned leaves the account alone.
+func (h *AdminHandler) UploadAvatar(c *gin.Context) {
+	if _, ok := middleware.AdminFrom(c); !ok {
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
+		return
+	}
+
+	header, err := c.FormFile("image")
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed",
+			"Attach an image in the 'image' field")
+		return
+	}
+
+	// Checked before the file is opened, so an oversized upload is refused
+	// without being read.
+	if header.Size > storage.MaxImageBytes {
+		response.Error(c, http.StatusRequestEntityTooLarge, "file_too_large",
+			"The image is larger than 5 MB")
+		return
+	}
+
+	file, err := header.Open()
+	if err != nil {
+		logger.Errorf("upload avatar: open: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error", "Something went wrong")
+		return
+	}
+	defer file.Close()
+
+	// The browser's declared type is a hint; storage re-checks it against its
+	// allow-list and decides the extension itself.
+	path, err := h.files.Save(c.Request.Context(), header.Header.Get("Content-Type"), file)
+	if err != nil {
+		if errors.Is(err, storage.ErrUnsupportedType) {
+			response.Error(c, http.StatusUnsupportedMediaType, "unsupported_type",
+				"Only JPEG, PNG and WebP images are accepted")
+			return
+		}
+		logger.Errorf("upload avatar: save: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error", "Something went wrong")
+		return
+	}
+
+	response.Success(c, http.StatusCreated, "Image uploaded", gin.H{"url": h.absolute(c, path)})
+}
+
+// absolute turns a stored path into a full URL, so a frontend on another origin
+// can load it.
+func (h *AdminHandler) absolute(c *gin.Context, path string) string {
+	if h.baseURL != "" {
+		return h.baseURL + path
+	}
+	scheme := "http"
+	if c.Request.TLS != nil || strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") {
+		scheme = "https"
+	}
+	return scheme + "://" + c.Request.Host + path
 }
 
 // Login handles POST /api/v1/admin/auth/login.
@@ -201,6 +285,140 @@ func (h *AdminHandler) UpdateSidebar(c *gin.Context) {
 		return
 	}
 	response.OK(c, "Sidebar configuration updated", gin.H{"sections": sections})
+}
+
+// Users handles GET /api/v1/admin/users.
+//
+// Searching, filtering and paging are all query parameters and all applied by
+// PostgreSQL. The client sends what it wants and receives one page plus the
+// totals; it never receives every account and narrows them itself.
+func (h *AdminHandler) Users(c *gin.Context) {
+	page, _ := strconv.Atoi(c.Query("page"))
+	limit, _ := strconv.Atoi(c.Query("limit"))
+
+	result, err := h.admins.Users(
+		c.Request.Context(), c.Query("search"), c.Query("status"), page, limit,
+	)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidAdminStatus) {
+			response.Error(c, http.StatusBadRequest, "invalid_status", "Invalid status filter")
+			return
+		}
+		logger.Errorf("list users: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not load users")
+		return
+	}
+
+	users := make([]dto.AdminUserResponse, 0, len(result.Users))
+	for i := range result.Users {
+		row := &result.Users[i]
+		users = append(users, dto.NewAdminUserResponse(&row.User, row.Listings))
+	}
+
+	totalPages := int((result.Total + int64(result.Limit) - 1) / int64(result.Limit))
+	if totalPages < 1 {
+		totalPages = 1
+	}
+
+	response.OK(c, "Users", dto.AdminUserListResponse{
+		Users:      users,
+		Total:      result.Total,
+		Page:       result.Page,
+		Limit:      result.Limit,
+		TotalPages: totalPages,
+	})
+}
+
+// SetUserStatus handles PATCH /api/v1/admin/users/:id/status.
+func (h *AdminHandler) SetUserStatus(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil || id == uuid.Nil {
+		response.Error(c, http.StatusBadRequest, "invalid_id", "Invalid user id")
+		return
+	}
+
+	var req dto.UpdateUserStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+
+	if err := h.admins.SetUserStatus(c.Request.Context(), id, req.Status); err != nil {
+		switch {
+		case errors.Is(err, service.ErrAdminNotFound):
+			response.Error(c, http.StatusNotFound, "not_found", "User not found")
+		case errors.Is(err, service.ErrInvalidAdminStatus):
+			response.Error(c, http.StatusBadRequest, "invalid_status", "Invalid status")
+		default:
+			logger.Errorf("set user status: %v", err)
+			response.Error(c, http.StatusInternalServerError, "internal_error",
+				"Could not update the user")
+		}
+		return
+	}
+	response.OK(c, "User updated", nil)
+}
+
+// UpdateProfile handles PATCH /api/v1/admin/profile.
+//
+// The account edited is the one the token names. There is no id in the path or
+// the body, so this cannot be aimed at another administrator.
+func (h *AdminHandler) UpdateProfile(c *gin.Context) {
+	actor, ok := middleware.AdminFrom(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
+		return
+	}
+
+	var req dto.UpdateAdminProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+	req.Normalize()
+
+	// A picture must be one this server stored. Without the check, a client
+	// could point the avatar at any address on the internet and every viewer's
+	// browser would fetch it — a tracking pixel with an audience.
+	if req.AvatarURL != nil && *req.AvatarURL != "" && !h.isOwnUpload(*req.AvatarURL) {
+		response.Error(c, http.StatusBadRequest, "invalid_avatar",
+			"Upload the image first, then save the profile")
+		return
+	}
+
+	admin, err := h.admins.UpdateProfile(c.Request.Context(), actor, req.Name, req.AvatarURL)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrNameRequired):
+			response.Error(c, http.StatusBadRequest, "validation_failed", "Name cannot be empty")
+		case errors.Is(err, service.ErrAdminNotFound):
+			response.Error(c, http.StatusUnauthorized, "invalid_token", "Invalid token")
+		default:
+			logger.Errorf("update admin profile: %v", err)
+			response.Error(c, http.StatusInternalServerError, "internal_error",
+				"Could not save the profile")
+		}
+		return
+	}
+	response.OK(c, "Profile updated", dto.NewAdminResponse(admin))
+}
+
+// isOwnUpload reports whether a URL points at a file this server stored.
+//
+// Both forms are accepted: the absolute URL the uploader hands back, and the
+// bare path, which is what an older record may hold. Anything else is somebody
+// else's address.
+func (h *AdminHandler) isOwnUpload(url string) bool {
+	if strings.HasPrefix(url, h.uploadPath) {
+		return true
+	}
+	marker := h.uploadPath + "/"
+	if index := strings.Index(url, marker); index > 0 {
+		// Only after a scheme and host, never as a suffix of another path.
+		return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
+	}
+	return false
 }
 
 // actorAndTarget pulls the caller and the :id out of a request, reporting the

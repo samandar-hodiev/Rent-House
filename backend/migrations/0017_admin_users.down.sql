@@ -1,0 +1,4 @@
+ALTER TABLE admins DROP COLUMN IF EXISTS avatar_url;
+DROP INDEX IF EXISTS idx_users_blocked;
+ALTER TABLE users DROP CONSTRAINT IF EXISTS ck_users_status;
+ALTER TABLE users DROP COLUMN IF EXISTS status;

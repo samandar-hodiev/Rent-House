@@ -312,6 +312,12 @@ func newRouter(
 		me.GET("/dashboard/summary", favoriteHandler.Summary)
 	}
 
+	// Uploaded files: listing photographs and chat attachments share one store.
+	files, err := storage.NewLocalStorage(cfg.UploadDir, cfg.UploadPublicPath)
+	if err != nil {
+		return nil, fmt.Errorf("storage: %w", err)
+	}
+
 	// The dashboard, which is a separate system with separate accounts.
 	//
 	// Its own table, its own token audience and its own middleware: a signed-in
@@ -319,7 +325,9 @@ func newRouter(
 	// marketplace. Sharing one account table would mean the public registration
 	// endpoint writes rows the admin authorization has to be careful about.
 	adminService := service.NewAdminService(repository.NewAdminRepository(db), tokens)
-	adminHandler := handler.NewAdminHandler(adminService)
+	adminHandler := handler.NewAdminHandler(
+		adminService, files, cfg.UploadPublicPath, cfg.PublicBaseURL,
+	)
 
 	admin := v1.Group("/admin")
 	{
@@ -332,6 +340,21 @@ func newRouter(
 		{
 			authed.GET("/auth/me", adminHandler.Me)
 			authed.POST("/auth/logout", adminHandler.Logout)
+
+			// The administrator's own account: their name and their picture,
+			// and nothing else. The role and the status are not editable here
+			// by anyone, including themselves.
+			authed.PATCH("/profile", adminHandler.UpdateProfile)
+			authed.POST("/profile/avatar", adminHandler.UploadAvatar)
+
+			// Marketplace accounts. Moderating them is what an administrator
+			// is for, so this is not owner-only — but it is behind the
+			// "users" section, which the owner can withdraw.
+			marketplaceUsers := authed.Group("/users", middleware.RequireSection(adminService, "users"))
+			{
+				marketplaceUsers.GET("", adminHandler.Users)
+				marketplaceUsers.PATCH("/:id/status", adminHandler.SetUserStatus)
+			}
 
 			// Read by every administrator, because the dashboard draws its own
 			// navigation from it. Written by the owner alone.
@@ -348,12 +371,6 @@ func newRouter(
 				admins.DELETE("/:id", adminHandler.Delete)
 			}
 		}
-	}
-
-	// Uploaded files: listing photographs and chat attachments share one store.
-	files, err := storage.NewLocalStorage(cfg.UploadDir, cfg.UploadPublicPath)
-	if err != nil {
-		return nil, fmt.Errorf("storage: %w", err)
 	}
 
 	// Chat. The hub is process-wide state — the set of live sockets — so it is

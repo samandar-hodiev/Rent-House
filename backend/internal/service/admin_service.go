@@ -278,6 +278,84 @@ func (s *AdminService) MayUseSection(
 	return s.admins.SectionEnabled(ctx, section)
 }
 
+// UserPage is one page of marketplace accounts, with what a paginator needs.
+type UserPage struct {
+	Users []repository.AdminUserRow
+	Total int64
+	Page  int
+	Limit int
+}
+
+// maxUserPageSize caps what a caller may ask for, so a request for a million
+// rows cannot be made by editing a query string.
+const maxUserPageSize = 100
+
+// Users lists marketplace accounts for the administrator's table.
+func (s *AdminService) Users(
+	ctx context.Context, search, status string, page, limit int,
+) (*UserPage, error) {
+	if status != "" && status != models.UserStatusActive && status != models.UserStatusBlocked {
+		return nil, ErrInvalidAdminStatus
+	}
+	if page < 1 {
+		page = 1
+	}
+	switch {
+	case limit < 1:
+		limit = 10
+	case limit > maxUserPageSize:
+		limit = maxUserPageSize
+	}
+
+	rows, total, err := s.admins.Users(ctx, repository.UserQuery{
+		Search: search, Status: status, Page: page, Limit: limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &UserPage{Users: rows, Total: total, Page: page, Limit: limit}, nil
+}
+
+// SetUserStatus blocks or unblocks a marketplace account.
+//
+// Any administrator may do it — moderating the marketplace is what the role is
+// for — but only an administrator: the middleware has already established that
+// the caller is one.
+func (s *AdminService) SetUserStatus(ctx context.Context, id uuid.UUID, status string) error {
+	if status != models.UserStatusActive && status != models.UserStatusBlocked {
+		return ErrInvalidAdminStatus
+	}
+	if err := s.admins.SetUserStatus(ctx, id, status); err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return ErrAdminNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+// UpdateProfile changes the calling administrator's own name and picture.
+//
+// The account edited is the one the token named — there is no id in the
+// signature, so this cannot be aimed at anybody else. Role and status are not
+// parameters: an administrator cannot promote themselves by editing a form.
+func (s *AdminService) UpdateProfile(
+	ctx context.Context, actor *models.Admin, name string, avatarURL *string,
+) (*models.Admin, error) {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return nil, ErrNameRequired
+	}
+
+	if err := s.admins.UpdateProfile(ctx, actor.ID, trimmed, avatarURL); err != nil {
+		if errors.Is(err, repository.ErrAdminNotFound) {
+			return nil, ErrAdminNotFound
+		}
+		return nil, err
+	}
+	return s.admins.FindByID(ctx, actor.ID)
+}
+
 // EnsureOwner creates the first owner if there is none.
 //
 // Idempotent, so it can run on every deploy: with an owner present it reports

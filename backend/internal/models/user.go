@@ -7,6 +7,16 @@ const (
 	LanguageEn = "en"
 )
 
+// Whether an account may be used.
+//
+// Set by an administrator, and not by the person themselves. Distinct from a
+// user_blocks row, which is one member refusing to hear from another: this one
+// refuses the sign-in.
+const (
+	UserStatusActive  = "active"
+	UserStatusBlocked = "blocked"
+)
+
 // Theme options offered by the frontend.
 const (
 	ThemeLight = "light"
@@ -38,6 +48,8 @@ type User struct {
 	PasswordHash string `gorm:"column:password_hash;type:varchar(255);not null" json:"-"`
 
 	AvatarURL *string `gorm:"column:avatar_url;type:text" json:"avatar_url,omitempty"`
+	// "active" or "blocked". A blocked account cannot sign in; see AuthService.
+	Status string `gorm:"column:status;type:varchar(20);not null;default:active" json:"status"`
 	Language  string  `gorm:"column:language;type:varchar(2);not null;default:uz" json:"language"`
 	Theme     string  `gorm:"column:theme;type:varchar(5);not null;default:light" json:"theme"`
 

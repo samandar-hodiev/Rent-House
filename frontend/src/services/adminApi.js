@@ -15,8 +15,23 @@ export function toAdmin(data) {
     // 'owner' | 'super_admin' — as stored, so the UI never invents a role.
     role: data.role,
     status: data.status,
+    avatarUrl: data.avatar_url ?? null,
     createdAt: data.created_at,
     lastLoginAt: data.last_login_at ?? null,
+  }
+}
+
+/** Maps a marketplace account as the administrator's table shows it. */
+export function toManagedUser(data) {
+  return {
+    id: data.id,
+    name: data.name,
+    email: data.email ?? null,
+    phone: data.phone ?? null,
+    avatarUrl: data.avatar_url ?? null,
+    status: data.status,
+    listings: data.listings ?? 0,
+    registeredAt: data.registered_at,
   }
 }
 
@@ -89,4 +104,62 @@ export async function saveSidebarSections(sections, { token, signal } = {}) {
     signal,
   })
   return data?.sections ?? {}
+}
+
+/**
+ * One page of marketplace accounts.
+ *
+ * Searching, filtering and paging are all the server's work: it returns the
+ * page plus the totals a paginator needs, so the client never holds every
+ * account in order to show ten of them.
+ */
+export async function fetchUsers({ search, status, page = 1, limit = 10, token, signal } = {}) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+  if (search) params.set('search', search)
+  if (status) params.set('status', status)
+
+  const data = await request(`/admin/users?${params}`, { token, signal })
+  return {
+    users: (data?.users ?? []).map(toManagedUser),
+    total: data?.total ?? 0,
+    page: data?.page ?? 1,
+    totalPages: data?.total_pages ?? 1,
+  }
+}
+
+/** Blocks or unblocks a marketplace account. */
+export async function setUserStatus(id, status, { token, signal } = {}) {
+  return request(`/admin/users/${id}/status`, {
+    method: 'PATCH',
+    body: { status },
+    token,
+    signal,
+  })
+}
+
+/** The calling administrator's own name and picture. Nothing else is editable. */
+export async function updateProfile({ name, avatarUrl, token, signal } = {}) {
+  const body = { name }
+  // Omitted rather than sent as null when unchanged: the server treats an
+  // absent field as "leave it alone".
+  if (avatarUrl !== undefined) body.avatar_url = avatarUrl
+  return toAdmin(await request('/admin/profile', { method: 'PATCH', body, token, signal }))
+}
+
+/**
+ * Stores a picture and returns its URL.
+ *
+ * Uploading does not change the profile — saving does. A picture chosen and
+ * then abandoned leaves the account as it was.
+ */
+export async function uploadAvatar(file, { token, signal } = {}) {
+  const form = new FormData()
+  form.append('image', file)
+  const data = await request('/admin/profile/avatar', {
+    method: 'POST',
+    body: form,
+    token,
+    signal,
+  })
+  return data?.url ?? null
 }

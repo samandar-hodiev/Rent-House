@@ -46,6 +46,9 @@ var (
 	// Profile editing. Each says exactly what the person has to change, so the
 	// handler can map it to a message rather than a generic refusal.
 	ErrNameRequired    = errors.New("name cannot be empty")
+	// ErrAccountBlocked is returned when an administrator has blocked the
+	// account. Distinct from bad credentials: the password was right.
+	ErrAccountBlocked = errors.New("account is blocked")
 	ErrContactRequired = errors.New("an account needs a phone number or an email")
 	ErrInvalidPhone    = errors.New("phone number is not a valid Uzbek mobile number")
 	ErrPhoneTaken      = errors.New("phone number already belongs to another account")
@@ -396,6 +399,14 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest) (*dto.Aut
 	// CompareHashAndPassword is constant-time with respect to the hash.
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		return nil, ErrInvalidCredentials
+	}
+
+	// Checked after the password, not before: telling somebody who guessed an
+	// address but not its password that the account is blocked would confirm
+	// the address exists. This is what an administrator's "Bloklash" does —
+	// without it the status would be a label rather than a consequence.
+	if user.Status == models.UserStatusBlocked {
+		return nil, ErrAccountBlocked
 	}
 
 	return s.authResponse(user)
