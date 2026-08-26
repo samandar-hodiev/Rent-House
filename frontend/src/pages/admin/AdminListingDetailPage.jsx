@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import {
-  ArrowLeft, Building2, ChevronLeft, ChevronRight, Eye, Heart, Loader2, MessageSquare,
-  Phone, ShieldAlert,
-} from 'lucide-react'
+import { ArrowLeft, Building2, Eye, Heart, Loader2, MessageSquare, Phone } from 'lucide-react'
 import EmptyState from '../../components/EmptyState'
 import UserAvatar from '../../components/dashboard/UserAvatar'
 import ListingGalleryDialog from '../../components/admin/ListingGalleryDialog'
+import ConversationAudit from '../../components/admin/ConversationAudit'
 import { AdminCard, StatusBadge, useAdminFormat } from '../../components/admin/adminUi'
 import { ADMIN_ROLE, useAdmin } from '../../context/AdminSettingsContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
-import { fetchListing, fetchListingChats } from '../../services/adminApi'
+import { fetchListing } from '../../services/adminApi'
 import { ADMIN_ROUTES } from '../../routes/adminPaths'
 
 /** One figure about the listing. */
@@ -33,114 +31,6 @@ function Field({ label, children }) {
     <div className="min-w-0">
       <dt className="text-[11px] text-text-muted">{label}</dt>
       <dd className="mt-0.5 truncate text-sm text-text-primary">{children}</dd>
-    </div>
-  )
-}
-
-/**
- * The conversations held about this listing, one at a time.
- *
- * Read-only and deliberately so: there is no composer anywhere in it, so an
- * administrator cannot write in somebody else's name even by accident. It shows
- * the latest message of each conversation and nothing further back — this is a
- * preview, not an inbox.
- *
- * Rendered only for the owner, and the endpoint behind it answers 403 to
- * anybody else, so the two agree rather than the interface being the only lock.
- */
-function ChatPreview({ listingId, count }) {
-  const { t } = useAdmin()
-  const { token } = useAdminAuth()
-  const [chats, setChats] = useState([])
-  const [state, setState] = useState('loading')
-  const [index, setIndex] = useState(0)
-
-  useEffect(() => {
-    const controller = new AbortController()
-    let cancelled = false
-    fetchListingChats(listingId, { token, signal: controller.signal })
-      .then((rows) => {
-        if (cancelled) return
-        setChats(rows)
-        setState('ready')
-      })
-      .catch((error) => {
-        if (cancelled || error?.name === 'AbortError') return
-        setState('error')
-      })
-    return () => {
-      cancelled = true
-      controller.abort()
-    }
-  }, [listingId, token])
-
-  if (state === 'loading') {
-    return (
-      <div className="flex items-center justify-center p-6">
-        <Loader2 aria-hidden="true" size={18} className="animate-spin text-text-muted" />
-      </div>
-    )
-  }
-  if (state === 'error' || chats.length === 0) {
-    return <p className="p-4 text-sm text-text-muted">{t('listings.noChats')}</p>
-  }
-
-  const chat = chats[Math.min(index, chats.length - 1)]
-  const at = new Date(chat.lastMessageAt)
-  const pad = (value) => String(value).padStart(2, '0')
-
-  return (
-    <div className="flex flex-col gap-3 p-4">
-      <div className="flex items-start gap-2.5">
-        <UserAvatar name={chat.userName} src={chat.userAvatar} />
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className="min-w-0 truncate text-sm font-medium text-text-primary">
-              {chat.userName}
-            </span>
-            {chat.unread > 0 ? (
-              <span className="shrink-0 rounded-full bg-primary-light px-1.5 py-0.5 text-[10px] font-semibold text-primary-hover dark:text-primary">
-                {chat.unread}
-              </span>
-            ) : null}
-          </span>
-          <span className="mt-0.5 block text-sm text-text-secondary">{chat.lastMessage}</span>
-          <span className="mt-0.5 block text-[11px] text-text-muted">
-            {pad(at.getHours())}:{pad(at.getMinutes())}
-          </span>
-        </span>
-      </div>
-
-      {/* One at a time, with a counter: an administrator scanning seven
-          conversations needs to know where they are in them. */}
-      <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
-        <button
-          type="button"
-          onClick={() => setIndex((i) => Math.max(0, i - 1))}
-          disabled={index === 0}
-          className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <ChevronLeft aria-hidden="true" size={14} />
-          {t('action.previous')}
-        </button>
-        <span className="text-xs tabular-nums text-text-muted">
-          {index + 1} / {chats.length}
-        </span>
-        <button
-          type="button"
-          onClick={() => setIndex((i) => Math.min(chats.length - 1, i + 1))}
-          disabled={index >= chats.length - 1}
-          className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {t('action.next')}
-          <ChevronRight aria-hidden="true" size={14} />
-        </button>
-      </div>
-
-      <p className="flex items-center gap-2 text-[11px] text-text-muted">
-        <ShieldAlert aria-hidden="true" size={13} className="shrink-0" />
-        {t('chats.readOnly')}
-      </p>
     </div>
   )
 }
@@ -318,8 +208,12 @@ function AdminListingDetailPage() {
       {/* The owner's alone. The endpoint refuses everybody else, so this is the
           interface agreeing with the rule rather than enforcing it. */}
       {role === ADMIN_ROLE.owner ? (
-        <AdminCard title={t('listings.chats', { count: listing.stats.chats })}>
-          <ChatPreview listingId={listing.id} count={listing.stats.chats} />
+        <AdminCard title={t('audit.title')} className="overflow-hidden">
+          <ConversationAudit
+            listingId={listing.id}
+            ownerId={listing.owner.id}
+            ownerName={listing.owner.name}
+          />
         </AdminCard>
       ) : null}
 

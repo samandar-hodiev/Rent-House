@@ -265,3 +265,131 @@ func (r *AdminListingRepository) Chats(
 	}
 	return rows, nil
 }
+
+// OwnerConversation is one thread between a listing owner and somebody who
+// wrote to them.
+type OwnerConversation struct {
+	ConversationID uuid.UUID `gorm:"column:conversation_id"`
+	UserID         uuid.UUID `gorm:"column:user_id"`
+	UserName       string    `gorm:"column:user_name"`
+	UserAvatar     *string   `gorm:"column:user_avatar"`
+	LastMessageAt  time.Time `gorm:"column:last_message_at"`
+	MessageCount   int64     `gorm:"column:message_count"`
+}
+
+// OwnerMessage is one message inside such a thread, as moderation reads it.
+type OwnerMessage struct {
+	ID             uuid.UUID  `gorm:"column:id"`
+	ConversationID uuid.UUID  `gorm:"column:conversation_id"`
+	SenderID       uuid.UUID  `gorm:"column:sender_id"`
+	SenderName     string     `gorm:"column:sender_name"`
+	Body           string     `gorm:"column:body"`
+	Kind           string     `gorm:"column:kind"`
+	CreatedAt      time.Time  `gorm:"column:created_at"`
+	EditedAt       *time.Time `gorm:"column:edited_at"`
+	DeletedAt      *time.Time `gorm:"column:deleted_at"`
+	// Null when the message stands, and null for one withdrawn before the
+	// column existed — the audit view says so rather than naming nobody.
+	DeletedByName *string `gorm:"column:deleted_by_name"`
+	ListingTitle  *string `gorm:"column:listing_title"`
+}
+
+// OwnerConversations lists every thread held about any of one person's
+// listings, busiest end first.
+//
+// Scoped through `messages.apartment_id`: conversations are per pair of people,
+// so the same thread can carry messages about several listings and about none.
+// Asking which conversations contain a message about one of this owner's
+// listings is the question that matches how the data is actually shaped.
+func (r *AdminListingRepository) OwnerConversations(
+	ctx context.Context, ownerID uuid.UUID,
+) ([]OwnerConversation, error) {
+	var rows []OwnerConversation
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT
+			c.id AS conversation_id,
+			other.id AS user_id,
+			btrim(other.first_name || ' ' || other.last_name) AS user_name,
+			other.avatar_url AS user_avatar,
+			MAX(m.created_at) AS last_message_at,
+			COUNT(m.id) AS message_count
+		FROM conversations c
+		JOIN users other
+		  ON other.id = CASE WHEN c.buyer_id = ? THEN c.owner_id ELSE c.buyer_id END
+		JOIN messages m ON m.conversation_id = c.id
+		WHERE (c.buyer_id = ? OR c.owner_id = ?)
+		  AND EXISTS (
+		        SELECT 1 FROM messages lm
+		        JOIN apartments a ON a.id = lm.apartment_id
+		        WHERE lm.conversation_id = c.id AND a.owner_id = ?
+		  )
+		GROUP BY c.id, other.id, other.first_name, other.last_name, other.avatar_url
+		ORDER BY MAX(m.created_at) DESC
+	`, ownerID, ownerID, ownerID, ownerID).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("owner conversations: %w", err)
+	}
+	return rows, nil
+}
+
+// OwnerMessages loads every message of the given conversations.
+//
+// One query for all of them rather than one per thread: the dashboard shows
+// them one at a time but fetches them together, so moving between threads is
+// instant and the server is asked once.
+//
+// Withdrawn messages come back with their text. That is the whole point of the
+// endpoint — and why it is refused to anybody but the owner.
+func (r *AdminListingRepository) OwnerMessages(
+	ctx context.Context, conversationIDs []uuid.UUID,
+) ([]OwnerMessage, error) {
+	if len(conversationIDs) == 0 {
+		return nil, nil
+	}
+
+	var rows []OwnerMessage
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT
+			m.id, m.conversation_id, m.sender_id,
+			btrim(s.first_name || ' ' || s.last_name) AS sender_name,
+			m.body, m.kind, m.created_at, m.edited_at, m.deleted_at,
+			CASE WHEN d.id IS NULL THEN NULL
+			     ELSE btrim(d.first_name || ' ' || d.last_name) END AS deleted_by_name,
+			a.title AS listing_title
+		FROM messages m
+		JOIN users s ON s.id = m.sender_id
+		LEFT JOIN users d ON d.id = m.deleted_by
+		LEFT JOIN apartments a ON a.id = m.apartment_id
+		WHERE m.conversation_id IN ?
+		ORDER BY m.created_at
+	`, conversationIDs).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("owner messages: %w", err)
+	}
+	return rows, nil
+}
+
+// ListingOwnerID returns who published a listing, for scoping the audit view.
+func (r *AdminListingRepository) ListingOwnerID(
+	ctx context.Context, listingID uuid.UUID,
+) (uuid.UUID, error) {
+	// Read as text and parsed here: the driver hands a uuid column back as a
+	// string, and scanning it straight into uuid.UUID asks it to fill a
+	// [16]byte with 36 characters.
+	var raw string
+	err := r.db.WithContext(ctx).
+		Table("apartments").
+		Where("id = ?", listingID).
+		Pluck("owner_id::text", &raw).Error
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("listing owner: %w", err)
+	}
+	if raw == "" {
+		return uuid.Nil, ErrListingNotFound
+	}
+	ownerID, err := uuid.Parse(raw)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("listing owner: %w", err)
+	}
+	return ownerID, nil
+}

@@ -536,7 +536,7 @@ func (s *ChatService) DeleteMessage(
 	// it gone, and it is.
 	if message.DeletedAt == nil {
 		deletedAt := s.now().UTC()
-		if err := s.chat.SoftDeleteMessage(ctx, messageID, deletedAt); err != nil {
+		if err := s.chat.SoftDeleteMessage(ctx, messageID, actorID, deletedAt); err != nil {
 			return nil, err
 		}
 		message.DeletedAt = &deletedAt
@@ -608,7 +608,7 @@ func (s *ChatService) DeleteMessages(
 	}
 
 	deletedAt := s.now().UTC()
-	if err := s.chat.SoftDeleteMessages(ctx, unique, deletedAt); err != nil {
+	if err := s.chat.SoftDeleteMessages(ctx, unique, actorID, deletedAt); err != nil {
 		return nil, err
 	}
 

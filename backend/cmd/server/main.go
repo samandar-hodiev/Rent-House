@@ -364,6 +364,10 @@ func newRouter(
 				// this dashboard can show, so this one is the owner's alone —
 				// checked in the service, not just hidden in the sidebar.
 				marketplaceListings.GET("/:id/chats", adminHandler.ListingChats)
+				// The full audit: every thread about this owner's listings,
+				// with the text of withdrawn messages. Owner-only, and the
+				// service refuses before it reads anything.
+				marketplaceListings.GET("/:id/audit", adminHandler.ListingAudit)
 			}
 
 			// Marketplace accounts. Moderating them is what an administrator

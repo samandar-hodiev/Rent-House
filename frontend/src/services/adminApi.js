@@ -301,3 +301,33 @@ export async function fetchListingChats(id, { token, signal } = {}) {
     unread: c.unread ?? 0,
   }))
 }
+
+/**
+ * Every conversation held about a listing owner's listings, with the messages.
+ *
+ * The owner's alone: the API answers 403 to anyone else. Withdrawn messages
+ * arrive with their original text and who withdrew it, which is the whole point
+ * of the endpoint and why it is guarded at the server rather than in the UI.
+ */
+export async function fetchListingAudit(id, { token, signal } = {}) {
+  const data = await request(`/admin/listings/${id}/audit`, { token, signal })
+  return (data?.conversations ?? []).map((c) => ({
+    conversationId: c.conversation_id,
+    userId: c.user_id,
+    userName: c.user_name,
+    userAvatar: c.user_avatar ?? null,
+    lastMessageAt: c.last_message_at,
+    messages: (c.messages ?? []).map((m) => ({
+      id: m.id,
+      senderId: m.sender_id,
+      senderName: m.sender_name,
+      body: m.body,
+      kind: m.kind,
+      createdAt: m.created_at,
+      editedAt: m.edited_at ?? null,
+      deletedAt: m.deleted_at ?? null,
+      deletedByName: m.deleted_by_name ?? null,
+      listingTitle: m.listing_title ?? null,
+    })),
+  }))
+}

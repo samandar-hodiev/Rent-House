@@ -429,6 +429,33 @@ func (h *AdminHandler) ListingChats(c *gin.Context) {
 	response.OK(c, "Listing chats", gin.H{"chats": dto.NewAdminChatPreviews(chats)})
 }
 
+// ListingAudit handles GET /api/v1/admin/listings/:id/audit.
+//
+// Every conversation held about this listing's owner's listings, with the full
+// text of every message — including messages the participants withdrew. The
+// owner's alone, refused in the service before a single row is read.
+func (h *AdminHandler) ListingAudit(c *gin.Context) {
+	actor, exists := middleware.AdminFrom(c)
+	if !exists {
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
+		return
+	}
+	id, ok := h.listingID(c)
+	if !ok {
+		return
+	}
+
+	audit, err := h.listings.AuditConversations(c.Request.Context(), actor, id)
+	if err != nil {
+		h.writeListingError(c, err, "listing audit")
+		return
+	}
+
+	response.OK(c, "Conversation audit", gin.H{
+		"conversations": dto.NewAdminAuditConversations(audit.Conversations, audit.Messages),
+	})
+}
+
 func (h *AdminHandler) listingID(c *gin.Context) (uuid.UUID, bool) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil || id == uuid.Nil {

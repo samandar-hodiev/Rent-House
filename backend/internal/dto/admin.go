@@ -296,3 +296,75 @@ func NewAdminChatPreviews(rows []repository.ChatPreview) []AdminChatPreviewRespo
 	}
 	return out
 }
+
+// AdminAuditMessageResponse is one message as moderation reads it.
+//
+// Unlike the conversation's own participants, the owner receives the text of a
+// withdrawn message together with who withdrew it and when. Everything else in
+// the shape matches what the chat already speaks.
+type AdminAuditMessageResponse struct {
+	ID         string     `json:"id"`
+	SenderID   string     `json:"sender_id"`
+	SenderName string     `json:"sender_name"`
+	Body       string     `json:"body"`
+	Kind       string     `json:"kind"`
+	CreatedAt  time.Time  `json:"created_at"`
+	EditedAt   *time.Time `json:"edited_at"`
+	DeletedAt  *time.Time `json:"deleted_at"`
+	// Null for a message still standing, and null for one withdrawn before the
+	// column existed — the interface says "unknown" rather than naming nobody.
+	DeletedByName *string `json:"deleted_by_name"`
+	ListingTitle  *string `json:"listing_title"`
+}
+
+// AdminAuditConversationResponse is one thread, with its messages.
+type AdminAuditConversationResponse struct {
+	ConversationID string                      `json:"conversation_id"`
+	UserID         string                      `json:"user_id"`
+	UserName       string                      `json:"user_name"`
+	UserAvatar     *string                     `json:"user_avatar"`
+	LastMessageAt  time.Time                   `json:"last_message_at"`
+	Messages       []AdminAuditMessageResponse `json:"messages"`
+}
+
+// NewAdminAuditConversations stitches the two queries into one answer.
+//
+// The messages arrive as one flat list for every thread, so they are bucketed
+// here rather than fetched per thread — one query for all of them instead of
+// one each.
+func NewAdminAuditConversations(
+	conversations []repository.OwnerConversation, messages []repository.OwnerMessage,
+) []AdminAuditConversationResponse {
+	byConversation := make(map[string][]AdminAuditMessageResponse, len(conversations))
+	for _, m := range messages {
+		key := m.ConversationID.String()
+		byConversation[key] = append(byConversation[key], AdminAuditMessageResponse{
+			ID:            m.ID.String(),
+			SenderID:      m.SenderID.String(),
+			SenderName:    m.SenderName,
+			Body:          m.Body,
+			Kind:          m.Kind,
+			CreatedAt:     m.CreatedAt,
+			EditedAt:      m.EditedAt,
+			DeletedAt:     m.DeletedAt,
+			DeletedByName: m.DeletedByName,
+			ListingTitle:  m.ListingTitle,
+		})
+	}
+
+	out := make([]AdminAuditConversationResponse, 0, len(conversations))
+	for _, c := range conversations {
+		key := c.ConversationID.String()
+		out = append(out, AdminAuditConversationResponse{
+			ConversationID: key,
+			UserID:         c.UserID.String(),
+			UserName:       c.UserName,
+			UserAvatar:     c.UserAvatar,
+			LastMessageAt:  c.LastMessageAt,
+			// Never nil: a thread with nothing in it must arrive as [] so the
+			// client can count it without checking.
+			Messages: append([]AdminAuditMessageResponse{}, byConversation[key]...),
+		})
+	}
+	return out
+}

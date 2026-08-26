@@ -568,16 +568,17 @@ func (r *ChatRepository) UpdateMessageBody(
 
 // SoftDeleteMessage withdraws a message from both sides.
 //
-// The body is cleared as well as flagged: a withdrawn message should not sit in
-// the database in readable form, and the response would not show it anyway.
-// Migration 0004 relaxes the not-blank constraint for exactly this case.
+// The text stays in the row and `deleted_by` records who withdrew it. Neither
+// reaches the two people in the conversation: the response builder blanks the
+// body of anything deleted, which it has always done, so clearing the column as
+// well only destroyed the one copy moderation would need. See migration 0019.
 func (r *ChatRepository) SoftDeleteMessage(
-	ctx context.Context, id uuid.UUID, deletedAt time.Time,
+	ctx context.Context, id, deletedBy uuid.UUID, deletedAt time.Time,
 ) error {
 	err := r.db.WithContext(ctx).
 		Model(&models.Message{}).
 		Where("id = ?", id).
-		Updates(map[string]any{"deleted_at": deletedAt, "body": ""}).Error
+		Updates(map[string]any{"deleted_at": deletedAt, "deleted_by": deletedBy}).Error
 	if err != nil {
 		return fmt.Errorf("delete message: %w", err)
 	}
@@ -617,7 +618,7 @@ func (r *ChatRepository) HideMessagesForUser(
 // One statement, so a selection cannot end up half-withdrawn because the caller
 // failed partway through a loop.
 func (r *ChatRepository) SoftDeleteMessages(
-	ctx context.Context, ids []uuid.UUID, deletedAt time.Time,
+	ctx context.Context, ids []uuid.UUID, deletedBy uuid.UUID, deletedAt time.Time,
 ) error {
 	if len(ids) == 0 {
 		return nil
@@ -625,10 +626,11 @@ func (r *ChatRepository) SoftDeleteMessages(
 	err := r.db.WithContext(ctx).
 		Model(&models.Message{}).
 		Where("id IN ?", ids).
-		// Already-withdrawn messages keep their original timestamp: re-running
-		// a delete should not move when it happened.
+		// Already-withdrawn messages keep their original timestamp and their
+		// original deleter: re-running a delete should not rewrite when it
+		// happened or who did it.
 		Where("deleted_at IS NULL").
-		Updates(map[string]any{"deleted_at": deletedAt, "body": ""}).Error
+		Updates(map[string]any{"deleted_at": deletedAt, "deleted_by": deletedBy}).Error
 	if err != nil {
 		return fmt.Errorf("delete messages: %w", err)
 	}

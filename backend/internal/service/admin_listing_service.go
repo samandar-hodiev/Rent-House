@@ -151,3 +151,51 @@ func isKnownListingStatus(status string) bool {
 	}
 	return false
 }
+
+// OwnerAudit is every conversation held about one person's listings, with the
+// messages in them.
+type OwnerAudit struct {
+	Conversations []repository.OwnerConversation
+	Messages      []repository.OwnerMessage
+}
+
+// AuditConversations returns the threads about a listing owner's listings.
+//
+// Reached from a listing but scoped to its owner: an administrator looking into
+// somebody's conduct wants every conversation that person has had about what
+// they published, not the one thread that happens to mention this flat.
+//
+// The owner's alone. It returns the text of withdrawn messages, which is the
+// most sensitive thing this dashboard can produce, so the check is here — in
+// the service every caller passes through — and not in the interface.
+func (s *AdminListingService) AuditConversations(
+	ctx context.Context, actor *models.Admin, listingID uuid.UUID,
+) (*OwnerAudit, error) {
+	if !actor.IsOwner() {
+		return nil, ErrAdminForbidden
+	}
+
+	ownerID, err := s.listings.ListingOwnerID(ctx, listingID)
+	if err != nil {
+		if errors.Is(err, repository.ErrListingNotFound) {
+			return nil, ErrListingNotFound
+		}
+		return nil, err
+	}
+
+	conversations, err := s.listings.OwnerConversations(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]uuid.UUID, 0, len(conversations))
+	for _, c := range conversations {
+		ids = append(ids, c.ConversationID)
+	}
+	messages, err := s.listings.OwnerMessages(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	return &OwnerAudit{Conversations: conversations, Messages: messages}, nil
+}

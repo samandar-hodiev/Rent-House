@@ -46,6 +46,10 @@ type Message struct {
 
 	Timestamps
 
+	// Who withdrew it, when somebody did. Null for a message still standing,
+	// and null for one withdrawn before migration 0019.
+	DeletedBy *uuid.UUID `gorm:"column:deleted_by;type:uuid" json:"-"`
+
 	Conversation *Conversation      `gorm:"foreignKey:ConversationID;references:ID" json:"conversation,omitempty"`
 	Sender       *User              `gorm:"foreignKey:SenderID;references:ID" json:"sender,omitempty"`
 	Attachment   *MessageAttachment `gorm:"foreignKey:MessageID" json:"attachment,omitempty"`
