@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Loader2 } from 'lucide-react'
 import { useAdmin } from '../../context/AdminSettingsContext'
+import { useModalDialog } from '../../hooks/useModalDialog'
 
 /**
  * The dashboard's confirmation dialog.
@@ -31,16 +31,7 @@ function AdminConfirmDialog({
   children,
 }) {
   const { t } = useAdmin()
-  const dialogRef = useRef(null)
-
-  useEffect(() => {
-    dialogRef.current?.focus()
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape' && !busy) onCancel()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onCancel, busy])
+  const dialogRef = useModalDialog(onCancel, { disabled: busy })
 
   const host = document.getElementById('admin-root')
   if (!host) return null

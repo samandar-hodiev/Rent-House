@@ -12,21 +12,15 @@ import { ApiError } from '../../services/apiClient'
 import {
   createAdmin, deleteAdmin, fetchAdmins, setAdminStatus,
 } from '../../services/adminApi'
+import { useModalDialog } from '../../hooks/useModalDialog'
 
 const INPUT =
   'h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
 
 /** A dialog inside the admin root, so it takes the dashboard's own theme. */
 function AdminDialog({ title, onClose, children }) {
+  const dialogRef = useModalDialog(onClose)
   const host = document.getElementById('admin-root')
-  useEffect(() => {
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
-
   if (!host) return null
 
   return createPortal(
@@ -35,6 +29,8 @@ function AdminDialog({ title, onClose, children }) {
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}

@@ -11,6 +11,7 @@ import {
 import { useAdmin } from '../../context/AdminSettingsContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { fetchUsers, setUserStatus } from '../../services/adminApi'
+import { useModalDialog } from '../../hooks/useModalDialog'
 
 const PER_PAGE = 10
 
@@ -27,16 +28,7 @@ const SEARCH_DEBOUNCE = 300
  */
 function BlockDetailsDialog({ user, onClose }) {
   const { t } = useAdmin()
-  const dialogRef = useRef(null)
-
-  useEffect(() => {
-    dialogRef.current?.focus()
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  const dialogRef = useModalDialog(onClose)
 
   const host = document.getElementById('admin-root')
   if (!host) return null
@@ -74,7 +66,11 @@ function BlockDetailsDialog({ user, onClose }) {
         <h2 id="block-details-title" className="text-base font-semibold text-text-primary">
           {t('users.blockDetailsTitle')}
         </h2>
-        <p className="mt-1 text-sm text-text-muted">{user.name}</p>
+        {/* The account, not the person's display name — the name is already on
+            the row this was opened from, and repeating it identifies nobody.
+            RentHouse has no username: an account is registered with a phone or
+            an email and that is what identifies it, so that is what is shown. */}
+        <p className="mt-1 text-sm text-text-muted">{user.email ?? user.phone ?? user.name}</p>
 
         <dl className="mt-4 flex flex-col gap-3">
           {rows.map(([key, value]) => (

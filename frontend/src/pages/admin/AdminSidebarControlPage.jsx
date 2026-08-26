@@ -5,6 +5,7 @@ import { RotateCcw } from 'lucide-react'
 import { AdminCard, MockButton, PageHeading, Switch } from '../../components/admin/adminUi'
 import { CONFIGURABLE_NAV } from '../../components/admin/AdminSidebar'
 import { ADMIN_ROLE, useAdmin } from '../../context/AdminSettingsContext'
+import { useModalDialog } from '../../hooks/useModalDialog'
 import { ADMIN_ROUTES } from '../../routes/adminPaths'
 
 /**
@@ -31,16 +32,7 @@ import { ADMIN_ROUTES } from '../../routes/adminPaths'
  */
 function ResetDialog({ onCancel, onConfirm }) {
   const { t } = useAdmin()
-  const dialogRef = useRef(null)
-
-  useEffect(() => {
-    dialogRef.current?.focus()
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') onCancel()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onCancel])
+  const dialogRef = useModalDialog(onCancel)
 
   const host = document.getElementById('admin-root')
   if (!host) return null
