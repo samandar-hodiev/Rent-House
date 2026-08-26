@@ -134,3 +134,10 @@ func isUniqueViolation(err error) bool {
 	// code rather than the constraint name keeps this independent of naming.
 	return err != nil && strings.Contains(err.Error(), "SQLSTATE "+uniqueViolation)
 }
+
+// isConstraint reports which unique index a violation came from, for the few
+// tables that have more than one and where the caller must tell them apart.
+// Used only after isUniqueViolation has already matched on the SQLSTATE.
+func isConstraint(err error, name string) bool {
+	return err != nil && strings.Contains(err.Error(), name)
+}

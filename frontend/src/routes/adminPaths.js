@@ -3,6 +3,10 @@
 const BASE = '/admin'
 
 export const ADMIN_ROUTES = {
+  // The way in. Outside the guarded tree, because a signed-out person has to be
+  // able to reach it.
+  login: `${BASE}/login`,
+
   dashboard: BASE,
 
   users: `${BASE}/users`,

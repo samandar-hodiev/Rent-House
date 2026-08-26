@@ -14,6 +14,27 @@ import (
 	"github.com/google/uuid"
 )
 
+// Audiences a token can be minted for. They are separate systems with separate
+// accounts, and a token for one must never open the other.
+const (
+	ScopeUser  = "renthouse:user"
+	ScopeAdmin = "renthouse:admin"
+)
+
+// hasScope reports whether the audience list contains the scope. An empty
+// audience is the user scope: tokens minted before scopes existed have none.
+func hasScope(audience jwt.ClaimStrings, scope string) bool {
+	if len(audience) == 0 {
+		return scope == ScopeUser
+	}
+	for _, value := range audience {
+		if value == scope {
+			return true
+		}
+	}
+	return false
+}
+
 // Errors a caller can act on. Everything else is wrapped and reported as an
 // invalid token, so a client cannot learn why parsing failed.
 var (
@@ -54,11 +75,25 @@ func (s *Service) ExpiresIn() time.Duration { return s.expiresIn }
 // JWT is readable by anyone holding it, so it carries an identifier and nothing
 // else — no email, no phone, no profile data.
 func (s *Service) Generate(userID uuid.UUID) (string, time.Time, error) {
+	return s.GenerateScoped(userID, ScopeUser, s.expiresIn)
+}
+
+// GenerateScoped mints a token for one audience and no other.
+//
+// The scope is the JWT audience. It is what stops a marketplace user's token
+// from being presented to the admin API: both are signed with the same secret,
+// so without it a valid token from either side would verify on the other. A
+// separate secret would do the same job, but then two secrets have to be
+// deployed, rotated and kept in step.
+func (s *Service) GenerateScoped(
+	subject uuid.UUID, scope string, expiresIn time.Duration,
+) (string, time.Time, error) {
 	now := time.Now()
-	expiresAt := now.Add(s.expiresIn)
+	expiresAt := now.Add(expiresIn)
 
 	claims := jwt.RegisteredClaims{
-		Subject:   userID.String(),
+		Subject:   subject.String(),
+		Audience:  jwt.ClaimStrings{scope},
 		IssuedAt:  jwt.NewNumericDate(now),
 		ExpiresAt: jwt.NewNumericDate(expiresAt),
 	}
@@ -77,6 +112,17 @@ func (s *Service) Generate(userID uuid.UUID) (string, time.Time, error) {
 // with, but says nothing about whether the user still exists — the caller
 // decides whether that matters.
 func (s *Service) Validate(raw string) (uuid.UUID, error) {
+	return s.ValidateScoped(raw, ScopeUser)
+}
+
+// ValidateScoped verifies a token and requires it to have been minted for the
+// given audience.
+//
+// A token with no audience counts as ScopeUser. Tokens issued before scopes
+// existed carry none, and treating them as user tokens keeps every signed-in
+// visitor signed in — while still refusing them at the admin API, which asks
+// for ScopeAdmin.
+func (s *Service) ValidateScoped(raw, scope string) (uuid.UUID, error) {
 	claims := &jwt.RegisteredClaims{}
 
 	_, err := jwt.ParseWithClaims(raw, claims, func(t *jwt.Token) (any, error) {
@@ -94,6 +140,10 @@ func (s *Service) Validate(raw string) (uuid.UUID, error) {
 	}
 
 	if claims.Subject == "" {
+		return uuid.Nil, ErrInvalidToken
+	}
+
+	if !hasScope(claims.Audience, scope) {
 		return uuid.Nil, ErrInvalidToken
 	}
 

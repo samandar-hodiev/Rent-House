@@ -89,6 +89,9 @@ function ResetDialog({ onCancel, onConfirm }) {
 function AdminSidebarControlPage() {
   const { t, role, sidebar, setSidebarItem, resetSidebar } = useAdmin()
   const [confirming, setConfirming] = useState(false)
+  // A write can be refused. The switch goes back on its own; this says why,
+  // so the reader is not left wondering whether they mis-tapped.
+  const [failed, setFailed] = useState(false)
 
   if (role !== ADMIN_ROLE.owner) return <Navigate to={ADMIN_ROUTES.dashboard} replace />
 
@@ -128,7 +131,9 @@ function AdminSidebarControlPage() {
                 <Switch
                   checked={enabled}
                   labelledBy={labelId}
-                  onChange={(next) => setSidebarItem(item.id, next)}
+                  onChange={async (next) => {
+                    setFailed(!(await setSidebarItem(item.id, next)))
+                  }}
                 />
               </li>
             )
@@ -147,14 +152,20 @@ function AdminSidebarControlPage() {
         </div>
       </AdminCard>
 
+      {failed ? (
+        <p role="alert" className="rounded-md bg-error/10 px-3 py-2 text-sm text-error">
+          {t('sidebarControl.saveFailed')}
+        </p>
+      ) : null}
+
       <p className="text-xs text-text-muted">{t('sidebarControl.note')}</p>
 
       {confirming ? (
         <ResetDialog
           onCancel={() => setConfirming(false)}
-          onConfirm={() => {
-            resetSidebar()
+          onConfirm={async () => {
             setConfirming(false)
+            setFailed(!(await resetSidebar()))
           }}
         />
       ) : null}

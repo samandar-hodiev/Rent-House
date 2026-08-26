@@ -312,6 +312,44 @@ func newRouter(
 		me.GET("/dashboard/summary", favoriteHandler.Summary)
 	}
 
+	// The dashboard, which is a separate system with separate accounts.
+	//
+	// Its own table, its own token audience and its own middleware: a signed-in
+	// visitor's token is refused here, and an administrator's is refused by the
+	// marketplace. Sharing one account table would mean the public registration
+	// endpoint writes rows the admin authorization has to be careful about.
+	adminService := service.NewAdminService(repository.NewAdminRepository(db), tokens)
+	adminHandler := handler.NewAdminHandler(adminService)
+
+	admin := v1.Group("/admin")
+	{
+		// Public: somebody signing in has no token to present. There is no
+		// registration endpoint — the owner creates every other account, and
+		// the owner itself is created by `cmd/admin`.
+		admin.POST("/auth/login", adminHandler.Login)
+
+		authed := admin.Group("", middleware.AdminAuth(tokens, adminService))
+		{
+			authed.GET("/auth/me", adminHandler.Me)
+			authed.POST("/auth/logout", adminHandler.Logout)
+
+			// Read by every administrator, because the dashboard draws its own
+			// navigation from it. Written by the owner alone.
+			authed.GET("/sidebar", adminHandler.Sidebar)
+			authed.PUT("/sidebar", middleware.RequireOwner(), adminHandler.UpdateSidebar)
+
+			// Managing administrators is the owner's, enforced here rather than
+			// by hiding the link: a super admin calling this directly gets 403.
+			admins := authed.Group("/admins", middleware.RequireOwner())
+			{
+				admins.GET("", adminHandler.List)
+				admins.POST("", adminHandler.Create)
+				admins.PATCH("/:id/status", adminHandler.SetStatus)
+				admins.DELETE("/:id", adminHandler.Delete)
+			}
+		}
+	}
+
 	// Uploaded files: listing photographs and chat attachments share one store.
 	files, err := storage.NewLocalStorage(cfg.UploadDir, cfg.UploadPublicPath)
 	if err != nil {

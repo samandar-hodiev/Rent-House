@@ -1,14 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { ADMIN_DEFAULT_LOCALE, ADMIN_TRANSLATIONS } from '../locales/admin'
+import { ADMIN_AUTH_STATUS, useAdminAuth } from './AdminAuthContext'
+import { fetchSidebarSections, saveSidebarSections } from '../services/adminApi'
 
 // Its own keys, deliberately. The admin area's appearance and language belong
 // to whoever administers the marketplace; the public site's belong to whoever
 // is browsing it. Sharing a key would mean an administrator switching the
 // dashboard to Russian also switched the shop window.
+// Appearance and language are this browser's preference and stay local. The
+// role and the sidebar configuration are not preferences — they are what the
+// server says this account is and may see — so neither is stored here.
 const THEME_KEY = 'renthouse_admin_theme'
 const LOCALE_KEY = 'renthouse_admin_locale'
-const ROLE_KEY = 'renthouse_admin_role'
-const SIDEBAR_KEY = 'renthouse_admin_sidebar'
 
 /**
  * Every role an admin can hold, in one place.
@@ -18,15 +21,13 @@ const SIDEBAR_KEY = 'renthouse_admin_sidebar'
  * the sidebar; everyone else is offered whatever the owner configured, so a
  * role added here needs no other change to behave correctly.
  *
- * When admin sign-in exists these become the ids the session reports, and the
- * display names stay where they are now: in the dictionary, one entry each.
+ * These are the values the `admins.role` column holds, so the id travelling
+ * from the database to the header never changes shape on the way. The display
+ * names live in the dictionary, one entry each.
  */
 export const ADMIN_ROLE = {
   owner: 'owner',
-  superAdmin: 'superAdmin',
-  moderator: 'moderator',
-  support: 'support',
-  analyst: 'analyst',
+  superAdmin: 'super_admin',
 }
 
 /**
@@ -69,22 +70,16 @@ function read(key, allowed, fallback) {
   }
 }
 
-// Stored as JSON, and merged over the defaults rather than trusted whole: a
-// section added to the dashboard after somebody saved their configuration must
-// arrive with its default rather than as `undefined`.
-function readSidebar() {
-  if (typeof window === 'undefined') return DEFAULT_SIDEBAR
-  try {
-    const stored = JSON.parse(window.localStorage.getItem(SIDEBAR_KEY) ?? 'null')
-    if (!stored || typeof stored !== 'object') return DEFAULT_SIDEBAR
-    const merged = { ...DEFAULT_SIDEBAR }
-    for (const key of Object.keys(DEFAULT_SIDEBAR)) {
-      if (typeof stored[key] === 'boolean') merged[key] = stored[key]
-    }
-    return merged
-  } catch {
-    return DEFAULT_SIDEBAR
+// Merged over the defaults rather than trusted whole: a section added to the
+// dashboard after a configuration was saved must arrive with its default rather
+// than as `undefined`.
+function mergeSections(stored) {
+  const merged = { ...DEFAULT_SIDEBAR }
+  if (!stored || typeof stored !== 'object') return merged
+  for (const key of Object.keys(DEFAULT_SIDEBAR)) {
+    if (typeof stored[key] === 'boolean') merged[key] = stored[key]
   }
+  return merged
 }
 
 function interpolate(template, params) {
@@ -106,14 +101,10 @@ export function AdminSettingsProvider({ children }) {
   const [locale, setLocaleState] = useState(() =>
     read(LOCALE_KEY, Object.keys(ADMIN_TRANSLATIONS), ADMIN_DEFAULT_LOCALE),
   )
-  // Who is looking. There is no admin sign-in yet, so this is a preview of the
-  // two roles rather than an identity — the header lets you switch between
-  // them. When authentication arrives, this is the one line that changes: the
-  // role comes from the session instead, and everything reading it stays put.
-  const [role, setRoleState] = useState(() =>
-    read(ROLE_KEY, Object.values(ADMIN_ROLE), ADMIN_ROLE.owner),
-  )
-  const [sidebar, setSidebarState] = useState(readSidebar)
+  // Who is looking, from the session — never from the client. A role kept in
+  // the browser would be a role the browser could edit.
+  const { status, token, role } = useAdminAuth()
+  const [sidebar, setSidebarState] = useState(DEFAULT_SIDEBAR)
 
   const persist = (key, value) => {
     try {
@@ -133,25 +124,59 @@ export function AdminSettingsProvider({ children }) {
     persist(LOCALE_KEY, next)
   }, [])
 
-  const setRole = useCallback((next) => {
-    setRoleState(next)
-    persist(ROLE_KEY, next)
-  }, [])
+  // The configuration comes from the server, so every administrator sees the
+  // one the owner set rather than whatever their own browser remembers.
+  useEffect(() => {
+    if (status !== ADMIN_AUTH_STATUS.authenticated || !token) return undefined
 
-  /** Back to the defaults above, in one step. */
-  const resetSidebar = useCallback(() => {
-    setSidebarState(DEFAULT_SIDEBAR)
-    persist(SIDEBAR_KEY, JSON.stringify(DEFAULT_SIDEBAR))
-  }, [])
+    const controller = new AbortController()
+    let cancelled = false
+    fetchSidebarSections({ token, signal: controller.signal })
+      .then((sections) => {
+        if (!cancelled) setSidebarState(mergeSections(sections))
+      })
+      .catch(() => {
+        // The defaults stand. Better a working sidebar than an empty one.
+      })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [status, token])
+
+  /**
+   * Writes a configuration and keeps the screen honest about the result.
+   *
+   * Applied at once so a switch responds to the tap, then reconciled with what
+   * the server actually stored. If the write is refused — a super admin who got
+   * to the page somehow, a lost connection — the switch goes back, because
+   * showing it on while the server has it off would be a lie.
+   */
+  const writeSections = useCallback(
+    async (next) => {
+      const previous = sidebar
+      setSidebarState(next)
+      try {
+        const saved = await saveSidebarSections(next, { token })
+        setSidebarState(mergeSections(saved))
+        return true
+      } catch {
+        setSidebarState(previous)
+        return false
+      }
+    },
+    [sidebar, token],
+  )
 
   /** Show or hide one section. The owner's switch board is the only caller. */
-  const setSidebarItem = useCallback((id, enabled) => {
-    setSidebarState((current) => {
-      const next = { ...current, [id]: enabled }
-      persist(SIDEBAR_KEY, JSON.stringify(next))
-      return next
-    })
-  }, [])
+  const setSidebarItem = useCallback(
+    (id, enabled) => writeSections({ ...sidebar, [id]: enabled }),
+    [sidebar, writeSections],
+  )
+
+  /** Back to the defaults above, in one step. */
+  const resetSidebar = useCallback(() => writeSections(DEFAULT_SIDEBAR), [writeSections])
 
   // The admin area is a document of its own as far as language is concerned, so
   // its subtree is marked with the language it is actually written in. Screen
@@ -175,15 +200,15 @@ export function AdminSettingsProvider({ children }) {
 
   // Resolved once, here, so every place that shows the role shows the same
   // words. Nothing downstream decides what a role is called.
-  const roleLabel = t(`role.${role}`)
+  const roleLabel = role ? t(`role.${role}`) : ''
 
   const value = useMemo(
     () => ({
       theme, setTheme, locale, setLocale, t,
-      role, roleLabel, setRole, sidebar, setSidebarItem, resetSidebar,
+      role, roleLabel, sidebar, setSidebarItem, resetSidebar,
     }),
     [theme, setTheme, locale, setLocale, t,
-      role, roleLabel, setRole, sidebar, setSidebarItem, resetSidebar],
+      role, roleLabel, sidebar, setSidebarItem, resetSidebar],
   )
 
   return <AdminSettingsContext.Provider value={value}>{children}</AdminSettingsContext.Provider>

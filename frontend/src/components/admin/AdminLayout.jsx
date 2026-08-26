@@ -1,36 +1,27 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import {
-  Crown, Gavel, LifeBuoy, LogOut, Menu, PieChart, Settings, ShieldCheck, SlidersHorizontal,
-  User, X,
-} from 'lucide-react'
+import { Crown, LogOut, Menu, Settings, ShieldCheck, SlidersHorizontal, User, X } from 'lucide-react'
 import { useDismiss } from '../../hooks/useDismiss'
 import { useRef } from 'react'
 import UserAvatar from '../dashboard/UserAvatar'
 import { AdminNavList, AdminSidebarFooter } from './AdminSidebar'
 import { ADMIN_ROLE, AdminSettingsProvider, useAdmin } from '../../context/AdminSettingsContext'
+import { AdminAuthProvider, useAdminAuth } from '../../context/AdminAuthContext'
 import { ADMIN_ROUTES } from '../../routes/adminPaths'
 
 // The signed-in administrator. Fake, like everything else in this module —
 // there is no admin authentication yet, and inventing one was explicitly out
 // of scope.
-const CURRENT_ADMIN = { name: 'Samandar Hodiev' }
-
 /**
- * A mark per role, so the icon says something the label already says twice
- * over — a crown for the person who owns the place, a shield for the one with
- * every key, a gavel for the one who judges what gets published, a life ring
- * for the one who answers people, a chart for the one who only reads.
+ * A mark per role: a crown for the person who owns the place, a shield for the
+ * one trusted with every key.
  *
- * Keyed by the same ids as `ADMIN_ROLE`, and used everywhere a role appears, so
- * the badge beside the wordmark and the entry in the menu never disagree.
+ * Keyed by the values the database stores, and used everywhere a role appears,
+ * so the badge beside the wordmark and the label under the name never disagree.
  */
 const ROLE_ICON = {
   [ADMIN_ROLE.owner]: Crown,
   [ADMIN_ROLE.superAdmin]: ShieldCheck,
-  [ADMIN_ROLE.moderator]: Gavel,
-  [ADMIN_ROLE.support]: LifeBuoy,
-  [ADMIN_ROLE.analyst]: PieChart,
 }
 
 /** Falls back to the shield rather than to nothing, if a role arrives unmapped. */
@@ -39,7 +30,8 @@ function roleIcon(role) {
 }
 
 function AdminProfileMenu() {
-  const { t, role, roleLabel, setRole } = useAdmin()
+  const { t, roleLabel } = useAdmin()
+  const { admin, signOut } = useAdminAuth()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   useDismiss(ref, open, () => setOpen(false))
@@ -56,10 +48,10 @@ function AdminProfileMenu() {
         aria-expanded={open}
         className="flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
-        <UserAvatar name={CURRENT_ADMIN.name} />
+        <UserAvatar name={admin?.name ?? ''} />
         <span className="hidden min-w-0 text-left sm:block">
           <span className="block truncate text-sm font-medium text-text-primary">
-            {CURRENT_ADMIN.name}
+            {admin?.name ?? ''}
           </span>
           <span className="block truncate text-[11px] text-text-muted">{roleLabel}</span>
         </span>
@@ -83,37 +75,13 @@ function AdminProfileMenu() {
             <Settings aria-hidden="true" size={15} className="shrink-0" />
             {t('header.settings')}
           </Link>
-          {/* Until admin sign-in exists there is nobody to be, so the two
-              roles are offered as a preview. It is the only way to see what a
-              super admin's sidebar looks like after the owner has configured
-              it, and it goes when the session provides the role instead. */}
-          <p className="mt-1 border-t border-border px-3 pb-1 pt-2 text-[11px] font-medium text-text-muted">
-            {t('role.preview')}
-          </p>
-          {Object.values(ADMIN_ROLE).map((option) => {
-            const Icon = roleIcon(option)
-            return (
-              <button
-                key={option}
-                type="button"
-                role="menuitemradio"
-                aria-checked={role === option}
-                onClick={() => {
-                  setRole(option)
-                  setOpen(false)
-                }}
-                className={`${item} ${role === option ? 'font-medium text-primary-hover dark:text-primary' : ''}`}
-              >
-                <Icon aria-hidden="true" size={15} className="shrink-0" />
-                {t(`role.${option}`)}
-              </button>
-            )
-          })}
-
           <button
             type="button"
             role="menuitem"
-            onClick={() => setOpen(false)}
+            onClick={() => {
+              setOpen(false)
+              signOut()
+            }}
             className={`${item} mt-1 border-t border-border pt-2 text-error hover:bg-error/10`}
           >
             <LogOut aria-hidden="true" size={15} className="shrink-0" />
@@ -240,15 +208,26 @@ function AdminShell() {
 }
 
 /**
- * The provider sits outside the shell so everything inside — including the
- * shell's own chrome — reads the same theme and language.
+ * Everything under /admin, signed in or not.
+ *
+ * Both providers sit here rather than inside the shell so the sign-in page gets
+ * them too: it needs the dictionary to speak Uzbek and the theme tokens to look
+ * like the rest of the dashboard, and it renders before there is a session at
+ * all. Auth is outermost because the settings provider asks it who is signed in.
  */
-function AdminLayout() {
+export function AdminRoot() {
   return (
-    <AdminSettingsProvider>
-      <AdminShell />
-    </AdminSettingsProvider>
+    <AdminAuthProvider>
+      <AdminSettingsProvider>
+        <Outlet />
+      </AdminSettingsProvider>
+    </AdminAuthProvider>
   )
+}
+
+/** The signed-in dashboard: the navigation column, the header, and the page. */
+function AdminLayout() {
+  return <AdminShell />
 }
 
 export default AdminLayout
