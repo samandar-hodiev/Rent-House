@@ -170,3 +170,48 @@ export async function uploadAvatar(file, { token, signal } = {}) {
   })
   return data?.url ?? null
 }
+
+/** The dashboard's headline figures, counted by PostgreSQL. */
+export async function fetchDashboardStats({ token, signal } = {}) {
+  const d = await request('/admin/dashboard/stats', { token, signal })
+  return {
+    totalUsers: d?.total_users ?? 0,
+    activeUsers: d?.active_users ?? 0,
+    blockedUsers: d?.blocked_users ?? 0,
+    totalListings: d?.total_listings ?? 0,
+    activeListings: d?.active_listings ?? 0,
+    pendingListings: d?.pending_listings ?? 0,
+    closedListings: d?.closed_listings ?? 0,
+    reports: d?.reports ?? 0,
+    newUsersToday: d?.new_users_today ?? 0,
+  }
+}
+
+/**
+ * Both growth charts, at all three granularities.
+ *
+ * One request rather than one per tab: the series are small, and switching
+ * between Kunlik and Oylik should not wait on the network.
+ */
+export async function fetchDashboardGrowth({ token, signal } = {}) {
+  const d = await request('/admin/dashboard/growth', { token, signal })
+  const series = (metric) => ({
+    daily: (d?.[metric]?.daily ?? []).map(toPoint),
+    weekly: (d?.[metric]?.weekly ?? []).map(toPoint),
+    monthly: (d?.[metric]?.monthly ?? []).map(toPoint),
+  })
+  return { users: series('users'), listings: series('listings') }
+}
+
+function toPoint(p) {
+  return { period: p.period, count: p.count ?? 0 }
+}
+
+/** Every district with its live listing count, busiest first. */
+export async function fetchDistrictActivity({ token, signal } = {}) {
+  const d = await request('/admin/dashboard/districts', { token, signal })
+  return (d?.districts ?? []).map((row) => ({
+    name: row.name,
+    activeListings: row.active_listings ?? 0,
+  }))
+}

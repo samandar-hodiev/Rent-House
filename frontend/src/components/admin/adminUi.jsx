@@ -73,7 +73,10 @@ export function StatusBadge({ status }) {
   const tint = LISTING_STATUS_CLASS[status] ?? BADGE_TINTS[status] ?? BADGE_TINTS.inactive
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${tint}`}
+      // `justify-center` matters as much as `items-center`: as a flex item in
+      // a stretching column the pill takes the full width, and without it the
+      // label sits against the left edge of a wide badge.
+      className={`inline-flex shrink-0 items-center justify-center rounded-full px-2 py-0.5 text-center text-[11px] font-medium ${tint}`}
     >
       {/* Every state a badge can show — a listing's and a user's alike — has a
           `status.*` entry, so the badge translates itself and no caller has to
@@ -188,6 +191,26 @@ export function Switch({ checked, onChange, labelledBy }) {
       />
     </button>
   )
+}
+
+/**
+ * A select that keeps its arrow away from the edge.
+ *
+ * A native arrow is painted by the browser hard against the border, and no
+ * amount of padding moves it — padding shifts the text, not the control. So the
+ * native one is turned off and the same chevron is drawn as a background image,
+ * positioned with room to breathe.
+ */
+export const ADMIN_SELECT =
+  'h-9 shrink-0 appearance-none rounded-md border border-border bg-surface bg-no-repeat pl-2.5 pr-9 text-sm text-text-primary focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+
+// The chevron, inline so it needs no network request, and using currentColor so
+// it follows the text in either theme.
+export const ADMIN_SELECT_STYLE = {
+  backgroundImage:
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
+  backgroundPosition: 'right 12px center',
+  backgroundSize: '14px 14px',
 }
 
 /** Page title and, optionally, a line under it. */

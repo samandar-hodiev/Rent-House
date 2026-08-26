@@ -23,6 +23,7 @@ import (
 // rule about who may do what lives in the service.
 type AdminHandler struct {
 	admins *service.AdminService
+	stats  *service.AdminStatsService
 	files  storage.Storage
 	// Where this server's uploads live, so an avatar can be checked to be one
 	// of them rather than an address the client made up.
@@ -33,10 +34,12 @@ type AdminHandler struct {
 }
 
 func NewAdminHandler(
-	admins *service.AdminService, files storage.Storage, uploadPath, baseURL string,
+	admins *service.AdminService, stats *service.AdminStatsService,
+	files storage.Storage, uploadPath, baseURL string,
 ) *AdminHandler {
 	return &AdminHandler{
 		admins:     admins,
+		stats:      stats,
 		files:      files,
 		uploadPath: uploadPath,
 		baseURL:    strings.TrimRight(baseURL, "/"),
@@ -285,6 +288,46 @@ func (h *AdminHandler) UpdateSidebar(c *gin.Context) {
 		return
 	}
 	response.OK(c, "Sidebar configuration updated", gin.H{"sections": sections})
+}
+
+// DashboardStats handles GET /api/v1/admin/dashboard/stats.
+func (h *AdminHandler) DashboardStats(c *gin.Context) {
+	overview, err := h.stats.Overview(c.Request.Context())
+	if err != nil {
+		logger.Errorf("dashboard stats: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not load the statistics")
+		return
+	}
+	response.OK(c, "Dashboard statistics", overview)
+}
+
+// DashboardGrowth handles GET /api/v1/admin/dashboard/growth.
+//
+// Both charts at all three granularities in one answer. The series are small,
+// and sending them together means switching between daily and monthly is
+// instant rather than another round trip.
+func (h *AdminHandler) DashboardGrowth(c *gin.Context) {
+	growth, err := h.stats.Growth(c.Request.Context())
+	if err != nil {
+		logger.Errorf("dashboard growth: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not load the statistics")
+		return
+	}
+	response.OK(c, "Growth", growth)
+}
+
+// DashboardDistricts handles GET /api/v1/admin/dashboard/districts.
+func (h *AdminHandler) DashboardDistricts(c *gin.Context) {
+	districts, err := h.stats.Districts(c.Request.Context())
+	if err != nil {
+		logger.Errorf("dashboard districts: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not load the statistics")
+		return
+	}
+	response.OK(c, "District activity", gin.H{"districts": districts})
 }
 
 // Users handles GET /api/v1/admin/users.

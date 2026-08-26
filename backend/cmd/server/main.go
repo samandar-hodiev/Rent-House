@@ -325,8 +325,11 @@ func newRouter(
 	// marketplace. Sharing one account table would mean the public registration
 	// endpoint writes rows the admin authorization has to be careful about.
 	adminService := service.NewAdminService(repository.NewAdminRepository(db), tokens)
+	// Every figure the dashboard shows is counted by PostgreSQL; this service
+	// only shapes the counts into series.
+	adminStats := service.NewAdminStatsService(repository.NewAdminStatsRepository(db))
 	adminHandler := handler.NewAdminHandler(
-		adminService, files, cfg.UploadPublicPath, cfg.PublicBaseURL,
+		adminService, adminStats, files, cfg.UploadPublicPath, cfg.PublicBaseURL,
 	)
 
 	admin := v1.Group("/admin")
@@ -354,6 +357,16 @@ func newRouter(
 			{
 				marketplaceUsers.GET("", adminHandler.Users)
 				marketplaceUsers.PATCH("/:id/status", adminHandler.SetUserStatus)
+			}
+
+			// The dashboard's own figures. Behind the "dashboard" section, so
+			// an administrator without it cannot read the numbers by calling
+			// the endpoint directly.
+			stats := authed.Group("/dashboard", middleware.RequireSection(adminService, "dashboard"))
+			{
+				stats.GET("/stats", adminHandler.DashboardStats)
+				stats.GET("/growth", adminHandler.DashboardGrowth)
+				stats.GET("/districts", adminHandler.DashboardDistricts)
 			}
 
 			// Read by every administrator, because the dashboard draws its own

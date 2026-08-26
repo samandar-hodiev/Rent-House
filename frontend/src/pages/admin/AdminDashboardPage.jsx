@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
-  Building2, CheckCircle2, Clock, Flag, UserPlus, Users, XCircle, Activity,
+  Building2, CheckCircle2, Clock, Flag, Loader2, UserPlus, Users, XCircle, Activity,
 } from 'lucide-react'
 import { AdminCard, PageHeading, StatCard } from '../../components/admin/adminUi'
 import { BarList, LineChart } from '../../components/admin/AdminChart'
+import EmptyState from '../../components/EmptyState'
 import { useAdmin } from '../../context/AdminSettingsContext'
-import { DISTRICT_STATS, GROWTH, OVERVIEW } from '../../mock/admin'
+import { useAdminAuth } from '../../context/AdminAuthContext'
+import {
+  fetchDashboardGrowth, fetchDashboardStats, fetchDistrictActivity,
+} from '../../services/adminApi'
 
 const RANGES = ['daily', 'weekly', 'monthly']
 
@@ -31,20 +35,97 @@ function RangeTabs({ value, onChange, t }) {
   )
 }
 
+// Axis labels are built from the bucket the server reported, so a day is the
+// day PostgreSQL grouped by rather than a name the client made up.
+const LABEL_OPTIONS = {
+  daily: { day: '2-digit', month: 'short' },
+  weekly: { day: '2-digit', month: 'short' },
+  monthly: { month: 'short' },
+}
+
+/**
+ * Turns a server series into what the chart draws.
+ *
+ * The chart takes labels and values; the API sends periods and counts. The
+ * translation happens here so neither side has to know about the other.
+ */
+function toChart(points, range, locale) {
+  const tag = { uz: 'uz-UZ', ru: 'ru-RU', en: 'en-GB' }[locale] ?? 'en-GB'
+  return {
+    labels: points.map((p) => new Date(p.period).toLocaleDateString(tag, LABEL_OPTIONS[range])),
+    values: points.map((p) => p.count),
+  }
+}
+
+/**
+ * The dashboard. Every figure on it is counted by the database.
+ *
+ * Three requests, made once: the headline figures, both growth charts at every
+ * granularity, and the district ranking. Switching a chart's range is then a
+ * local change rather than another round trip.
+ */
 function AdminDashboardPage() {
-  const { t } = useAdmin()
+  const { t, locale } = useAdmin()
+  const { token } = useAdminAuth()
+
   const [userRange, setUserRange] = useState('daily')
   const [listingRange, setListingRange] = useState('daily')
+  const [data, setData] = useState(null)
+  const [state, setState] = useState('loading')
 
-  const stats = [
-    { icon: <Users size={17} />, key: 'totalUsers', value: OVERVIEW.totalUsers },
-    { icon: <Activity size={17} />, key: 'activeUsers', value: OVERVIEW.activeUsers },
-    { icon: <Building2 size={17} />, key: 'totalListings', value: OVERVIEW.totalListings },
-    { icon: <CheckCircle2 size={17} />, key: 'activeListings', value: OVERVIEW.activeListings },
-    { icon: <Clock size={17} />, key: 'pendingListings', value: OVERVIEW.pendingListings },
-    { icon: <XCircle size={17} />, key: 'closedListings', value: OVERVIEW.closedListings },
-    { icon: <Flag size={17} />, key: 'reports', value: OVERVIEW.reports },
-    { icon: <UserPlus size={17} />, key: 'newUsersToday', value: OVERVIEW.newUsersToday },
+  useEffect(() => {
+    const controller = new AbortController()
+    let cancelled = false
+
+    Promise.all([
+      fetchDashboardStats({ token, signal: controller.signal }),
+      fetchDashboardGrowth({ token, signal: controller.signal }),
+      fetchDistrictActivity({ token, signal: controller.signal }),
+    ])
+      .then(([stats, growth, districts]) => {
+        if (cancelled) return
+        setData({ stats, growth, districts })
+        setState('ready')
+      })
+      .catch((error) => {
+        if (cancelled || error?.name === 'AbortError') return
+        setState('error')
+      })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [token])
+
+  if (state === 'loading') {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 aria-hidden="true" size={22} className="animate-spin text-text-muted" />
+      </div>
+    )
+  }
+
+  if (state === 'error') {
+    return (
+      <EmptyState
+        icon={<Activity aria-hidden="true" size={28} />}
+        title={t('dashboard.loadFailed')}
+        description={t('login.errorNetwork')}
+      />
+    )
+  }
+
+  const { stats, growth, districts } = data
+  const cards = [
+    { icon: <Users size={17} />, key: 'totalUsers', value: stats.totalUsers },
+    { icon: <Activity size={17} />, key: 'activeUsers', value: stats.activeUsers },
+    { icon: <Building2 size={17} />, key: 'totalListings', value: stats.totalListings },
+    { icon: <CheckCircle2 size={17} />, key: 'activeListings', value: stats.activeListings },
+    { icon: <Clock size={17} />, key: 'pendingListings', value: stats.pendingListings },
+    { icon: <XCircle size={17} />, key: 'closedListings', value: stats.closedListings },
+    { icon: <Flag size={17} />, key: 'reports', value: stats.reports },
+    { icon: <UserPlus size={17} />, key: 'newUsersToday', value: stats.newUsersToday },
   ]
 
   return (
@@ -55,8 +136,8 @@ function AdminDashboardPage() {
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => (
-          <StatCard key={stat.key} icon={stat.icon} label={t(`stat.${stat.key}`)} value={stat.value} />
+        {cards.map((card) => (
+          <StatCard key={card.key} icon={card.icon} label={t(`stat.${card.key}`)} value={card.value} />
         ))}
       </div>
 
@@ -70,7 +151,7 @@ function AdminDashboardPage() {
         >
           <div className="flex min-h-[20rem] flex-1 flex-col p-4">
             <LineChart
-              {...GROWTH.users[userRange]}
+              {...toChart(growth.users[userRange], userRange, locale)}
               ariaLabel={t('chart.usersGrowth')}
               tooltipKey="chart.newUsers"
               t={t}
@@ -84,7 +165,7 @@ function AdminDashboardPage() {
         >
           <div className="flex min-h-[20rem] flex-1 flex-col p-4">
             <LineChart
-              {...GROWTH.listings[listingRange]}
+              {...toChart(growth.listings[listingRange], listingRange, locale)}
               ariaLabel={t('chart.listingsGrowth')}
               tooltipKey="chart.newListings"
               t={t}
@@ -94,7 +175,7 @@ function AdminDashboardPage() {
 
         <AdminCard title={t('chart.topDistricts')}>
           <div className="flex min-h-0 flex-1 flex-col p-4">
-            <BarList items={DISTRICT_STATS} scroll />
+            <BarList items={districts} scroll />
           </div>
         </AdminCard>
       </div>

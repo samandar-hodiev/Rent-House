@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Loader2, Search, Users } from 'lucide-react'
 import EmptyState from '../../components/EmptyState'
 import UserAvatar from '../../components/dashboard/UserAvatar'
 import AdminConfirmDialog from '../../components/admin/AdminConfirmDialog'
 import {
-  AdminCard, AdminTable, Cell, MockButton, PageHeading, Row, StatusBadge, useAdminFormat,
+  ADMIN_SELECT, ADMIN_SELECT_STYLE, AdminCard, AdminTable, Cell, MockButton, PageHeading,
+  Row, StatusBadge, useAdminFormat,
 } from '../../components/admin/adminUi'
 import { useAdmin } from '../../context/AdminSettingsContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
@@ -16,6 +18,87 @@ const PER_PAGE = 10
 // enough that typing a name is one request rather than eight, short enough that
 // it still feels like the list is following along.
 const SEARCH_DEBOUNCE = 300
+
+/**
+ * Why an account was blocked, who did it, and when.
+ *
+ * Every value comes from the block record the API returned with the row — the
+ * date and the time are two readings of one timestamp, so they cannot disagree.
+ */
+function BlockDetailsDialog({ user, onClose }) {
+  const { t } = useAdmin()
+  const dialogRef = useRef(null)
+
+  useEffect(() => {
+    dialogRef.current?.focus()
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
+  const host = document.getElementById('admin-root')
+  if (!host) return null
+
+  const at = user.blockedAt ? new Date(user.blockedAt) : null
+  // Written out rather than left to the locale: Chromium formats uz-UZ dates in
+  // ISO order, and an administrator reading "2026-08-26" where the rest of the
+  // product says "26.08.2026" has to stop and work out which is which. A
+  // timestamp on an audit record should read the same in every language.
+  const pad = (value) => String(value).padStart(2, '0')
+  const date = at ? `${pad(at.getDate())}.${pad(at.getMonth() + 1)}.${at.getFullYear()}` : null
+  const time = at ? `${pad(at.getHours())}:${pad(at.getMinutes())}` : null
+
+  const rows = [
+    ['users.blockReason', user.blockReason],
+    ['users.blockedBy', user.blockedBy],
+    ['users.blockedDate', date],
+    ['users.blockedTime', time],
+  ]
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="block-details-title"
+        tabIndex={-1}
+        onClick={(event) => event.stopPropagation()}
+        className="w-full max-w-sm rounded-xl border border-border bg-surface p-5 focus:outline-none"
+      >
+        <h2 id="block-details-title" className="text-base font-semibold text-text-primary">
+          {t('users.blockDetailsTitle')}
+        </h2>
+        <p className="mt-1 text-sm text-text-muted">{user.name}</p>
+
+        <dl className="mt-4 flex flex-col gap-3">
+          {rows.map(([key, value]) => (
+            <div key={key}>
+              <dt className="text-xs text-text-muted">{t(key)}</dt>
+              <dd className="mt-0.5 text-sm text-text-primary">{value || '—'}</dd>
+            </div>
+          ))}
+        </dl>
+
+        <div className="mt-5 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {t('action.close')}
+          </button>
+        </div>
+      </div>
+    </div>,
+    host,
+  )
+}
 
 /**
  * Marketplace accounts, from the database.
@@ -38,6 +121,9 @@ function AdminUsersPage() {
   const [data, setData] = useState({ users: [], total: 0, page: 1, totalPages: 1 })
   const [state, setState] = useState('loading')
   const [confirming, setConfirming] = useState(null)
+  // The account whose block is being read, which is a different question from
+  // the account whose block is being changed.
+  const [viewing, setViewing] = useState(null)
   const [reason, setReason] = useState('')
   const [reasonTouched, setReasonTouched] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -158,9 +244,8 @@ function AdminUsersPage() {
               setPage(1)
             }}
             aria-label={t('table.status')}
-            // `pr-8`: the native arrow sits in the padding box, and at the
-            // default it was pressed against the border.
-            className="h-9 shrink-0 rounded-md border border-border bg-surface pl-2.5 pr-8 text-sm text-text-primary focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className={ADMIN_SELECT}
+            style={ADMIN_SELECT_STYLE}
           >
             <option value="all">{t('users.allStatuses')}</option>
             <option value="active">{t('users.statusActive')}</option>
@@ -215,47 +300,36 @@ function AdminUsersPage() {
                   <Cell className="tabular-nums text-text-secondary">
                     {formatNumber(user.listings)}
                   </Cell>
-                  {/* The reason sits under the badge rather than in a column
-                      of its own: it only exists for blocked accounts, and a
-                      column that is empty for most rows costs every row its
-                      width. The date and the administrator are in the title,
-                      where they are available without crowding the table. */}
-                  <Cell>
-                    <span className="flex min-w-0 flex-col gap-0.5">
-                      <StatusBadge status={user.status} />
-                      {blocked && user.blockReason ? (
-                        <span
-                          title={[
-                            user.blockReason,
-                            user.blockedAt ? formatDate(user.blockedAt) : null,
-                            user.blockedBy,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ')}
-                          className="block max-w-[220px] truncate text-[11px] text-text-muted"
-                        >
-                          {user.blockReason}
-                        </span>
-                      ) : null}
-                    </span>
-                  </Cell>
+                  <Cell><StatusBadge status={user.status} /></Cell>
                   <Cell className="whitespace-nowrap text-text-secondary">
                     {formatDate(user.registeredAt)}
                   </Cell>
                   <Cell>
-                    {/* Blocking is destructive and lifting one is not, so they
-                        do not look alike: red to take access away, amber to
-                        give it back. */}
-                    <MockButton
-                      tone={blocked ? 'warning' : 'danger'}
-                      onClick={() => {
-                        setConfirming(user)
-                        setReason('')
-                        setReasonTouched(false)
-                      }}
-                    >
-                      {t(blocked ? 'users.unblockUser' : 'users.blockUser')}
-                    </MockButton>
+                    <span className="flex items-center gap-1.5">
+                      {/* Only a blocked account has a reason to show, so only a
+                          blocked account offers the button. The reason itself
+                          stays out of the table: it is a sentence, and a
+                          sentence in a cell makes every row taller. */}
+                      {blocked && user.blockReason ? (
+                        <MockButton onClick={() => setViewing(user)}>
+                          {t('users.blockReasonAction')}
+                        </MockButton>
+                      ) : null}
+
+                      {/* Blocking is destructive and lifting one is not, so they
+                          do not look alike: red to take access away, amber to
+                          give it back. */}
+                      <MockButton
+                        tone={blocked ? 'warning' : 'danger'}
+                        onClick={() => {
+                          setConfirming(user)
+                          setReason('')
+                          setReasonTouched(false)
+                        }}
+                      >
+                        {t(blocked ? 'users.unblockUser' : 'users.blockConfirm')}
+                      </MockButton>
+                    </span>
                   </Cell>
                 </Row>
               )
@@ -340,6 +414,9 @@ function AdminUsersPage() {
         </AdminConfirmDialog>
       ) : null}
 
+      {viewing ? (
+        <BlockDetailsDialog user={viewing} onClose={() => setViewing(null)} />
+      ) : null}
     </div>
   )
 }
