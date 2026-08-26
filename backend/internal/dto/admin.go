@@ -4,7 +4,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"github.com/samandar-hodiev/Rent-House/backend/internal/models"
+	"github.com/samandar-hodiev/Rent-House/backend/internal/repository"
 )
 
 // AdminLoginRequest is the body of POST /api/v1/admin/auth/login.
@@ -171,4 +174,125 @@ type AdminSessionResponse struct {
 	TokenType   string        `json:"token_type"`
 	// ExpiresIn is in seconds, matching the OAuth 2.0 convention clients expect.
 	ExpiresIn int64 `json:"expires_in"`
+}
+
+// AdminListingResponse is one row of the listings table.
+type AdminListingResponse struct {
+	ID        string          `json:"id"`
+	Title     string          `json:"title"`
+	Price     decimal.Decimal `json:"price"`
+	Currency  string          `json:"currency"`
+	Status    string          `json:"status"`
+	Rooms     int             `json:"rooms"`
+	Area      int32           `json:"area"`
+	Floor     int             `json:"floor"`
+	Views     int64           `json:"views"`
+	District  string          `json:"district"`
+	OwnerName string          `json:"owner_name"`
+	CoverURL  *string         `json:"cover_url"`
+	CreatedAt time.Time       `json:"created_at"`
+}
+
+// NewAdminListingResponse maps one row.
+func NewAdminListingResponse(row *repository.AdminListingRow) AdminListingResponse {
+	return AdminListingResponse{
+		ID:        row.ID.String(),
+		Title:     row.Title,
+		Price:     row.Price,
+		Currency:  row.Currency,
+		Status:    row.Status,
+		Rooms:     row.Rooms,
+		Area:      row.Area,
+		Floor:     row.Floor,
+		Views:     row.ViewsCount,
+		District:  row.District,
+		OwnerName: row.OwnerName,
+		CoverURL:  row.CoverURL,
+		CreatedAt: row.CreatedAt,
+	}
+}
+
+// AdminListingListResponse is one page, with what a paginator needs.
+type AdminListingListResponse struct {
+	Listings   []AdminListingResponse `json:"listings"`
+	Total      int64                  `json:"total"`
+	Page       int                    `json:"page"`
+	Limit      int                    `json:"limit"`
+	TotalPages int                    `json:"total_pages"`
+}
+
+// AdminListingOwner is the person who published a listing.
+type AdminListingOwner struct {
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	Email     *string `json:"email"`
+	Phone     *string `json:"phone"`
+	AvatarURL *string `json:"avatar_url"`
+}
+
+// AdminListingDetailResponse is the whole detail card.
+type AdminListingDetailResponse struct {
+	AdminListingResponse
+	Address     string                  `json:"address"`
+	Description string                  `json:"description"`
+	TotalFloors int                     `json:"total_floors"`
+	Furnished   bool                    `json:"furnished"`
+	Images      []string                `json:"images"`
+	Owner       AdminListingOwner       `json:"owner"`
+	Stats       repository.ListingStats `json:"stats"`
+}
+
+// NewAdminListingDetailResponse assembles the card.
+func NewAdminListingDetailResponse(
+	detail *repository.AdminListingDetail, images []string, stats *repository.ListingStats,
+) AdminListingDetailResponse {
+	return AdminListingDetailResponse{
+		AdminListingResponse: NewAdminListingResponse(&detail.AdminListingRow),
+		Address:              detail.Address,
+		Description:          detail.Description,
+		TotalFloors:          detail.TotalFloors,
+		Furnished:            detail.Furnished,
+		// Never nil: an empty gallery must arrive as [] rather than null, so the
+		// client can count it without checking.
+		Images: append([]string{}, images...),
+		Owner: AdminListingOwner{
+			ID:        detail.OwnerID,
+			Name:      detail.OwnerName,
+			Email:     detail.OwnerEmail,
+			Phone:     detail.OwnerPhone,
+			AvatarURL: detail.OwnerAvatar,
+		},
+		Stats: *stats,
+	}
+}
+
+// AdminChatPreviewResponse is one conversation about a listing, read-only.
+//
+// It carries the last message and nothing else of the thread: the dashboard
+// previews conversations, it does not open them.
+type AdminChatPreviewResponse struct {
+	ConversationID string    `json:"conversation_id"`
+	UserID         string    `json:"user_id"`
+	UserName       string    `json:"user_name"`
+	UserAvatar     *string   `json:"user_avatar"`
+	LastMessage    string    `json:"last_message"`
+	LastMessageAt  time.Time `json:"last_message_at"`
+	Unread         int64     `json:"unread"`
+}
+
+// NewAdminChatPreviews maps the list.
+func NewAdminChatPreviews(rows []repository.ChatPreview) []AdminChatPreviewResponse {
+	out := make([]AdminChatPreviewResponse, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, AdminChatPreviewResponse{
+			ConversationID: row.ConversationID.String(),
+			UserID:         row.UserID.String(),
+			UserName:       row.UserName,
+			UserAvatar:     row.UserAvatar,
+			LastMessage:    row.LastMessage,
+			LastMessageAt:  row.LastMessageAt,
+			Unread:         row.Unread,
+		})
+	}
+	return out
 }

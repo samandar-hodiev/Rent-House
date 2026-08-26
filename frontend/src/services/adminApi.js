@@ -215,3 +215,89 @@ export async function fetchDistrictActivity({ token, signal } = {}) {
     activeListings: row.active_listings ?? 0,
   }))
 }
+
+/** Maps one row of the listings table. */
+export function toManagedListing(data) {
+  return {
+    id: data.id,
+    title: data.title,
+    price: data.price,
+    currency: data.currency,
+    status: data.status,
+    rooms: data.rooms,
+    area: data.area,
+    floor: data.floor,
+    views: data.views ?? 0,
+    district: data.district,
+    ownerName: data.owner_name,
+    coverUrl: data.cover_url ?? null,
+    createdAt: data.created_at,
+  }
+}
+
+/** One page of listings, filtered and paged by the server. */
+export async function fetchListings({ status, search, page = 1, limit = 10, token, signal } = {}) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+  if (status) params.set('status', status)
+  if (search) params.set('search', search)
+
+  const data = await request(`/admin/listings?${params}`, { token, signal })
+  return {
+    listings: (data?.listings ?? []).map(toManagedListing),
+    total: data?.total ?? 0,
+    page: data?.page ?? 1,
+    totalPages: data?.total_pages ?? 1,
+  }
+}
+
+/** One listing, with its gallery, its owner and its figures. */
+export async function fetchListing(id, { token, signal } = {}) {
+  const data = await request(`/admin/listings/${id}`, { token, signal })
+  return {
+    ...toManagedListing(data),
+    address: data.address,
+    description: data.description,
+    totalFloors: data.total_floors,
+    furnished: data.furnished,
+    images: data.images ?? [],
+    owner: {
+      id: data.owner?.id,
+      name: data.owner?.name,
+      email: data.owner?.email ?? null,
+      phone: data.owner?.phone ?? null,
+      avatarUrl: data.owner?.avatar_url ?? null,
+    },
+    stats: {
+      views: data.stats?.views ?? 0,
+      saves: data.stats?.saves ?? 0,
+      contacts: data.stats?.contacts ?? 0,
+      chats: data.stats?.chats ?? 0,
+    },
+  }
+}
+
+/** Just the photographs — what the gallery opened from the table needs. */
+export async function fetchListingImages(id, { token, signal } = {}) {
+  const data = await request(`/admin/listings/${id}/images`, { token, signal })
+  return data?.images ?? []
+}
+
+/**
+ * The conversations held about a listing.
+ *
+ * The owner's alone: the API answers 403 to anyone else, so a super admin
+ * calling this directly gets nothing rather than a hidden button's worth of
+ * protection.
+ */
+export async function fetchListingChats(id, { token, signal } = {}) {
+  const data = await request(`/admin/listings/${id}/chats`, { token, signal })
+  return (data?.chats ?? []).map((c) => ({
+    conversationId: c.conversation_id,
+    userId: c.user_id,
+    userName: c.user_name,
+    userAvatar: c.user_avatar ?? null,
+    lastMessage: c.last_message,
+    lastMessageAt: c.last_message_at,
+    unread: c.unread ?? 0,
+  }))
+}

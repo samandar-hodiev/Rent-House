@@ -328,8 +328,11 @@ func newRouter(
 	// Every figure the dashboard shows is counted by PostgreSQL; this service
 	// only shapes the counts into series.
 	adminStats := service.NewAdminStatsService(repository.NewAdminStatsRepository(db))
+	// Read-only: an administrator inspects listings, and the owner's own
+	// endpoints remain the only way to change one.
+	adminListings := service.NewAdminListingService(repository.NewAdminListingRepository(db))
 	adminHandler := handler.NewAdminHandler(
-		adminService, adminStats, files, cfg.UploadPublicPath, cfg.PublicBaseURL,
+		adminService, adminStats, adminListings, files, cfg.UploadPublicPath, cfg.PublicBaseURL,
 	)
 
 	admin := v1.Group("/admin")
@@ -349,6 +352,19 @@ func newRouter(
 			// by anyone, including themselves.
 			authed.PATCH("/profile", adminHandler.UpdateProfile)
 			authed.POST("/profile/avatar", adminHandler.UploadAvatar)
+
+			// Listings, behind the section the owner can withdraw.
+			marketplaceListings := authed.Group("/listings",
+				middleware.RequireSection(adminService, "listings"))
+			{
+				marketplaceListings.GET("", adminHandler.Listings)
+				marketplaceListings.GET("/:id", adminHandler.ListingDetail)
+				marketplaceListings.GET("/:id/images", adminHandler.ListingImages)
+				// Somebody else's conversations are the most sensitive thing
+				// this dashboard can show, so this one is the owner's alone —
+				// checked in the service, not just hidden in the sidebar.
+				marketplaceListings.GET("/:id/chats", adminHandler.ListingChats)
+			}
 
 			// Marketplace accounts. Moderating them is what an administrator
 			// is for, so this is not owner-only — but it is behind the

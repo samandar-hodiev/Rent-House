@@ -22,9 +22,10 @@ import (
 // AdminHandler serves the dashboard's own endpoints. HTTP concerns only: every
 // rule about who may do what lives in the service.
 type AdminHandler struct {
-	admins *service.AdminService
-	stats  *service.AdminStatsService
-	files  storage.Storage
+	admins   *service.AdminService
+	stats    *service.AdminStatsService
+	listings *service.AdminListingService
+	files    storage.Storage
 	// Where this server's uploads live, so an avatar can be checked to be one
 	// of them rather than an address the client made up.
 	uploadPath string
@@ -35,11 +36,13 @@ type AdminHandler struct {
 
 func NewAdminHandler(
 	admins *service.AdminService, stats *service.AdminStatsService,
+	listings *service.AdminListingService,
 	files storage.Storage, uploadPath, baseURL string,
 ) *AdminHandler {
 	return &AdminHandler{
 		admins:     admins,
 		stats:      stats,
+		listings:   listings,
 		files:      files,
 		uploadPath: uploadPath,
 		baseURL:    strings.TrimRight(baseURL, "/"),
@@ -328,6 +331,125 @@ func (h *AdminHandler) DashboardDistricts(c *gin.Context) {
 		return
 	}
 	response.OK(c, "District activity", gin.H{"districts": districts})
+}
+
+// Listings handles GET /api/v1/admin/listings.
+func (h *AdminHandler) Listings(c *gin.Context) {
+	page, _ := strconv.Atoi(c.Query("page"))
+	limit, _ := strconv.Atoi(c.Query("limit"))
+
+	result, err := h.listings.List(
+		c.Request.Context(), c.Query("status"), c.Query("search"), page, limit,
+	)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidAdminStatus) {
+			response.Error(c, http.StatusBadRequest, "invalid_status", "Invalid status filter")
+			return
+		}
+		logger.Errorf("list listings: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not load listings")
+		return
+	}
+
+	listings := make([]dto.AdminListingResponse, 0, len(result.Listings))
+	for i := range result.Listings {
+		listings = append(listings, dto.NewAdminListingResponse(&result.Listings[i]))
+	}
+	totalPages := int((result.Total + int64(result.Limit) - 1) / int64(result.Limit))
+	if totalPages < 1 {
+		totalPages = 1
+	}
+
+	response.OK(c, "Listings", dto.AdminListingListResponse{
+		Listings:   listings,
+		Total:      result.Total,
+		Page:       result.Page,
+		Limit:      result.Limit,
+		TotalPages: totalPages,
+	})
+}
+
+// ListingDetail handles GET /api/v1/admin/listings/:id.
+func (h *AdminHandler) ListingDetail(c *gin.Context) {
+	id, ok := h.listingID(c)
+	if !ok {
+		return
+	}
+
+	detail, err := h.listings.Detail(c.Request.Context(), id)
+	if err != nil {
+		h.writeListingError(c, err, "listing detail")
+		return
+	}
+	response.OK(c, "Listing", dto.NewAdminListingDetailResponse(
+		detail.Listing, detail.Images, detail.Stats,
+	))
+}
+
+// ListingImages handles GET /api/v1/admin/listings/:id/images.
+//
+// Its own endpoint because the gallery is opened on its own, from the table,
+// without the rest of the card being wanted.
+func (h *AdminHandler) ListingImages(c *gin.Context) {
+	id, ok := h.listingID(c)
+	if !ok {
+		return
+	}
+
+	images, err := h.listings.Images(c.Request.Context(), id)
+	if err != nil {
+		h.writeListingError(c, err, "listing images")
+		return
+	}
+	response.OK(c, "Listing images", gin.H{"images": images})
+}
+
+// ListingChats handles GET /api/v1/admin/listings/:id/chats.
+//
+// The owner's alone. A super admin calling this directly receives 403 — the
+// service refuses before a single message is read, so hiding the link in the
+// interface is a courtesy rather than the protection.
+func (h *AdminHandler) ListingChats(c *gin.Context) {
+	actor, exists := middleware.AdminFrom(c)
+	if !exists {
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
+		return
+	}
+	id, ok := h.listingID(c)
+	if !ok {
+		return
+	}
+
+	chats, err := h.listings.Chats(c.Request.Context(), actor, id)
+	if err != nil {
+		h.writeListingError(c, err, "listing chats")
+		return
+	}
+	response.OK(c, "Listing chats", gin.H{"chats": dto.NewAdminChatPreviews(chats)})
+}
+
+func (h *AdminHandler) listingID(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil || id == uuid.Nil {
+		response.Error(c, http.StatusBadRequest, "invalid_id", "Invalid listing id")
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+func (h *AdminHandler) writeListingError(c *gin.Context, err error, action string) {
+	switch {
+	case errors.Is(err, service.ErrAdminForbidden):
+		response.Error(c, http.StatusForbidden, "forbidden",
+			"This action is reserved for the owner")
+	case errors.Is(err, service.ErrListingNotFound):
+		response.Error(c, http.StatusNotFound, "not_found", "Listing not found")
+	default:
+		logger.Errorf("%s: %v", action, err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not complete the request")
+	}
 }
 
 // Users handles GET /api/v1/admin/users.

@@ -226,11 +226,14 @@ export function PageHeading({ title, description, action }) {
   )
 }
 
-// The admin language decides how dates and numbers read, so a month name is in
-// the language the rest of the page is in. Uzbek has no widely supported CLDR
-// data in every browser; `uz-UZ` falls back on its own when it is missing,
-// which is better than pinning everyone to English.
+// Numbers follow the admin's language — thousands separators differ and people
+// read their own. Dates do not: Chromium renders `uz-UZ` as "2026 M08 22",
+// which nobody writes and which reads differently from the same date elsewhere
+// in the product. They are written out below instead, in the day-month-year
+// order this product uses everywhere.
 const DATE_LOCALE = { uz: 'uz-UZ', ru: 'ru-RU', en: 'en-GB' }
+
+const pad = (value) => String(value).padStart(2, '0')
 
 /**
  * Dates and money in the admin's chosen language.
@@ -245,19 +248,14 @@ export function useAdminFormat() {
   const tag = DATE_LOCALE[locale] ?? DATE_LOCALE.en
 
   return {
-    formatDate: (iso) =>
-      new Date(iso).toLocaleDateString(tag, {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      }),
-    formatDateTime: (iso) =>
-      new Date(iso).toLocaleString(tag, {
-        day: '2-digit',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
+    formatDate: (iso) => {
+      const at = new Date(iso)
+      return `${pad(at.getDate())}.${pad(at.getMonth() + 1)}.${at.getFullYear()}`
+    },
+    formatDateTime: (iso) => {
+      const at = new Date(iso)
+      return `${pad(at.getDate())}.${pad(at.getMonth() + 1)}.${at.getFullYear()} ${pad(at.getHours())}:${pad(at.getMinutes())}`
+    },
     formatNumber: (value) => value.toLocaleString(tag),
     formatMoney: (amount, currency) =>
       currency === 'USD'
