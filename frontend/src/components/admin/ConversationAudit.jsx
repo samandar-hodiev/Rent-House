@@ -25,27 +25,33 @@ function AuditMessage({ message, mine, t }) {
 
   return (
     <li className={`flex ${mine ? 'justify-start' : 'justify-end'}`}>
-      <span className="flex max-w-[78%] flex-col gap-0.5">
-        <span
-          className={`rounded-lg px-3 py-2 text-sm ${
-            mine
-              ? 'border border-border bg-surface-secondary text-text-primary'
-              : 'bg-primary text-white'
-          } ${deleted ? 'opacity-70' : ''}`}
-        >
-          {message.body || <span className="italic opacity-70">{t('audit.noText')}</span>}
-          <span
-            className={`mt-1 block text-[10px] ${mine ? 'text-text-muted' : 'text-white/70'}`}
-          >
-            {clock(message.createdAt)}
-            {message.editedAt ? ` · ${t('audit.edited')}` : ''}
-          </span>
+      <span
+        className={`max-w-[78%] rounded-lg px-3 py-2 text-sm ${
+          mine
+            ? 'border border-border bg-surface-secondary text-text-primary'
+            : 'bg-primary text-white'
+        }`}
+      >
+        {message.body || <span className="italic opacity-70">{t('audit.noText')}</span>}
+
+        <span className={`mt-1 block text-[10px] ${mine ? 'text-text-muted' : 'text-white/70'}`}>
+          {clock(message.createdAt)}
+          {message.editedAt ? ` · ${t('audit.edited')}` : ''}
         </span>
 
-        {/* Where an "edited" note would go, and the same size. */}
+        {/* Inside the bubble and last, so a withdrawn message reads as one
+            thing rather than as a message with a caption floating under it.
+            On the green side the plain error red would disappear, so the note
+            keeps its own light tint there. */}
         {deleted ? (
-          <span className={`text-[10px] text-error ${mine ? 'text-left' : 'text-right'}`}>
-            {t('audit.deletedBy', { name: message.deletedByName ?? t('audit.unknownDeleter') })}
+          <span
+            className={`mt-1 block border-t pt-1 text-[10px] ${
+              mine ? 'border-error/25 text-error' : 'border-white/25 text-red-100'
+            }`}
+          >
+            {message.deletedByName
+              ? t('audit.deletedBy', { name: message.deletedByName })
+              : t('audit.deletedUnknown')}
           </span>
         ) : null}
       </span>
@@ -100,16 +106,24 @@ function ConversationAudit({ listingId, ownerName, ownerId }) {
 
   if (state === 'loading') {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex min-h-[16rem] flex-1 items-center justify-center">
         <Loader2 aria-hidden="true" size={18} className="animate-spin text-text-muted" />
       </div>
     )
   }
   if (state === 'error') {
-    return <p className="p-4 text-sm text-error">{t('audit.loadFailed')}</p>
+    return (
+      <p className="flex min-h-[16rem] flex-1 items-center justify-center text-sm text-error">
+        {t('audit.loadFailed')}
+      </p>
+    )
   }
   if (conversations.length === 0) {
-    return <p className="p-4 text-sm text-text-muted">{t('listings.noChats')}</p>
+    return (
+      <p className="flex min-h-[16rem] flex-1 items-center justify-center text-sm text-text-muted">
+        {t('listings.noChats')}
+      </p>
+    )
   }
 
   const chat = conversations[index]
@@ -117,9 +131,12 @@ function ConversationAudit({ listingId, ownerName, ownerId }) {
   const last = index === conversations.length - 1
   const nav =
     'flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-45'
+  // One declaration for both arrows, so they cannot end up different sizes.
+  const circle =
+    'flex size-8 shrink-0 items-center justify-center rounded-full border border-border text-text-primary transition-colors hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-45'
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Owner on the left, the person who wrote on the right, and the way
           between threads in the middle — the same arrangement as the messages
           below it, so the sides mean the same thing throughout. */}
@@ -140,9 +157,9 @@ function ConversationAudit({ listingId, ownerName, ownerId }) {
             onClick={() => setIndex((i) => i - 1)}
             disabled={first}
             aria-label={t('audit.previousChat')}
-            className="flex size-7 items-center justify-center rounded-md border border-border text-text-primary transition-colors hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-45"
+            className={circle}
           >
-            <ChevronLeft aria-hidden="true" size={15} />
+            <ChevronLeft aria-hidden="true" size={16} />
           </button>
           <span className="px-1 text-[11px] tabular-nums text-text-muted">
             {index + 1} / {conversations.length}
@@ -152,9 +169,9 @@ function ConversationAudit({ listingId, ownerName, ownerId }) {
             onClick={() => setIndex((i) => i + 1)}
             disabled={last}
             aria-label={t('audit.nextChat')}
-            className="flex size-7 items-center justify-center rounded-md border border-border text-text-primary transition-colors hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-45"
+            className={circle}
           >
-            <ChevronRight aria-hidden="true" size={15} />
+            <ChevronRight aria-hidden="true" size={16} />
           </button>
         </span>
 
@@ -169,9 +186,15 @@ function ConversationAudit({ listingId, ownerName, ownerId }) {
         </span>
       </header>
 
+      {/* Capped against the viewport rather than left to `flex-1`: the admin
+          shell's main column is as tall as its content, so a flexible child
+          has nothing to be a fraction of and simply grows — a hundred and fifty
+          messages made the card ten thousand pixels tall. A viewport-relative
+          ceiling gives the card the rest of the screen and no more, which is
+          what makes the thread scroll inside it and the footer stay put. */}
       <ul
         ref={bodyRef}
-        className="chat-scroll flex max-h-96 flex-col gap-2 overflow-y-auto bg-background/40 p-4"
+        className="chat-scroll flex max-h-[calc(100vh-26rem)] min-h-[18rem] flex-1 flex-col gap-2 overflow-y-auto bg-background/40 p-4"
       >
         {chat.messages.map((message) => (
           <AuditMessage

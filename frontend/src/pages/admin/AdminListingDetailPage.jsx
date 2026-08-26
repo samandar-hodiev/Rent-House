@@ -92,7 +92,9 @@ function AdminListingDetailPage() {
   const cover = listing.images[0] ?? listing.coverUrl
 
   return (
-    <div className="flex max-w-5xl flex-col gap-4">
+    // `min-h-full` so the conversations card can reach the foot of the screen
+    // rather than stopping wherever its content happens to end.
+    <div className="flex min-h-full max-w-5xl flex-col gap-4">
       <Link
         to={ADMIN_ROUTES.listings}
         className="flex w-fit items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -166,27 +168,32 @@ function AdminListingDetailPage() {
         </div>
       </AdminCard>
 
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-        <AdminCard title={t('listings.engagement')}>
+      {/* No `items-start`: the two cards sit on one row and should end on one
+          line, whichever has more in it. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Every figure is counted for this listing alone — two flats owned by
+            the same person never share a number. The labels say so, because a
+            bare "Ko'rishlar" beside an owner card invites the question. */}
+        <AdminCard title={t('listings.thisListing')}>
           <div className="grid grid-cols-2 gap-2 p-4">
             <Stat
               icon={<Eye size={14} />}
-              label={t('stat.views')}
+              label={t('listings.statViews')}
               value={formatNumber(listing.stats.views)}
             />
             <Stat
               icon={<Heart size={14} />}
-              label={t('stat.favorites')}
+              label={t('listings.statSaves')}
               value={formatNumber(listing.stats.saves)}
             />
             <Stat
               icon={<Phone size={14} />}
-              label={t('stat.contacts')}
+              label={t('listings.statContacts')}
               value={formatNumber(listing.stats.contacts)}
             />
             <Stat
               icon={<MessageSquare size={14} />}
-              label={t('stat.chats')}
+              label={t('listings.statWriters')}
               value={formatNumber(listing.stats.chats)}
             />
           </div>
@@ -208,7 +215,7 @@ function AdminListingDetailPage() {
       {/* The owner's alone. The endpoint refuses everybody else, so this is the
           interface agreeing with the rule rather than enforcing it. */}
       {role === ADMIN_ROLE.owner ? (
-        <AdminCard title={t('audit.title')} className="overflow-hidden">
+        <AdminCard title={t('audit.title')} className="min-h-0 flex-1 overflow-hidden">
           <ConversationAudit
             listingId={listing.id}
             ownerId={listing.owner.id}
