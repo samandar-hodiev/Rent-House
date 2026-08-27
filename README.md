@@ -1,7 +1,9 @@
 # RentHouse
 
 RentHouse helps users find apartments for rent in Tashkent, Uzbekistan —
-district-based search, keyword search, filters, map discovery, wishlist,
+district-based search, keyword search,
+
+filters, map discovery, wishlist
 owner listings, and moderation.
 
 Frontend: React + Vite + Tailwind CSS (JavaScript).
