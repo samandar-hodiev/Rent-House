@@ -370,12 +370,23 @@ func newRouter(
 				marketplaceListings.GET("/:id/audit", adminHandler.ListingAudit)
 			}
 
+			// Conversations, behind the section the owner can withdraw. Who
+			// spoke to whom is visible to any administrator with it; what they
+			// said is the owner's alone.
+			marketplaceChats := authed.Group("/chats",
+				middleware.RequireSection(adminService, "chats"))
+			{
+				marketplaceChats.GET("", adminHandler.Chats)
+				marketplaceChats.GET("/:id/messages", adminHandler.ChatMessages)
+			}
+
 			// Marketplace accounts. Moderating them is what an administrator
 			// is for, so this is not owner-only — but it is behind the
 			// "users" section, which the owner can withdraw.
 			marketplaceUsers := authed.Group("/users", middleware.RequireSection(adminService, "users"))
 			{
 				marketplaceUsers.GET("", adminHandler.Users)
+				marketplaceUsers.GET("/:id", adminHandler.UserDetail)
 				marketplaceUsers.PATCH("/:id/status", adminHandler.SetUserStatus)
 			}
 
@@ -391,6 +402,15 @@ func newRouter(
 
 			// Read by every administrator, because the dashboard draws its own
 			// navigation from it. Written by the owner alone.
+			// What each role may reach. Readable by any administrator: it
+			// describes the rules, and knowing them grants nothing.
+			authed.GET("/permissions", adminHandler.Permissions)
+
+			// What administrators have done. Behind its own section, which the
+			// owner can withdraw like any other.
+			authed.GET("/audit-logs",
+				middleware.RequireSection(adminService, "auditLogs"), adminHandler.AuditLogs)
+
 			authed.GET("/sidebar", adminHandler.Sidebar)
 			authed.PUT("/sidebar", middleware.RequireOwner(), adminHandler.UpdateSidebar)
 

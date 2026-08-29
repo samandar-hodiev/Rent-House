@@ -7,11 +7,12 @@ import AdminConfirmDialog from '../../components/admin/AdminConfirmDialog'
 import AvatarDialog from '../../components/admin/AvatarDialog'
 import {
   ADMIN_SELECT, ADMIN_SELECT_STYLE, AdminCard, AdminTable, Cell, MockButton, PageHeading,
-  Row, StatusBadge, useAdminFormat,
+  Row, StatusBadge, ViewLink, useAdminFormat,
 } from '../../components/admin/adminUi'
 import { useAdmin } from '../../context/AdminSettingsContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { fetchUsers, setUserStatus } from '../../services/adminApi'
+import { adminUserPath } from '../../routes/adminPaths'
 import { useModalDialog } from '../../hooks/useModalDialog'
 
 const PER_PAGE = 10
@@ -332,6 +333,8 @@ function AdminUsersPage() {
                   </Cell>
                   <Cell>
                     <span className="flex items-center gap-1.5">
+                      <ViewLink to={adminUserPath(user.id)} />
+
                       {/* Only a blocked account has a reason to show, so only a
                           blocked account offers the button. The reason itself
                           stays out of the table: it is a sentence, and a

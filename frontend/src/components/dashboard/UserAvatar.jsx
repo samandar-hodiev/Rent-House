@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getUserInitials } from '../../data/currentUser'
+import { getUserInitials } from '../../utils/userInitials'
 import { resolveUploadUrl } from '../../utils/uploadUrl'
 
 const SIZE_CLASS = {

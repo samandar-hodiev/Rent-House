@@ -199,3 +199,70 @@ func (s *AdminListingService) AuditConversations(
 
 	return &OwnerAudit{Conversations: conversations, Messages: messages}, nil
 }
+
+// ChatPage is one page of the moderation chat list.
+type ChatPage struct {
+	Chats []repository.AdminChatRow
+	Total int64
+	Page  int
+	Limit int
+}
+
+// AllChats lists conversations for the moderation table.
+//
+// Any administrator with the section may see who spoke to whom and when. What
+// they said is a separate question, answered by ChatMessages, which is the
+// owner's alone.
+func (s *AdminListingService) AllChats(
+	ctx context.Context, search string, page, limit int,
+) (*ChatPage, error) {
+	if page < 1 {
+		page = 1
+	}
+	switch {
+	case limit < 1:
+		limit = 10
+	case limit > maxListingPageSize:
+		limit = maxListingPageSize
+	}
+
+	rows, total, err := s.listings.AllChats(ctx, search, page, limit)
+	if err != nil {
+		return nil, err
+	}
+	return &ChatPage{Chats: rows, Total: total, Page: page, Limit: limit}, nil
+}
+
+// ChatThread is one conversation with its messages.
+type ChatThread struct {
+	Buyer    string
+	Seller   string
+	Messages []repository.OwnerMessage
+}
+
+// ChatMessages returns what was said in one conversation.
+//
+// The owner's alone, for the same reason the listing audit is: this returns the
+// text of messages, withdrawn ones included. An administrator who may moderate
+// the marketplace is not thereby entitled to read everybody's correspondence.
+func (s *AdminListingService) ChatMessages(
+	ctx context.Context, actor *models.Admin, id uuid.UUID,
+) (*ChatThread, error) {
+	if !actor.IsOwner() {
+		return nil, ErrAdminForbidden
+	}
+
+	buyer, seller, err := s.listings.ChatParticipants(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrConversationNotFound) {
+			return nil, ErrConversationNotFound
+		}
+		return nil, err
+	}
+
+	messages, err := s.listings.OwnerMessages(ctx, []uuid.UUID{id})
+	if err != nil {
+		return nil, err
+	}
+	return &ChatThread{Buyer: buyer, Seller: seller, Messages: messages}, nil
+}

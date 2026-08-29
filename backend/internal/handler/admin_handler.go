@@ -127,6 +127,10 @@ func (h *AdminHandler) Login(c *gin.Context) {
 
 	session, err := h.admins.Login(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
+		// Recorded with the address that was tried rather than an account,
+		// because a refused attempt may not correspond to one.
+		h.admins.Audit(c.Request.Context(), nil,
+			models.AuditSignInFailed, req.Email, c.ClientIP(), models.AuditFailed)
 		switch {
 		case errors.Is(err, service.ErrAdminCredentials):
 			// One message for a wrong password and for an unknown address.
@@ -145,6 +149,9 @@ func (h *AdminHandler) Login(c *gin.Context) {
 		}
 		return
 	}
+
+	h.admins.Audit(c.Request.Context(), session.Admin,
+		models.AuditSignIn, session.Admin.Email, c.ClientIP(), models.AuditSuccess)
 
 	response.OK(c, "Signed in", dto.AdminSessionResponse{
 		Admin:       dto.NewAdminResponse(session.Admin),
@@ -212,6 +219,9 @@ func (h *AdminHandler) Create(c *gin.Context) {
 		return
 	}
 
+	h.admins.Audit(c.Request.Context(), actor,
+		models.AuditAdminCreated, admin.Email, c.ClientIP(), models.AuditSuccess)
+
 	response.Success(c, http.StatusCreated, "Administrator created", dto.NewAdminResponse(admin))
 }
 
@@ -232,6 +242,9 @@ func (h *AdminHandler) SetStatus(c *gin.Context) {
 		h.writeAdminError(c, err, "set admin status")
 		return
 	}
+	h.admins.Audit(c.Request.Context(), actor,
+		models.AuditAdminStatus, id.String()+" -> "+req.Status, c.ClientIP(), models.AuditSuccess)
+
 	response.OK(c, "Status updated", nil)
 }
 
@@ -246,6 +259,9 @@ func (h *AdminHandler) Delete(c *gin.Context) {
 		h.writeAdminError(c, err, "delete admin")
 		return
 	}
+	h.admins.Audit(c.Request.Context(), actor,
+		models.AuditAdminDeleted, id.String(), c.ClientIP(), models.AuditSuccess)
+
 	response.OK(c, "Administrator removed", nil)
 }
 
@@ -290,6 +306,9 @@ func (h *AdminHandler) UpdateSidebar(c *gin.Context) {
 			"Could not load the sidebar configuration")
 		return
 	}
+	h.admins.Audit(c.Request.Context(), actor,
+		models.AuditSidebarChanged, "", c.ClientIP(), models.AuditSuccess)
+
 	response.OK(c, "Sidebar configuration updated", gin.H{"sections": sections})
 }
 
@@ -479,6 +498,72 @@ func (h *AdminHandler) writeListingError(c *gin.Context, err error, action strin
 	}
 }
 
+// Chats handles GET /api/v1/admin/chats.
+func (h *AdminHandler) Chats(c *gin.Context) {
+	page, _ := strconv.Atoi(c.Query("page"))
+	limit, _ := strconv.Atoi(c.Query("limit"))
+
+	result, err := h.listings.AllChats(c.Request.Context(), c.Query("search"), page, limit)
+	if err != nil {
+		logger.Errorf("list chats: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not load conversations")
+		return
+	}
+
+	totalPages := int((result.Total + int64(result.Limit) - 1) / int64(result.Limit))
+	if totalPages < 1 {
+		totalPages = 1
+	}
+	response.OK(c, "Conversations", dto.AdminChatListResponse{
+		Chats:      dto.NewAdminChatResponses(result.Chats),
+		Total:      result.Total,
+		Page:       result.Page,
+		Limit:      result.Limit,
+		TotalPages: totalPages,
+	})
+}
+
+// ChatMessages handles GET /api/v1/admin/chats/:id/messages.
+//
+// The owner's alone: it returns what people wrote to each other, withdrawn
+// messages included. Moderating the marketplace does not by itself entitle
+// somebody to read everybody's correspondence.
+func (h *AdminHandler) ChatMessages(c *gin.Context) {
+	actor, exists := middleware.AdminFrom(c)
+	if !exists {
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
+		return
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil || id == uuid.Nil {
+		response.Error(c, http.StatusBadRequest, "invalid_id", "Invalid conversation id")
+		return
+	}
+
+	thread, err := h.listings.ChatMessages(c.Request.Context(), actor, id)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrAdminForbidden):
+			response.Error(c, http.StatusForbidden, "forbidden",
+				"This action is reserved for the owner")
+		case errors.Is(err, service.ErrConversationNotFound):
+			response.Error(c, http.StatusNotFound, "not_found", "Conversation not found")
+		default:
+			logger.Errorf("chat messages: %v", err)
+			response.Error(c, http.StatusInternalServerError, "internal_error",
+				"Could not load the conversation")
+		}
+		return
+	}
+
+	response.OK(c, "Conversation", gin.H{
+		"buyer_name":  thread.Buyer,
+		"seller_name": thread.Seller,
+		"messages":    dto.NewAdminAuditMessages(thread.Messages),
+	})
+}
+
 // Users handles GET /api/v1/admin/users.
 //
 // Searching, filtering and paging are all query parameters and all applied by
@@ -524,6 +609,70 @@ func (h *AdminHandler) Users(c *gin.Context) {
 	})
 }
 
+// UserDetail handles GET /api/v1/admin/users/:id.
+func (h *AdminHandler) UserDetail(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil || id == uuid.Nil {
+		response.Error(c, http.StatusBadRequest, "invalid_id", "Invalid user id")
+		return
+	}
+
+	detail, err := h.admins.User(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, service.ErrAdminNotFound) {
+			response.Error(c, http.StatusNotFound, "not_found", "User not found")
+			return
+		}
+		logger.Errorf("user detail: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not load the user")
+		return
+	}
+	response.OK(c, "User", dto.NewAdminUserDetailResponse(detail.User, detail.History))
+}
+
+// AuditLogs handles GET /api/v1/admin/audit-logs.
+func (h *AdminHandler) AuditLogs(c *gin.Context) {
+	page, _ := strconv.Atoi(c.Query("page"))
+	limit, _ := strconv.Atoi(c.Query("limit"))
+
+	result, err := h.admins.AuditLogs(c.Request.Context(), page, limit)
+	if err != nil {
+		logger.Errorf("audit logs: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not load the audit log")
+		return
+	}
+
+	totalPages := int((result.Total + int64(result.Limit) - 1) / int64(result.Limit))
+	if totalPages < 1 {
+		totalPages = 1
+	}
+	response.OK(c, "Audit log", gin.H{
+		"entries":     result.Entries,
+		"total":       result.Total,
+		"page":        result.Page,
+		"limit":       result.Limit,
+		"total_pages": totalPages,
+	})
+}
+
+// Permissions handles GET /api/v1/admin/permissions.
+//
+// What each role may actually reach, derived from the rules the middleware
+// enforces and the configuration the owner set — so the table cannot claim a
+// permission the server would refuse.
+func (h *AdminHandler) Permissions(c *gin.Context) {
+	rows, err := h.admins.Permissions(c.Request.Context())
+	if err != nil {
+		logger.Errorf("permissions: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not load permissions")
+		return
+	}
+	response.OK(c, "Permissions", gin.H{"permissions": rows})
+}
+
 // SetUserStatus handles PATCH /api/v1/admin/users/:id/status.
 func (h *AdminHandler) SetUserStatus(c *gin.Context) {
 	actor, ok := middleware.AdminFrom(c)
@@ -562,6 +711,12 @@ func (h *AdminHandler) SetUserStatus(c *gin.Context) {
 		}
 		return
 	}
+	action := models.AuditUserUnblocked
+	if req.Status == models.UserStatusBlocked {
+		action = models.AuditUserBlocked
+	}
+	h.admins.Audit(c.Request.Context(), actor, action, id.String(), c.ClientIP(), models.AuditSuccess)
+
 	response.OK(c, "User updated", nil)
 }
 
@@ -606,6 +761,9 @@ func (h *AdminHandler) UpdateProfile(c *gin.Context) {
 		}
 		return
 	}
+	h.admins.Audit(c.Request.Context(), actor,
+		models.AuditProfileUpdated, admin.Email, c.ClientIP(), models.AuditSuccess)
+
 	response.OK(c, "Profile updated", dto.NewAdminResponse(admin))
 }
 

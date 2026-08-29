@@ -393,3 +393,103 @@ func (r *AdminListingRepository) ListingOwnerID(
 	}
 	return ownerID, nil
 }
+
+// AdminChatRow is one conversation as the moderation table lists it.
+type AdminChatRow struct {
+	ID            uuid.UUID  `gorm:"column:id"`
+	BuyerName     string     `gorm:"column:buyer_name"`
+	SellerName    string     `gorm:"column:seller_name"`
+	ListingTitle  *string    `gorm:"column:listing_title"`
+	LastMessage   string     `gorm:"column:last_message"`
+	LastMessageAt *time.Time `gorm:"column:last_message_at"`
+	LastDeleted   *time.Time `gorm:"column:last_deleted"`
+	Messages      int64      `gorm:"column:messages"`
+	DeletedAt     *time.Time `gorm:"column:deleted_at"`
+}
+
+// AllChats lists conversations across the marketplace, busiest end first.
+//
+// Every thread, including ones a participant has removed from their own view:
+// this is the moderation table, and a conversation somebody deleted is exactly
+// the one an administrator may need to look at.
+func (r *AdminListingRepository) AllChats(
+	ctx context.Context, search string, page, limit int,
+) ([]AdminChatRow, int64, error) {
+	base := r.db.WithContext(ctx).
+		Table("conversations AS c").
+		Joins("JOIN users AS b ON b.id = c.buyer_id").
+		Joins("JOIN users AS s ON s.id = c.owner_id")
+
+	if term := strings.TrimSpace(search); term != "" {
+		pattern := "%" + strings.ToLower(term) + "%"
+		base = base.Where(
+			`b.first_name ILIKE ? OR b.last_name ILIKE ?
+			 OR s.first_name ILIKE ? OR s.last_name ILIKE ?`,
+			pattern, pattern, pattern, pattern,
+		)
+	}
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("count chats: %w", err)
+	}
+
+	if limit <= 0 {
+		limit = 10
+	}
+	if page <= 0 {
+		page = 1
+	}
+
+	var rows []AdminChatRow
+	err := base.
+		Select(`c.id, c.deleted_at,
+			btrim(b.first_name || ' ' || b.last_name) AS buyer_name,
+			btrim(s.first_name || ' ' || s.last_name) AS seller_name,
+			(SELECT count(*) FROM messages m WHERE m.conversation_id = c.id) AS messages,
+			last.body       AS last_message,
+			last.created_at AS last_message_at,
+			last.deleted_at AS last_deleted,
+			(SELECT a.title FROM messages m
+			   JOIN apartments a ON a.id = m.apartment_id
+			   WHERE m.conversation_id = c.id
+			   ORDER BY m.created_at DESC LIMIT 1) AS listing_title`).
+		Joins(`LEFT JOIN LATERAL (
+			SELECT body, created_at, deleted_at FROM messages m
+			WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1
+		) last ON true`).
+		Order("last.created_at DESC NULLS LAST").
+		Limit(limit).
+		Offset((page - 1) * limit).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, 0, fmt.Errorf("list chats: %w", err)
+	}
+	return rows, total, nil
+}
+
+// ChatParticipants names the two people in a conversation, for the preview
+// header.
+func (r *AdminListingRepository) ChatParticipants(
+	ctx context.Context, id uuid.UUID,
+) (buyer, seller string, err error) {
+	var row struct {
+		Buyer  string `gorm:"column:buyer_name"`
+		Seller string `gorm:"column:seller_name"`
+	}
+	err = r.db.WithContext(ctx).
+		Table("conversations AS c").
+		Joins("JOIN users AS b ON b.id = c.buyer_id").
+		Joins("JOIN users AS s ON s.id = c.owner_id").
+		Where("c.id = ?", id).
+		Select(`btrim(b.first_name || ' ' || b.last_name) AS buyer_name,
+			btrim(s.first_name || ' ' || s.last_name) AS seller_name`).
+		Scan(&row).Error
+	if err != nil {
+		return "", "", fmt.Errorf("chat participants: %w", err)
+	}
+	if row.Buyer == "" && row.Seller == "" {
+		return "", "", ErrConversationNotFound
+	}
+	return row.Buyer, row.Seller, nil
+}

@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { ApiError } from '../services/apiClient'
 import { fetchCurrentUser } from '../services/authApi'
-import { CURRENT_USER } from '../data/currentUser'
 
 // The access token is the whole session. It lives in localStorage so a reload
 // keeps the user signed in; nothing else about the account is persisted, and
@@ -45,9 +44,6 @@ function persistToken(token) {
  * as null; the components expect camelCase and a display name. Doing the
  * translation here means the API contract can change without touching them.
  *
- * `stats` has no endpoint yet, so the placeholder counts are kept — they are
- * the same numbers the dashboard showed before the API existed, and they are
- * clearly marked here as the one thing still mocked.
  */
 export function toUiUser(apiUser) {
   const firstName = apiUser.first_name ?? ''
@@ -63,7 +59,6 @@ export function toUiUser(apiUser) {
     avatarUrl: apiUser.avatar_url ?? null,
     language: apiUser.language ?? 'uz',
     theme: apiUser.theme ?? 'light',
-    stats: CURRENT_USER.stats,
   }
 }
 
@@ -171,7 +166,6 @@ const EMPTY_USER = {
   avatarUrl: null,
   language: 'uz',
   theme: 'light',
-  stats: CURRENT_USER.stats,
 }
 
 export function useAuth() {

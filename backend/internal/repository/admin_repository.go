@@ -417,3 +417,120 @@ func (r *AdminRepository) SetSections(ctx context.Context, sections map[string]b
 	}
 	return nil
 }
+
+// AdminUserDetail is one marketplace account with the figures its page shows.
+type AdminUserDetail struct {
+	models.User
+	TotalListings  int64 `gorm:"column:total_listings"`
+	ActiveListings int64 `gorm:"column:active_listings"`
+	ClosedListings int64 `gorm:"column:closed_listings"`
+	DraftListings  int64 `gorm:"column:draft_listings"`
+	Chats          int64 `gorm:"column:chats"`
+	Saves          int64 `gorm:"column:saves"`
+}
+
+// UserDetail loads one account and counts what it has done.
+//
+// Every figure is a subquery rather than rows fetched and tallied in Go, so the
+// page costs one round trip whatever the account has been up to.
+func (r *AdminRepository) UserDetail(
+	ctx context.Context, id uuid.UUID,
+) (*AdminUserDetail, error) {
+	var row AdminUserDetail
+	err := r.db.WithContext(ctx).
+		Table("users").
+		Where("id = ?", id).
+		Select(`users.*,
+			(SELECT count(*) FROM apartments a WHERE a.owner_id = users.id AND a.status <> 'deleted')
+			                                                                  AS total_listings,
+			(SELECT count(*) FROM apartments a WHERE a.owner_id = users.id AND a.status = 'active')
+			                                                                  AS active_listings,
+			(SELECT count(*) FROM apartments a WHERE a.owner_id = users.id AND a.status = 'closed')
+			                                                                  AS closed_listings,
+			(SELECT count(*) FROM apartments a WHERE a.owner_id = users.id AND a.status = 'draft')
+			                                                                  AS draft_listings,
+			(SELECT count(*) FROM conversations c
+			  WHERE c.buyer_id = users.id OR c.owner_id = users.id)           AS chats,
+			(SELECT count(*) FROM favorites f WHERE f.user_id = users.id)     AS saves`).
+		Scan(&row).Error
+	if err != nil {
+		return nil, fmt.Errorf("user detail: %w", err)
+	}
+	if row.ID == uuid.Nil {
+		return nil, ErrUserNotFound
+	}
+	return &row, nil
+}
+
+// UserBlockRecord is one entry of an account's block history.
+type UserBlockRecord struct {
+	Reason          string     `gorm:"column:reason"`
+	BlockedAt       time.Time  `gorm:"column:blocked_at"`
+	BlockedByName   *string    `gorm:"column:blocked_by_name"`
+	UnblockedAt     *time.Time `gorm:"column:unblocked_at"`
+	UnblockedByName *string    `gorm:"column:unblocked_by_name"`
+}
+
+// UserBlockHistory returns every time an account was blocked, newest first.
+//
+// The real record behind the status badge: an account blocked and released
+// twice has two rows here, and neither is erased by the release.
+func (r *AdminRepository) UserBlockHistory(
+	ctx context.Context, id uuid.UUID,
+) ([]UserBlockRecord, error) {
+	var rows []UserBlockRecord
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT b.reason, b.blocked_at, b.unblocked_at,
+		       btrim(ba.name) AS blocked_by_name,
+		       btrim(ua.name) AS unblocked_by_name
+		FROM admin_user_blocks b
+		LEFT JOIN admins ba ON ba.id = b.blocked_by
+		LEFT JOIN admins ua ON ua.id = b.unblocked_by
+		WHERE b.user_id = ?
+		ORDER BY b.blocked_at DESC
+	`, id).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("user block history: %w", err)
+	}
+	return rows, nil
+}
+
+// RecordAudit writes one entry of the admin action log.
+//
+// Best effort by design: the caller ignores the error. An action that succeeded
+// must not be reported as failed because the bookkeeping row could not be
+// written, and a failed write here is a logging problem, not a refusal.
+func (r *AdminRepository) RecordAudit(ctx context.Context, entry *models.AdminAuditLog) error {
+	if err := r.db.WithContext(ctx).Create(entry).Error; err != nil {
+		return fmt.Errorf("record audit: %w", err)
+	}
+	return nil
+}
+
+// AuditLogs returns the action log, newest first.
+func (r *AdminRepository) AuditLogs(
+	ctx context.Context, page, limit int,
+) ([]models.AdminAuditLog, int64, error) {
+	base := r.db.WithContext(ctx).Model(&models.AdminAuditLog{})
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("count audit logs: %w", err)
+	}
+
+	if limit <= 0 {
+		limit = 20
+	}
+	if page <= 0 {
+		page = 1
+	}
+
+	var rows []models.AdminAuditLog
+	err := base.Order("created_at DESC").
+		Limit(limit).Offset((page - 1) * limit).
+		Find(&rows).Error
+	if err != nil {
+		return nil, 0, fmt.Errorf("list audit logs: %w", err)
+	}
+	return rows, total, nil
+}

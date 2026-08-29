@@ -337,3 +337,110 @@ export async function fetchListingAudit(id, { token, signal } = {}) {
     })),
   }))
 }
+
+/** One page of conversations for the moderation table. */
+export async function fetchChats({ search, page = 1, limit = 10, token, signal } = {}) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+  if (search) params.set('search', search)
+
+  const data = await request(`/admin/chats?${params}`, { token, signal })
+  return {
+    chats: (data?.chats ?? []).map((c) => ({
+      id: c.id,
+      buyerName: c.buyer_name,
+      sellerName: c.seller_name,
+      listingTitle: c.listing_title ?? null,
+      lastMessage: c.last_message ?? '',
+      lastMessageAt: c.last_message_at ?? null,
+      messages: c.messages ?? 0,
+      status: c.status,
+    })),
+    total: data?.total ?? 0,
+    page: data?.page ?? 1,
+    totalPages: data?.total_pages ?? 1,
+  }
+}
+
+/**
+ * What was said in one conversation.
+ *
+ * The owner's alone — the API answers 403 to anyone else, because moderating
+ * the marketplace does not by itself entitle somebody to read everybody's
+ * correspondence.
+ */
+export async function fetchChatMessages(id, { token, signal } = {}) {
+  const data = await request(`/admin/chats/${id}/messages`, { token, signal })
+  return {
+    buyerName: data?.buyer_name ?? '',
+    sellerName: data?.seller_name ?? '',
+    messages: (data?.messages ?? []).map((m) => ({
+      id: m.id,
+      senderId: m.sender_id,
+      senderName: m.sender_name,
+      body: m.body,
+      createdAt: m.created_at,
+      editedAt: m.edited_at ?? null,
+      deletedAt: m.deleted_at ?? null,
+      deletedByName: m.deleted_by_name ?? null,
+    })),
+  }
+}
+
+/** One marketplace account, with its figures and its block history. */
+export async function fetchUser(id, { token, signal } = {}) {
+  const d = await request(`/admin/users/${id}`, { token, signal })
+  return {
+    ...toManagedUser(d),
+    stats: {
+      totalListings: d?.stats?.total_listings ?? 0,
+      activeListings: d?.stats?.active_listings ?? 0,
+      closedListings: d?.stats?.closed_listings ?? 0,
+      draftListings: d?.stats?.draft_listings ?? 0,
+      chats: d?.stats?.chats ?? 0,
+      saves: d?.stats?.saves ?? 0,
+    },
+    blockHistory: (d?.block_history ?? []).map((b) => ({
+      reason: b.reason,
+      blockedAt: b.blocked_at,
+      blockedByName: b.blocked_by_name ?? null,
+      unblockedAt: b.unblocked_at ?? null,
+      unblockedByName: b.unblocked_by_name ?? null,
+    })),
+  }
+}
+
+/**
+ * What each role may reach.
+ *
+ * Derived on the server from the rules the middleware enforces and the sidebar
+ * configuration the owner set, so the table cannot promise a permission the
+ * server would refuse.
+ */
+export async function fetchPermissions({ token, signal } = {}) {
+  const d = await request('/admin/permissions', { token, signal })
+  return (d?.permissions ?? []).map((p) => ({
+    section: p.section,
+    owner: p.owner,
+    superAdmin: p.super_admin,
+  }))
+}
+
+/** One page of the admin action log, newest first. */
+export async function fetchAuditLogs({ page = 1, limit = 20, token, signal } = {}) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+  const d = await request(`/admin/audit-logs?${params}`, { token, signal })
+  return {
+    entries: (d?.entries ?? []).map((e) => ({
+      id: e.id,
+      adminName: e.admin_name,
+      action: e.action,
+      target: e.target,
+      ip: e.ip,
+      status: e.status,
+      createdAt: e.created_at,
+    })),
+    total: d?.total ?? 0,
+    page: d?.page ?? 1,
+    totalPages: d?.total_pages ?? 1,
+  }
+}

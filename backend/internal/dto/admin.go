@@ -317,6 +317,32 @@ type AdminAuditMessageResponse struct {
 	ListingTitle  *string `json:"listing_title"`
 }
 
+// newAuditMessage maps one message. Shared by the listing audit and the chat
+// moderation view, so the two cannot describe the same message differently.
+func newAuditMessage(m repository.OwnerMessage) AdminAuditMessageResponse {
+	return AdminAuditMessageResponse{
+		ID:            m.ID.String(),
+		SenderID:      m.SenderID.String(),
+		SenderName:    m.SenderName,
+		Body:          m.Body,
+		Kind:          m.Kind,
+		CreatedAt:     m.CreatedAt,
+		EditedAt:      m.EditedAt,
+		DeletedAt:     m.DeletedAt,
+		DeletedByName: m.DeletedByName,
+		ListingTitle:  m.ListingTitle,
+	}
+}
+
+// NewAdminAuditMessages maps a flat list of messages.
+func NewAdminAuditMessages(messages []repository.OwnerMessage) []AdminAuditMessageResponse {
+	out := make([]AdminAuditMessageResponse, 0, len(messages))
+	for _, m := range messages {
+		out = append(out, newAuditMessage(m))
+	}
+	return out
+}
+
 // AdminAuditConversationResponse is one thread, with its messages.
 type AdminAuditConversationResponse struct {
 	ConversationID string                      `json:"conversation_id"`
@@ -338,18 +364,7 @@ func NewAdminAuditConversations(
 	byConversation := make(map[string][]AdminAuditMessageResponse, len(conversations))
 	for _, m := range messages {
 		key := m.ConversationID.String()
-		byConversation[key] = append(byConversation[key], AdminAuditMessageResponse{
-			ID:            m.ID.String(),
-			SenderID:      m.SenderID.String(),
-			SenderName:    m.SenderName,
-			Body:          m.Body,
-			Kind:          m.Kind,
-			CreatedAt:     m.CreatedAt,
-			EditedAt:      m.EditedAt,
-			DeletedAt:     m.DeletedAt,
-			DeletedByName: m.DeletedByName,
-			ListingTitle:  m.ListingTitle,
-		})
+		byConversation[key] = append(byConversation[key], newAuditMessage(m))
 	}
 
 	out := make([]AdminAuditConversationResponse, 0, len(conversations))
@@ -364,6 +379,111 @@ func NewAdminAuditConversations(
 			// Never nil: a thread with nothing in it must arrive as [] so the
 			// client can count it without checking.
 			Messages: append([]AdminAuditMessageResponse{}, byConversation[key]...),
+		})
+	}
+	return out
+}
+
+// AdminChatResponse is one conversation in the moderation table.
+type AdminChatResponse struct {
+	ID            string     `json:"id"`
+	BuyerName     string     `json:"buyer_name"`
+	SellerName    string     `json:"seller_name"`
+	ListingTitle  *string    `json:"listing_title"`
+	LastMessage   string     `json:"last_message"`
+	LastMessageAt *time.Time `json:"last_message_at"`
+	Messages      int64      `json:"messages"`
+	// "active" while both sides still have it, "archived" once somebody has
+	// removed it from their own view. The table shows it as a status badge.
+	Status string `json:"status"`
+}
+
+// NewAdminChatResponses maps the list.
+//
+// The last message is blanked when it was withdrawn: the table is a list of
+// threads, not a place to read one, and the text of a withdrawn message belongs
+// only in the owner's audit view.
+func NewAdminChatResponses(rows []repository.AdminChatRow) []AdminChatResponse {
+	out := make([]AdminChatResponse, 0, len(rows))
+	for _, row := range rows {
+		body := row.LastMessage
+		if row.LastDeleted != nil {
+			body = ""
+		}
+		status := "active"
+		if row.DeletedAt != nil {
+			status = "archived"
+		}
+		out = append(out, AdminChatResponse{
+			ID:            row.ID.String(),
+			BuyerName:     row.BuyerName,
+			SellerName:    row.SellerName,
+			ListingTitle:  row.ListingTitle,
+			LastMessage:   body,
+			LastMessageAt: row.LastMessageAt,
+			Messages:      row.Messages,
+			Status:        status,
+		})
+	}
+	return out
+}
+
+// AdminChatListResponse is one page of them.
+type AdminChatListResponse struct {
+	Chats      []AdminChatResponse `json:"chats"`
+	Total      int64               `json:"total"`
+	Page       int                 `json:"page"`
+	Limit      int                 `json:"limit"`
+	TotalPages int                 `json:"total_pages"`
+}
+
+// AdminUserBlockRecordResponse is one entry of an account's block history.
+type AdminUserBlockRecordResponse struct {
+	Reason          string     `json:"reason"`
+	BlockedAt       time.Time  `json:"blocked_at"`
+	BlockedByName   *string    `json:"blocked_by_name"`
+	UnblockedAt     *time.Time `json:"unblocked_at"`
+	UnblockedByName *string    `json:"unblocked_by_name"`
+}
+
+// AdminUserDetailResponse is one account's page.
+type AdminUserDetailResponse struct {
+	AdminUserResponse
+	Stats struct {
+		TotalListings  int64 `json:"total_listings"`
+		ActiveListings int64 `json:"active_listings"`
+		ClosedListings int64 `json:"closed_listings"`
+		DraftListings  int64 `json:"draft_listings"`
+		Chats          int64 `json:"chats"`
+		Saves          int64 `json:"saves"`
+	} `json:"stats"`
+	BlockHistory []AdminUserBlockRecordResponse `json:"block_history"`
+}
+
+// NewAdminUserDetailResponse assembles the page.
+func NewAdminUserDetailResponse(
+	detail *repository.AdminUserDetail, history []repository.UserBlockRecord,
+) AdminUserDetailResponse {
+	out := AdminUserDetailResponse{
+		AdminUserResponse: NewAdminUserResponse(&detail.User, detail.TotalListings, nil, nil, nil),
+	}
+	out.Stats.TotalListings = detail.TotalListings
+	out.Stats.ActiveListings = detail.ActiveListings
+	out.Stats.ClosedListings = detail.ClosedListings
+	out.Stats.DraftListings = detail.DraftListings
+	out.Stats.Chats = detail.Chats
+	out.Stats.Saves = detail.Saves
+
+	// Never nil: an account never blocked must arrive as [] so the client can
+	// count it without checking.
+	out.BlockHistory = make([]AdminUserBlockRecordResponse, 0, len(history))
+	for _, record := range history {
+		out.BlockHistory = append(out.BlockHistory, AdminUserBlockRecordResponse{
+			Reason:          record.Reason,
+			BlockedAt:       record.BlockedAt,
+			BlockedByName:   record.BlockedByName,
+			UnblockedAt:     record.UnblockedAt,
+			UnblockedByName: record.UnblockedByName,
 		})
 	}
 	return out

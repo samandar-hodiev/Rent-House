@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -361,6 +362,120 @@ func (s *AdminService) SetUserStatus(
 	default:
 		return ErrInvalidAdminStatus
 	}
+}
+
+// Audit records one administrator action.
+//
+// Errors are swallowed: an action that succeeded must not be reported as having
+// failed because a log row could not be written. What is lost is one line of
+// history, which is worth less than a false failure.
+func (s *AdminService) Audit(
+	ctx context.Context, actor *models.Admin, action, target, ip, status string,
+) {
+	entry := &models.AdminAuditLog{
+		Action: action, Target: target, IP: ip, Status: status,
+	}
+	if actor != nil {
+		entry.AdminID = &actor.ID
+		entry.AdminName = actor.Name
+	}
+	if entry.AdminName == "" {
+		entry.AdminName = target
+	}
+	_ = s.admins.RecordAudit(ctx, entry)
+}
+
+// AuditPage is one page of the action log.
+type AuditPage struct {
+	Entries []models.AdminAuditLog
+	Total   int64
+	Page    int
+	Limit   int
+}
+
+// AuditLogs returns the action log, newest first.
+func (s *AdminService) AuditLogs(ctx context.Context, page, limit int) (*AuditPage, error) {
+	if page < 1 {
+		page = 1
+	}
+	switch {
+	case limit < 1:
+		limit = 20
+	case limit > maxUserPageSize:
+		limit = maxUserPageSize
+	}
+	rows, total, err := s.admins.AuditLogs(ctx, page, limit)
+	if err != nil {
+		return nil, err
+	}
+	return &AuditPage{Entries: rows, Total: total, Page: page, Limit: limit}, nil
+}
+
+// UserDetail is one account with its figures and its block history.
+type UserDetail struct {
+	User    *repository.AdminUserDetail
+	History []repository.UserBlockRecord
+}
+
+// User loads one marketplace account for its detail page.
+func (s *AdminService) User(ctx context.Context, id uuid.UUID) (*UserDetail, error) {
+	user, err := s.admins.UserDetail(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return nil, ErrAdminNotFound
+		}
+		return nil, err
+	}
+	history, err := s.admins.UserBlockHistory(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &UserDetail{User: user, History: history}, nil
+}
+
+// Sidebar sections that only ever belong to the owner, whatever the
+// configuration says. Reported by Permissions so the roles page describes the
+// rules the server actually enforces rather than a table somebody wrote once.
+var ownerOnlySections = []string{"sidebarControl", "adminManagement"}
+
+// RolePermission is one line of the roles table.
+type RolePermission struct {
+	Section    string `json:"section"`
+	Owner      bool   `json:"owner"`
+	SuperAdmin bool   `json:"super_admin"`
+}
+
+// Permissions describes what each role may reach.
+//
+// Derived rather than declared: the owner is never restricted, a handful of
+// sections are the owner's by rule, and the rest follow the configuration the
+// owner set. Reading it from the same places the middleware reads means the
+// page cannot claim a permission the server would refuse.
+func (s *AdminService) Permissions(ctx context.Context) ([]RolePermission, error) {
+	sections, err := s.admins.Sections(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ownerOnly := make(map[string]bool, len(ownerOnlySections))
+	for _, section := range ownerOnlySections {
+		ownerOnly[section] = true
+	}
+
+	out := make([]RolePermission, 0, len(sections)+len(ownerOnlySections))
+	for section, enabled := range sections {
+		out = append(out, RolePermission{
+			Section: section, Owner: true, SuperAdmin: enabled && !ownerOnly[section],
+		})
+	}
+	for _, section := range ownerOnlySections {
+		if _, listed := sections[section]; !listed {
+			out = append(out, RolePermission{Section: section, Owner: true, SuperAdmin: false})
+		}
+	}
+
+	sort.Slice(out, func(i, j int) bool { return out[i].Section < out[j].Section })
+	return out, nil
 }
 
 // UpdateProfile changes the calling administrator's own name and picture.
