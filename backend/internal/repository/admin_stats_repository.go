@@ -33,8 +33,21 @@ type Overview struct {
 	ActiveListings  int64 `json:"active_listings"`
 	PendingListings int64 `json:"pending_listings"`
 	ClosedListings  int64 `json:"closed_listings"`
+	DraftListings   int64 `json:"draft_listings"`
 	Reports         int64 `json:"reports"`
 	NewUsersToday   int64 `json:"new_users_today"`
+	// Registrations over the last 30 days, which is the window the analytics
+	// page reports against — its charts are monthly.
+	NewUsers30d int64 `json:"new_users_30d"`
+
+	// Engagement across every listing. Each is a different question and none of
+	// them is a proxy for another: a view is somebody opening a listing, a save
+	// is somebody keeping it, a chat is a thread it was discussed in, and a
+	// contact is one message written to its owner about it.
+	Views    int64 `json:"views"`
+	Saves    int64 `json:"saves"`
+	Chats    int64 `json:"chats"`
+	Contacts int64 `json:"contacts"`
 }
 
 // CountOverview gathers every headline figure.
@@ -54,6 +67,7 @@ func (r *AdminStatsRepository) CountOverview(ctx context.Context, zone string) (
 			(SELECT count(*) FROM apartments WHERE status = ?)                AS active_listings,
 			(SELECT count(*) FROM apartments WHERE status = ?)                AS pending_listings,
 			(SELECT count(*) FROM apartments WHERE status = ?)                AS closed_listings,
+			(SELECT count(*) FROM apartments WHERE status = ?)                AS draft_listings,
 			-- Reporting is not a feature this database has yet. Zero is what
 			-- there is, and inventing a number would make the card a decoration.
 			0                                                                 AS reports,
@@ -61,12 +75,33 @@ func (r *AdminStatsRepository) CountOverview(ctx context.Context, zone string) (
 			-- 02:00 local belongs to this morning, not to yesterday.
 			(SELECT count(*) FROM users
 			  WHERE (created_at AT TIME ZONE ?)::date = (now() AT TIME ZONE ?)::date)
-			                                                                  AS new_users_today
+			                                                                  AS new_users_today,
+			(SELECT count(*) FROM users WHERE created_at >= now() - interval '30 days')
+			                                                                  AS new_users_30d,
+
+			-- The counter the marketplace maintains as listings are opened,
+			-- summed over the listings that still exist.
+			(SELECT COALESCE(sum(views_count), 0) FROM apartments WHERE status <> ?)
+			                                                                  AS views,
+			(SELECT count(*) FROM favorites)                                  AS saves,
+			-- Threads a listing was actually discussed in. Conversations are
+			-- per pair of people and can carry no listing at all, so the count
+			-- comes from the messages that name one.
+			(SELECT count(DISTINCT conversation_id) FROM messages
+			  WHERE apartment_id IS NOT NULL AND deleted_at IS NULL)          AS chats,
+			-- Enquiries: messages written about a listing by somebody who does
+			-- not own it. The same definition the listing detail card uses, so
+			-- the two pages cannot disagree.
+			(SELECT count(*) FROM messages m
+			  JOIN apartments a ON a.id = m.apartment_id
+			  WHERE m.sender_id <> a.owner_id AND m.deleted_at IS NULL)       AS contacts
 	`,
 		models.UserStatusActive, models.UserStatusBlocked,
 		models.ApartmentStatusDeleted, models.ApartmentStatusActive,
 		models.ApartmentStatusPending, models.ApartmentStatusClosed,
+		models.ApartmentStatusDraft,
 		zone, zone,
+		models.ApartmentStatusDeleted,
 	).Scan(&out).Error
 	if err != nil {
 		return nil, fmt.Errorf("count overview: %w", err)

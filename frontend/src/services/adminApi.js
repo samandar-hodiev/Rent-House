@@ -182,8 +182,14 @@ export async function fetchDashboardStats({ token, signal } = {}) {
     activeListings: d?.active_listings ?? 0,
     pendingListings: d?.pending_listings ?? 0,
     closedListings: d?.closed_listings ?? 0,
+    draftListings: d?.draft_listings ?? 0,
     reports: d?.reports ?? 0,
     newUsersToday: d?.new_users_today ?? 0,
+    newUsers30d: d?.new_users_30d ?? 0,
+    views: d?.views ?? 0,
+    saves: d?.saves ?? 0,
+    chats: d?.chats ?? 0,
+    contacts: d?.contacts ?? 0,
   }
 }
 

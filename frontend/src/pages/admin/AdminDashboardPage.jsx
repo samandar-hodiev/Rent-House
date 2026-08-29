@@ -3,7 +3,7 @@ import {
   Building2, CheckCircle2, Clock, Flag, Loader2, UserPlus, Users, XCircle, Activity,
 } from 'lucide-react'
 import { AdminCard, PageHeading, StatCard } from '../../components/admin/adminUi'
-import { BarList, LineChart } from '../../components/admin/AdminChart'
+import { BarList, LineChart, periodLabel } from '../../components/admin/AdminChart'
 import EmptyState from '../../components/EmptyState'
 import { useAdmin } from '../../context/AdminSettingsContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
@@ -35,24 +35,15 @@ function RangeTabs({ value, onChange, t }) {
   )
 }
 
-// Axis labels are built from the bucket the server reported, so a day is the
-// day PostgreSQL grouped by rather than a name the client made up.
-const LABEL_OPTIONS = {
-  daily: { day: '2-digit', month: 'short' },
-  weekly: { day: '2-digit', month: 'short' },
-  monthly: { month: 'short' },
-}
-
 /**
  * Turns a server series into what the chart draws.
  *
  * The chart takes labels and values; the API sends periods and counts. The
  * translation happens here so neither side has to know about the other.
  */
-function toChart(points, range, locale) {
-  const tag = { uz: 'uz-UZ', ru: 'ru-RU', en: 'en-GB' }[locale] ?? 'en-GB'
+function toChart(points, range, t) {
   return {
-    labels: points.map((p) => new Date(p.period).toLocaleDateString(tag, LABEL_OPTIONS[range])),
+    labels: points.map((p) => periodLabel(p.period, range, t)),
     values: points.map((p) => p.count),
   }
 }
@@ -65,7 +56,7 @@ function toChart(points, range, locale) {
  * local change rather than another round trip.
  */
 function AdminDashboardPage() {
-  const { t, locale } = useAdmin()
+  const { t } = useAdmin()
   const { token } = useAdminAuth()
 
   const [userRange, setUserRange] = useState('daily')
@@ -151,7 +142,7 @@ function AdminDashboardPage() {
         >
           <div className="flex min-h-[20rem] flex-1 flex-col p-4">
             <LineChart
-              {...toChart(growth.users[userRange], userRange, locale)}
+              {...toChart(growth.users[userRange], userRange, t)}
               ariaLabel={t('chart.usersGrowth')}
               tooltipKey="chart.newUsers"
               t={t}
@@ -165,7 +156,7 @@ function AdminDashboardPage() {
         >
           <div className="flex min-h-[20rem] flex-1 flex-col p-4">
             <LineChart
-              {...toChart(growth.listings[listingRange], listingRange, locale)}
+              {...toChart(growth.listings[listingRange], listingRange, t)}
               ariaLabel={t('chart.listingsGrowth')}
               tooltipKey="chart.newListings"
               t={t}

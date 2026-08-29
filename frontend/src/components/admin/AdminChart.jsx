@@ -58,6 +58,25 @@ function stepTrend(from, to) {
 // line floating in an empty box.
 const TICKS = 4
 
+const MONTH_KEYS = [
+  'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+]
+
+/**
+ * The axis label for one bucket the server reported.
+ *
+ * Month names come from the dictionary rather than from `toLocaleDateString`:
+ * Chromium renders `uz-UZ` months as "M09", which is not a month name in any
+ * language. Days and weeks are written as numbers, which need no translating
+ * and read the same everywhere.
+ */
+export function periodLabel(iso, range, t) {
+  const at = new Date(iso)
+  if (range === 'monthly') return t(`chart.month.${MONTH_KEYS[at.getMonth()]}`)
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${pad(at.getDate())}.${pad(at.getMonth() + 1)}`
+}
+
 /**
  * A line chart, drawn as an SVG path.
  *
