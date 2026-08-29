@@ -18,6 +18,7 @@ const (
 	AuditUserUnblocked    = "user_unblocked"
 	AuditListingModerated = "listing_moderated"
 	AuditSidebarChanged   = "sidebar_changed"
+	AuditSettingsChanged  = "settings_changed"
 	AuditProfileUpdated   = "profile_updated"
 )
 

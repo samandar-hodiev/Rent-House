@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 
 	"github.com/samandar-hodiev/Rent-House/backend/internal/dto"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/models"
@@ -33,7 +34,7 @@ var (
 	// ErrInvalidStatusChange is a transition the lifecycle does not allow —
 	// reviving a deleted listing straight to public, for instance.
 	ErrInvalidStatusChange = errors.New("listing cannot move to that status")
-	ErrInvalidAmenity  = errors.New("amenity does not exist")
+	ErrInvalidAmenity      = errors.New("amenity does not exist")
 
 	// ErrInvalidPrice covers a price or deposit that parses as a number but is
 	// not a usable amount.
@@ -42,16 +43,52 @@ var (
 	// ErrInvalidFloors is floor > total_floors, which the CHECK would also
 	// reject — but as a 500 rather than a message the user can act on.
 	ErrInvalidFloors = errors.New("floor cannot be above the building's height")
+
+	// ErrTooManyImages is more photographs than the marketplace's configured
+	// limit. The binding tag enforces the ceiling the schema can take; this
+	// enforces the number the owner actually chose.
+	ErrTooManyImages = errors.New("too many images for one listing")
 )
 
 // ApartmentService holds the listing rules: who may change what, which fields a
 // client is allowed to set, and when a listing becomes publicly visible.
 type ApartmentService struct {
 	apartments *repository.ApartmentRepository
+	// How the marketplace is configured. Consulted on every write rather than
+	// read once at start-up, so switching moderation on takes effect on the
+	// next listing instead of on the next deployment.
+	settings *SettingsService
 }
 
-func NewApartmentService(apartments *repository.ApartmentRepository) *ApartmentService {
-	return &ApartmentService{apartments: apartments}
+func NewApartmentService(
+	apartments *repository.ApartmentRepository, settings *SettingsService,
+) *ApartmentService {
+	return &ApartmentService{apartments: apartments, settings: settings}
+}
+
+// applySettings enforces the configured rules on a write.
+//
+// Returns the status the listing should take. It is here, in the service, and
+// not in the handler for the usual reason: every path that writes a listing
+// goes through this, so there is no route that can be added later and forget.
+func (s *ApartmentService) applySettings(
+	ctx context.Context, req dto.ApartmentWriteRequest,
+) (string, error) {
+	settings, err := s.settings.Get(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	if len(req.Images) > settings.MaxImages {
+		return "", fmt.Errorf("%w: %d allowed", ErrTooManyImages, settings.MaxImages)
+	}
+
+	// A draft is nobody's business but its owner's, so moderation has nothing
+	// to say about it. Only the act of publishing is held back.
+	if req.Publish && settings.RequireModeration {
+		return models.ApartmentStatusPending, nil
+	}
+	return statusFor(req.Publish), nil
 }
 
 // Create publishes or drafts a new listing owned by `ownerID`.
@@ -68,7 +105,10 @@ func (s *ApartmentService) Create(
 	}
 
 	apartment.OwnerID = ownerID
-	apartment.Status = statusFor(req.Publish)
+	apartment.Status, err = s.applySettings(ctx, req)
+	if err != nil {
+		return nil, err
+	}
 	// Publishing stamps the moment the listing went live. Analytics read this,
 	// and the schema requires it to agree with the status.
 	if apartment.Status == models.ApartmentStatusActive {
@@ -178,6 +218,11 @@ func (s *ApartmentService) Update(
 		return nil, err
 	}
 
+	status, err := s.applySettings(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
 	// An explicit column list. owner_id, views_count and created_at are absent,
 	// so an edit cannot reassign a listing, reset its popularity or rewrite its
 	// history. Status is set from `publish`, which is the only transition the
@@ -202,7 +247,7 @@ func (s *ApartmentService) Update(
 		"utilities":      apartment.Utilities,
 		"minimum_months": apartment.MinimumMonths,
 		"rules":          apartment.Rules,
-		"status":         statusFor(req.Publish),
+		"status":         status,
 	}
 
 	if err := s.apartments.Update(ctx, id, fields, apartment.Images, amenityIDs); err != nil {
@@ -414,9 +459,16 @@ func (s *ApartmentService) build(
 		Address:      req.Address,
 		Latitude:     req.Latitude,
 		Longitude:    req.Longitude,
-		Utilities:    req.Utilities,
-		Rules:        req.Rules,
-		Images:       buildImages(req.Images),
+		// Optional in the form, mandatory in the row: the column has a default
+		// that an insert picks up but an explicit update would overwrite with
+		// an empty string the CHECK rejects.
+		Utilities: utilitiesOr(req.Utilities),
+		// Never nil. The column is NOT NULL with a default, which covers an
+		// insert but not an update: writing the field explicitly, as Update
+		// does, would write NULL and be rejected. A listing with no rules has
+		// an empty list, not a missing one.
+		Rules:  append(pq.StringArray{}, req.Rules...),
+		Images: buildImages(req.Images),
 	}
 
 	if req.Neighborhood != "" {
@@ -556,6 +608,14 @@ func (s *ApartmentService) get(
 	}
 	response := dto.NewApartmentResponse(apartment, includeOwnerContact)
 	return &response, nil
+}
+
+// utilitiesOr fills in the marketplace's default for an owner who did not say.
+func utilitiesOr(value string) string {
+	if value == "" {
+		return models.UtilitiesIncluded
+	}
+	return value
 }
 
 // statusFor maps the form's publish toggle onto a listing status. Only these

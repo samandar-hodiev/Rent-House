@@ -111,6 +111,20 @@ export async function saveSidebarSections(sections, { token, signal } = {}) {
 }
 
 /**
+ * How the marketplace is configured.
+ *
+ * The owner's, both ways — the server refuses anybody else, so the page being
+ * hidden from a super admin is convenience rather than the protection.
+ */
+export async function fetchSiteSettings({ token, signal } = {}) {
+  return request('/admin/settings', { token, signal })
+}
+
+export async function saveSiteSettings(settings, { token, signal } = {}) {
+  return request('/admin/settings', { method: 'PUT', body: settings, token, signal })
+}
+
+/**
  * One page of marketplace accounts.
  *
  * Searching, filtering and paging are all the server's work: it returns the

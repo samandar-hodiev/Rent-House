@@ -59,15 +59,7 @@ export const ADMIN_NAV = [
     alwaysVisible: true,
   },
   { id: 'auditLogs', key: 'nav.auditLogs', icon: ClipboardList, to: ADMIN_ROUTES.auditLogs },
-  {
-    id: 'settings', key: 'nav.settings', icon: Settings,
-    children: [
-      { key: 'nav.general', to: ADMIN_ROUTES.settings, end: true },
-      { key: 'nav.listings', to: ADMIN_ROUTES.settingsListings },
-      { key: 'nav.chat', to: ADMIN_ROUTES.settingsChat },
-      { key: 'nav.security', to: ADMIN_ROUTES.settingsSecurity },
-    ],
-  },
+  { id: 'settings', key: 'nav.settings', icon: Settings, to: ADMIN_ROUTES.settings },
 ]
 
 /**

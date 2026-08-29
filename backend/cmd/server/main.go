@@ -238,6 +238,11 @@ func newRouter(
 	// Listings. Same layering as auth: handler -> service -> repository -> db.
 	apartments := repository.NewApartmentRepository(db)
 
+	// How the marketplace is configured. Built here rather than inside the
+	// admin area because it is not an admin feature: the dashboard is where the
+	// values are set, but it is the listing service that has to obey them.
+	settingsService := service.NewSettingsService(repository.NewSettingsRepository(db))
+
 	// View events and the timelines built from them. The secret is used only to
 	// derive the key that tells two anonymous visitors apart — see
 	// NewAnalyticsService.
@@ -250,7 +255,7 @@ func newRouter(
 	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
 
 	apartmentHandler := handler.NewApartmentHandler(
-		service.NewApartmentService(apartments), analyticsService,
+		service.NewApartmentService(apartments, settingsService), analyticsService,
 	)
 
 	// One chat repository, shared: the chat service publishes messages through
@@ -334,7 +339,8 @@ func newRouter(
 		repository.NewAdminListingRepository(db), apartments,
 	)
 	adminHandler := handler.NewAdminHandler(
-		adminService, adminStats, adminListings, files, cfg.UploadPublicPath, cfg.PublicBaseURL,
+		adminService, adminStats, adminListings, settingsService,
+		files, cfg.UploadPublicPath, cfg.PublicBaseURL,
 	)
 
 	admin := v1.Group("/admin")
@@ -415,6 +421,11 @@ func newRouter(
 			// owner can withdraw like any other.
 			authed.GET("/audit-logs",
 				middleware.RequireSection(adminService, "auditLogs"), adminHandler.AuditLogs)
+
+			// How the marketplace behaves. The owner's alone, read and write:
+			// these values decide whether listings reach the public at all.
+			authed.GET("/settings", middleware.RequireOwner(), adminHandler.Settings)
+			authed.PUT("/settings", middleware.RequireOwner(), adminHandler.UpdateSettings)
 
 			authed.GET("/sidebar", adminHandler.Sidebar)
 			authed.PUT("/sidebar", middleware.RequireOwner(), adminHandler.UpdateSidebar)

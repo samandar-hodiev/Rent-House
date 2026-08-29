@@ -37,9 +37,6 @@ export const ADMIN_ROUTES = {
   dashboardSettings: `${BASE}/dashboard-settings`,
 
   settings: `${BASE}/settings`,
-  settingsListings: `${BASE}/settings/listings`,
-  settingsChat: `${BASE}/settings/chat`,
-  settingsSecurity: `${BASE}/settings/security`,
 }
 
 export const adminUserPath = (id) => `${BASE}/users/${id}`

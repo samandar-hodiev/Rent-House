@@ -273,6 +273,10 @@ func (h *ApartmentHandler) writeError(c *gin.Context, err error, operation strin
 	case errors.Is(err, service.ErrInvalidFloors):
 		response.Error(c, http.StatusBadRequest, "invalid_floors",
 			"Floor cannot be above the building's height")
+	case errors.Is(err, service.ErrTooManyImages):
+		// The message carries the configured limit, so the form can tell the
+		// owner the number rather than that there was one.
+		response.Error(c, http.StatusBadRequest, "too_many_images", err.Error())
 	default:
 		logger.Errorf("%s: %v", operation, err)
 		response.Error(c, http.StatusInternalServerError, "internal_error", "Something went wrong")

@@ -45,7 +45,12 @@ func newListingHarness(t *testing.T) *listingHarness {
 		t.Fatalf("analytics service: %v", err)
 	}
 	analyticsHandler := NewAnalyticsHandler(analyticsService)
-	apartmentHandler := NewApartmentHandler(service.NewApartmentService(apartments), analyticsService)
+	apartmentHandler := NewApartmentHandler(
+		service.NewApartmentService(
+			apartments, service.NewSettingsService(repository.NewSettingsRepository(h.db)),
+		),
+		analyticsService,
+	)
 
 	v1 := h.router.Group("/api/v1")
 	v1.GET("/districts", apartmentHandler.Districts)

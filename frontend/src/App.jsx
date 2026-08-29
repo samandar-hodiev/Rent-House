@@ -159,19 +159,11 @@ function App() {
                               from Settings for that reason. */}
                           <Route path="dashboard-settings" element={<AdminDashboardSettingsPage />} />
 
-                          <Route path="settings" element={<AdminSettingsPage panel="general" titleKey="nav.general" />} />
-                          <Route
-                            path="settings/listings"
-                            element={<AdminSettingsPage panel="listings" titleKey="nav.listings" />}
-                          />
-                          <Route
-                            path="settings/chat"
-                            element={<AdminSettingsPage panel="chat" titleKey="nav.chat" />}
-                          />
-                          <Route
-                            path="settings/security"
-                            element={<AdminSettingsPage panel="security" titleKey="nav.security" />}
-                          />
+                          {/* One page rather than four tabs: the marketplace
+                              has two settings it actually obeys, and three
+                              empty tabs to reach them was the interface
+                              apologising for itself. */}
+                          <Route path="settings" element={<AdminSettingsPage />} />
                         </Route>
                       </Route>
 

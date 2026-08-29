@@ -54,6 +54,16 @@ type UpdateSidebarRequest struct {
 	Sections map[string]bool `json:"sections" binding:"required"`
 }
 
+// UpdateSettingsRequest is the body of PUT /api/v1/admin/settings.
+//
+// Both fields are required rather than optional: the page sends the whole form,
+// and a partial write would let two administrators saving different tabs
+// overwrite one another with values neither of them chose.
+type UpdateSettingsRequest struct {
+	RequireModeration *bool `json:"require_moderation" binding:"required"`
+	MaxImages         *int  `json:"max_images"         binding:"required,min=1,max=50"`
+}
+
 // AdminResponse is the public view of an administrator. It has no password
 // field of any kind, which is what makes it safe to return.
 type AdminResponse struct {

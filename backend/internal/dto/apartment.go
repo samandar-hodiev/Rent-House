@@ -64,7 +64,7 @@ type ApartmentWriteRequest struct {
 	Rules         []string `json:"rules"        binding:"omitempty,max=20,dive,max=40"`
 
 	Amenities []string              `json:"amenities" binding:"omitempty,max=40,dive,max=40"`
-	Images    []ApartmentImageInput `json:"images"    binding:"omitempty,max=20,dive"`
+	Images    []ApartmentImageInput `json:"images"    binding:"omitempty,max=50,dive"`
 
 	// Publish decides whether the listing goes live or is kept as a draft. A
 	// boolean rather than a free-text status: the client may choose between

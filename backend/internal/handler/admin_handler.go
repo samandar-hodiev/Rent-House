@@ -25,6 +25,7 @@ type AdminHandler struct {
 	admins   *service.AdminService
 	stats    *service.AdminStatsService
 	listings *service.AdminListingService
+	settings *service.SettingsService
 	files    storage.Storage
 	// Where this server's uploads live, so an avatar can be checked to be one
 	// of them rather than an address the client made up.
@@ -36,13 +37,14 @@ type AdminHandler struct {
 
 func NewAdminHandler(
 	admins *service.AdminService, stats *service.AdminStatsService,
-	listings *service.AdminListingService,
+	listings *service.AdminListingService, settings *service.SettingsService,
 	files storage.Storage, uploadPath, baseURL string,
 ) *AdminHandler {
 	return &AdminHandler{
 		admins:     admins,
 		stats:      stats,
 		listings:   listings,
+		settings:   settings,
 		files:      files,
 		uploadPath: uploadPath,
 		baseURL:    strings.TrimRight(baseURL, "/"),
@@ -869,4 +871,50 @@ func (h *AdminHandler) writeAdminError(c *gin.Context, err error, action string)
 		response.Error(c, http.StatusInternalServerError, "internal_error",
 			"Could not complete the request")
 	}
+}
+
+// Settings handles GET /api/v1/admin/settings.
+//
+// Owner-only, like writing them: the settings decide how the marketplace
+// behaves, and that is not a super admin's to read or change.
+func (h *AdminHandler) Settings(c *gin.Context) {
+	settings, err := h.settings.Get(c.Request.Context())
+	if err != nil {
+		logger.Errorf("read settings: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not load the settings")
+		return
+	}
+	response.OK(c, "Settings", settings)
+}
+
+// UpdateSettings handles PUT /api/v1/admin/settings.
+func (h *AdminHandler) UpdateSettings(c *gin.Context) {
+	actor, ok := middleware.AdminFrom(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
+		return
+	}
+
+	var req dto.UpdateSettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+
+	saved, err := h.settings.Set(c.Request.Context(), service.Settings{
+		RequireModeration: *req.RequireModeration,
+		MaxImages:         *req.MaxImages,
+	})
+	if err != nil {
+		logger.Errorf("write settings: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not save the settings")
+		return
+	}
+
+	h.admins.Audit(c.Request.Context(), actor,
+		models.AuditSettingsChanged, "", c.ClientIP(), models.AuditSuccess)
+
+	response.OK(c, "Settings updated", saved)
 }

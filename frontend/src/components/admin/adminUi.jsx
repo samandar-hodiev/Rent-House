@@ -141,7 +141,12 @@ export function ViewLink({ to }) {
 }
 
 /** A button that looks like an action but only says it was pressed. */
-export function MockButton({ children, tone = 'neutral', onClick, disabled = false }) {
+// `type` defaults to "button" because most of these sit outside a form and a
+// stray submit would navigate. A form's own save button passes type="submit",
+// so Enter in a field saves the way a keyboard user expects.
+export function MockButton({
+  children, tone = 'neutral', onClick, disabled = false, type = 'button',
+}) {
   const tones = {
     neutral:
       'border border-border bg-surface text-text-primary hover:bg-surface-secondary',
@@ -152,7 +157,7 @@ export function MockButton({ children, tone = 'neutral', onClick, disabled = fal
   }
   return (
     <button
-      type="button"
+      type={type}
       onClick={onClick}
       disabled={disabled}
       className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 ${tones[tone]}`}
