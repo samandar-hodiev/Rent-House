@@ -9,15 +9,16 @@ import (
 // Actions the dashboard records. A closed set, named here so a typo in a
 // handler cannot invent a new kind of entry.
 const (
-	AuditSignIn         = "sign_in"
-	AuditSignInFailed   = "sign_in_failed"
-	AuditAdminCreated   = "admin_created"
-	AuditAdminDeleted   = "admin_deleted"
-	AuditAdminStatus    = "admin_status_changed"
-	AuditUserBlocked    = "user_blocked"
-	AuditUserUnblocked  = "user_unblocked"
-	AuditSidebarChanged = "sidebar_changed"
-	AuditProfileUpdated = "profile_updated"
+	AuditSignIn           = "sign_in"
+	AuditSignInFailed     = "sign_in_failed"
+	AuditAdminCreated     = "admin_created"
+	AuditAdminDeleted     = "admin_deleted"
+	AuditAdminStatus      = "admin_status_changed"
+	AuditUserBlocked      = "user_blocked"
+	AuditUserUnblocked    = "user_unblocked"
+	AuditListingModerated = "listing_moderated"
+	AuditSidebarChanged   = "sidebar_changed"
+	AuditProfileUpdated   = "profile_updated"
 )
 
 // Outcomes an entry can record.

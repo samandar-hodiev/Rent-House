@@ -475,6 +475,48 @@ func (h *AdminHandler) ListingAudit(c *gin.Context) {
 	})
 }
 
+// SetListingStatus handles PATCH /api/v1/admin/listings/:id/status.
+//
+// Moderation: approving something that is waiting, closing something that is
+// live, restoring something removed. The states and the moves between them are
+// the owner's own, so a listing can never reach a state its owner could not.
+func (h *AdminHandler) SetListingStatus(c *gin.Context) {
+	actor, exists := middleware.AdminFrom(c)
+	if !exists {
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
+		return
+	}
+	id, ok := h.listingID(c)
+	if !ok {
+		return
+	}
+
+	var req dto.UpdateListingStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+
+	if err := h.listings.SetStatus(c.Request.Context(), actor, id, req.Status); err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidStatusChange):
+			response.Error(c, http.StatusConflict, "invalid_status_change",
+				"That listing cannot move to this state")
+		case errors.Is(err, service.ErrInvalidAdminStatus):
+			response.Error(c, http.StatusBadRequest, "invalid_status", "Invalid status")
+		default:
+			h.writeListingError(c, err, "moderate listing")
+		}
+		return
+	}
+
+	h.admins.Audit(c.Request.Context(), actor,
+		models.AuditListingModerated, id.String()+" -> "+req.Status,
+		c.ClientIP(), models.AuditSuccess)
+
+	response.OK(c, "Listing updated", nil)
+}
+
 func (h *AdminHandler) listingID(c *gin.Context) (uuid.UUID, bool) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil || id == uuid.Nil {

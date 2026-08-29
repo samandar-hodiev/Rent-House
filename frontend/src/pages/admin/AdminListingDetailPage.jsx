@@ -5,10 +5,12 @@ import EmptyState from '../../components/EmptyState'
 import UserAvatar from '../../components/dashboard/UserAvatar'
 import ListingGalleryDialog from '../../components/admin/ListingGalleryDialog'
 import ConversationAudit from '../../components/admin/ConversationAudit'
-import { AdminCard, StatusBadge, useAdminFormat } from '../../components/admin/adminUi'
+import { AdminCard, MockButton, StatusBadge, useAdminFormat } from '../../components/admin/adminUi'
+import AdminConfirmDialog from '../../components/admin/AdminConfirmDialog'
+import { STATUS_ACTIONS } from '../../data/listingStatus'
 import { ADMIN_ROLE, useAdmin } from '../../context/AdminSettingsContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
-import { fetchListing } from '../../services/adminApi'
+import { fetchListing, setListingStatus } from '../../services/adminApi'
 import { ADMIN_ROUTES } from '../../routes/adminPaths'
 
 /** One figure about the listing. */
@@ -52,6 +54,10 @@ function AdminListingDetailPage() {
   const [listing, setListing] = useState(null)
   const [state, setState] = useState('loading')
   const [galleryOpen, setGalleryOpen] = useState(false)
+  // The state being moved to, while the administrator confirms it.
+  const [moving, setMoving] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [moderationError, setModerationError] = useState(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -90,6 +96,7 @@ function AdminListingDetailPage() {
   }
 
   const cover = listing.images[0] ?? listing.coverUrl
+  const targets = STATUS_ACTIONS[listing.status] ?? []
 
   return (
     // `min-h-full` so the conversations card can reach the foot of the screen
@@ -222,6 +229,59 @@ function AdminListingDetailPage() {
             ownerName={listing.owner.name}
           />
         </AdminCard>
+      ) : null}
+
+      {/* Moderation. Only the moves the server will accept are offered — the
+          same table the owner's own dashboard uses — so a button here never
+          produces a refusal. */}
+      {targets.length > 0 ? (
+        <AdminCard title={t('listings.moderation')}>
+          <div className="flex flex-wrap items-center gap-2 p-4">
+            {targets.map((target) => (
+              <MockButton
+                key={target}
+                tone={target === 'active' ? 'primary' : target === 'deleted' ? 'danger' : 'neutral'}
+                disabled={busy}
+                onClick={() => {
+                  setModerationError(null)
+                  setMoving(target)
+                }}
+              >
+                {t(`listingAction.${target}.menu`)}
+              </MockButton>
+            ))}
+          </div>
+          {moderationError ? (
+            <p role="alert" className="border-t border-border px-4 py-2.5 text-sm text-error">
+              {moderationError}
+            </p>
+          ) : null}
+        </AdminCard>
+      ) : null}
+
+      {moving ? (
+        <AdminConfirmDialog
+          title={t(`listingAction.${moving}.title`)}
+          description={t(`listingAction.${moving}.body`, { title: listing.title })}
+          confirmLabel={t(`listingAction.${moving}.confirm`)}
+          tone={moving === 'active' ? 'primary' : moving === 'deleted' ? 'danger' : 'warning'}
+          busy={busy}
+          onCancel={() => setMoving(null)}
+          onConfirm={async () => {
+            setBusy(true)
+            try {
+              await setListingStatus(listing.id, moving, { token })
+              setMoving(null)
+              // Refetched rather than patched in place: publishing stamps a
+              // date and the figures beside it may have moved too.
+              setListing(await fetchListing(id, { token }))
+            } catch (error) {
+              setModerationError(error?.message ?? t('listings.moderationFailed'))
+              setMoving(null)
+            }
+            setBusy(false)
+          }}
+        />
       ) : null}
 
       {galleryOpen ? (

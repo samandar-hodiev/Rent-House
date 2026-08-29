@@ -330,7 +330,9 @@ func newRouter(
 	adminStats := service.NewAdminStatsService(repository.NewAdminStatsRepository(db))
 	// Read-only: an administrator inspects listings, and the owner's own
 	// endpoints remain the only way to change one.
-	adminListings := service.NewAdminListingService(repository.NewAdminListingRepository(db))
+	adminListings := service.NewAdminListingService(
+		repository.NewAdminListingRepository(db), apartments,
+	)
 	adminHandler := handler.NewAdminHandler(
 		adminService, adminStats, adminListings, files, cfg.UploadPublicPath, cfg.PublicBaseURL,
 	)
@@ -360,6 +362,9 @@ func newRouter(
 				marketplaceListings.GET("", adminHandler.Listings)
 				marketplaceListings.GET("/:id", adminHandler.ListingDetail)
 				marketplaceListings.GET("/:id/images", adminHandler.ListingImages)
+				// Moderation: approve what is waiting, close what is live,
+				// restore what was removed.
+				marketplaceListings.PATCH("/:id/status", adminHandler.SetListingStatus)
 				// Somebody else's conversations are the most sensitive thing
 				// this dashboard can show, so this one is the owner's alone —
 				// checked in the service, not just hidden in the sidebar.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -21,10 +22,62 @@ const maxListingPageSize = 100
 // what about them.
 type AdminListingService struct {
 	listings *repository.AdminListingRepository
+	// The owner's own repository, reused for writes: moderation changes the
+	// same column an owner changes, and a second way to write it would be a
+	// second set of rules to keep in step.
+	apartments *repository.ApartmentRepository
 }
 
-func NewAdminListingService(listings *repository.AdminListingRepository) *AdminListingService {
-	return &AdminListingService{listings: listings}
+func NewAdminListingService(
+	listings *repository.AdminListingRepository, apartments *repository.ApartmentRepository,
+) *AdminListingService {
+	return &AdminListingService{listings: listings, apartments: apartments}
+}
+
+// SetStatus moves a listing between states, as moderation.
+//
+// The transitions are the owner's own — `allowedTransition` — so an
+// administrator cannot put a listing into a state its owner could never reach,
+// and the two never disagree about what a state means. What differs is the
+// authority: there is no ownership check, because moderating somebody else's
+// listing is the entire point.
+//
+// Publishing stamps a date and unpublishing clears it, exactly as the owner's
+// path does: `ck_apartments_published_at` requires a date precisely when a
+// listing is active.
+func (s *AdminListingService) SetStatus(
+	ctx context.Context, actor *models.Admin, id uuid.UUID, target string,
+) error {
+	if !isKnownListingStatus(target) {
+		return ErrInvalidAdminStatus
+	}
+
+	current, err := s.apartments.FindByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrApartmentNotFound) {
+			return ErrListingNotFound
+		}
+		return err
+	}
+
+	if !allowedTransition(current.Status, target) {
+		return ErrInvalidStatusChange
+	}
+
+	fields := map[string]any{"status": target}
+	if target == models.ApartmentStatusActive {
+		fields["published_at"] = time.Now().UTC()
+	} else {
+		fields["published_at"] = nil
+	}
+
+	if err := s.apartments.UpdateFields(ctx, id, fields); err != nil {
+		if errors.Is(err, repository.ErrApartmentNotFound) {
+			return ErrListingNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 // ListingPage is one page of the listings table.

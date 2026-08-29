@@ -444,3 +444,18 @@ export async function fetchAuditLogs({ page = 1, limit = 20, token, signal } = {
     totalPages: d?.total_pages ?? 1,
   }
 }
+
+/**
+ * Moves a listing between states, as moderation.
+ *
+ * The transitions are the owner's own, so this cannot put a listing into a
+ * state its owner could never reach; the server refuses anything else with 409.
+ */
+export async function setListingStatus(id, status, { token, signal } = {}) {
+  return request(`/admin/listings/${id}/status`, {
+    method: 'PATCH',
+    body: { status },
+    token,
+    signal,
+  })
+}

@@ -44,6 +44,11 @@ type UpdateAdminStatusRequest struct {
 	Status string `json:"status" binding:"required,oneof=active inactive suspended"`
 }
 
+// UpdateListingStatusRequest is the body of PATCH /api/v1/admin/listings/:id/status.
+type UpdateListingStatusRequest struct {
+	Status string `json:"status" binding:"required,oneof=draft pending active closed deleted"`
+}
+
 // UpdateSidebarRequest is the body of PUT /api/v1/admin/sidebar.
 type UpdateSidebarRequest struct {
 	Sections map[string]bool `json:"sections" binding:"required"`
