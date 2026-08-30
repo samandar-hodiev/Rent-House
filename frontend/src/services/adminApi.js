@@ -117,11 +117,21 @@ export async function saveSidebarSections(sections, { token, signal } = {}) {
  * hidden from a super admin is convenience rather than the protection.
  */
 export async function fetchSiteSettings({ token, signal } = {}) {
-  return request('/admin/settings', { token, signal })
+  const data = await request('/admin/settings', { token, signal })
+  return data?.settings ?? {}
 }
 
-export async function saveSiteSettings(settings, { token, signal } = {}) {
-  return request('/admin/settings', { method: 'PUT', body: settings, token, signal })
+// Only the keys that changed. The page saves one section at a time, and sending
+// the whole form would let two administrators saving different cards overwrite
+// each other with values neither of them chose.
+export async function saveSiteSettings(patch, { token, signal } = {}) {
+  const data = await request('/admin/settings', {
+    method: 'PUT',
+    body: { settings: patch },
+    token,
+    signal,
+  })
+  return data?.settings ?? {}
 }
 
 /**

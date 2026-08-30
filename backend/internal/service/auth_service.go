@@ -45,10 +45,10 @@ var (
 
 	// Profile editing. Each says exactly what the person has to change, so the
 	// handler can map it to a message rather than a generic refusal.
-	ErrNameRequired    = errors.New("name cannot be empty")
+	ErrNameRequired = errors.New("name cannot be empty")
 	// ErrAccountBlocked is returned when an administrator has blocked the
 	// account. Distinct from bad credentials: the password was right.
-	ErrAccountBlocked = errors.New("account is blocked")
+	ErrAccountBlocked  = errors.New("account is blocked")
 	ErrContactRequired = errors.New("an account needs a phone number or an email")
 	ErrInvalidPhone    = errors.New("phone number is not a valid Uzbek mobile number")
 	ErrPhoneTaken      = errors.New("phone number already belongs to another account")

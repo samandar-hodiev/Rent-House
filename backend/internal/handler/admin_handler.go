@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -875,8 +876,9 @@ func (h *AdminHandler) writeAdminError(c *gin.Context, err error, action string)
 
 // Settings handles GET /api/v1/admin/settings.
 //
-// Owner-only, like writing them: the settings decide how the marketplace
-// behaves, and that is not a super admin's to read or change.
+// Owner-only, like writing them: these values decide how the marketplace
+// behaves — whether it is open at all — and that is not a super admin's to read
+// or change. The route enforces it; hiding the page is only a convenience.
 func (h *AdminHandler) Settings(c *gin.Context) {
 	settings, err := h.settings.Get(c.Request.Context())
 	if err != nil {
@@ -885,10 +887,23 @@ func (h *AdminHandler) Settings(c *gin.Context) {
 			"Could not load the settings")
 		return
 	}
-	response.OK(c, "Settings", settings)
+	updatedAt, err := h.settings.LastUpdated(c.Request.Context())
+	if err != nil {
+		logger.Errorf("read settings timestamp: %v", err)
+	}
+
+	body := gin.H{"settings": settings}
+	if !updatedAt.IsZero() {
+		body["updated_at"] = updatedAt
+	}
+	response.OK(c, "Settings", body)
 }
 
 // UpdateSettings handles PUT /api/v1/admin/settings.
+//
+// The body carries only the keys the owner changed — the page saves one section
+// at a time — so two administrators saving different cards cannot overwrite one
+// another with values neither of them chose.
 func (h *AdminHandler) UpdateSettings(c *gin.Context) {
 	actor, ok := middleware.AdminFrom(c)
 	if !ok {
@@ -901,20 +916,66 @@ func (h *AdminHandler) UpdateSettings(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
 		return
 	}
+	if len(req.Settings) == 0 {
+		response.Error(c, http.StatusBadRequest, "validation_failed",
+			"Send at least one setting to change")
+		return
+	}
 
-	saved, err := h.settings.Set(c.Request.Context(), service.Settings{
-		RequireModeration: *req.RequireModeration,
-		MaxImages:         *req.MaxImages,
-	})
+	changes, err := h.settings.Update(c.Request.Context(), req.Settings, &actor.ID)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidSetting) {
+			// The message names the key and the rule it broke, so the form can
+			// point at the field rather than saying "invalid".
+			response.Error(c, http.StatusBadRequest, "validation_failed", err.Error())
+			return
+		}
 		logger.Errorf("write settings: %v", err)
 		response.Error(c, http.StatusInternalServerError, "internal_error",
 			"Could not save the settings")
 		return
 	}
 
-	h.admins.Audit(c.Request.Context(), actor,
-		models.AuditSettingsChanged, "", c.ClientIP(), models.AuditSuccess)
+	// One entry per value that actually moved, carrying what it was and what it
+	// became — a single "settings changed" line would record that something
+	// happened without recording what.
+	for _, change := range changes {
+		h.admins.Audit(c.Request.Context(), actor, models.AuditSettingsChanged,
+			auditTarget(change), c.ClientIP(), models.AuditSuccess)
+	}
 
-	response.OK(c, "Settings updated", saved)
+	saved, err := h.settings.Get(c.Request.Context())
+	if err != nil {
+		logger.Errorf("read settings: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not load the settings")
+		return
+	}
+	updatedAt, _ := h.settings.LastUpdated(c.Request.Context())
+
+	body := gin.H{"settings": saved, "changed": len(changes)}
+	if !updatedAt.IsZero() {
+		body["updated_at"] = updatedAt
+	}
+	response.OK(c, "Settings updated", body)
+}
+
+// auditTarget renders one change as the line the log will show.
+//
+// Long values are cut: the column holds 300 characters and a site description
+// would fill it on its own, leaving no room for the key that changed.
+func auditTarget(change service.SettingChange) string {
+	return fmt.Sprintf("%s: %s -> %s",
+		change.Key, auditValue(change.Old), auditValue(change.New))
+}
+
+func auditValue(value string) string {
+	if value == "" {
+		return "(empty)"
+	}
+	const limit = 100
+	if runes := []rune(value); len(runes) > limit {
+		return string(runes[:limit]) + "..."
+	}
+	return value
 }

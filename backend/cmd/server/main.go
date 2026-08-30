@@ -191,7 +191,19 @@ func newRouter(
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	v1 := router.Group("/api/v1")
+	// How the marketplace is configured. Built before anything is routed,
+	// because the first thing every request meets is the check for whether the
+	// marketplace is open at all. It is not an admin feature: the dashboard is
+	// where the values are set, but it is the rest of the API that obeys them.
+	settingsService := service.NewSettingsService(repository.NewSettingsRepository(db))
+
+	v1 := router.Group("/api/v1", middleware.Maintenance(settingsService))
+
+	// The site's own configuration: its name, the language it opens in, the
+	// limits its forms must respect, and whether it is in maintenance. Public
+	// because a visitor needs it before signing in, and exempt from the
+	// maintenance check because it is what announces maintenance.
+	v1.GET("/settings", handler.NewSettingsHandler(settingsService).Public)
 	v1.GET("", func(c *gin.Context) {
 		response.OK(c, "RentHouse API v1", nil)
 	})
@@ -237,11 +249,6 @@ func newRouter(
 
 	// Listings. Same layering as auth: handler -> service -> repository -> db.
 	apartments := repository.NewApartmentRepository(db)
-
-	// How the marketplace is configured. Built here rather than inside the
-	// admin area because it is not an admin feature: the dashboard is where the
-	// values are set, but it is the listing service that has to obey them.
-	settingsService := service.NewSettingsService(repository.NewSettingsRepository(db))
 
 	// View events and the timelines built from them. The secret is used only to
 	// derive the key that tells two anonymous visitors apart — see

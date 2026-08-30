@@ -78,8 +78,8 @@ function AdminSettingsPage() {
       try {
         const data = await fetchSiteSettings({ token, signal })
         const next = {
-          require_moderation: Boolean(data?.require_moderation),
-          max_images: Number(data?.max_images) || 1,
+          listing_moderation_required: Boolean(data?.listing_moderation_required),
+          listing_max_images: Number(data?.listing_max_images) || 1,
         }
         setSaved(next)
         setForm(next)
@@ -103,10 +103,10 @@ function AdminSettingsPage() {
   const dirty =
     form &&
     saved &&
-    (form.require_moderation !== saved.require_moderation || form.max_images !== saved.max_images)
+    (form.listing_moderation_required !== saved.listing_moderation_required || form.listing_max_images !== saved.listing_max_images)
 
-  const valid = form && Number.isInteger(form.max_images) &&
-    form.max_images >= 1 && form.max_images <= MAX_IMAGES_CEILING
+  const valid = form && Number.isInteger(form.listing_max_images) &&
+    form.listing_max_images >= 1 && form.listing_max_images <= MAX_IMAGES_CEILING
 
   const onSubmit = async (event) => {
     event.preventDefault()
@@ -120,8 +120,8 @@ function AdminSettingsPage() {
       // Reconciled with what the server stored rather than with what was sent:
       // it clamps, and the form should show the number that is now in force.
       const next = {
-        require_moderation: Boolean(result?.require_moderation),
-        max_images: Number(result?.max_images) || form.max_images,
+        listing_moderation_required: Boolean(result?.listing_moderation_required),
+        listing_max_images: Number(result?.listing_max_images) || form.listing_max_images,
       }
       setSaved(next)
       setForm(next)
@@ -172,10 +172,10 @@ function AdminSettingsPage() {
                   hint={t('settings.requireModerationHint')}
                 >
                   <Switch
-                    checked={form.require_moderation}
+                    checked={form.listing_moderation_required}
                     labelledBy={moderationLabelId}
                     onChange={(checked) =>
-                      setForm((current) => ({ ...current, require_moderation: checked }))
+                      setForm((current) => ({ ...current, listing_moderation_required: checked }))
                     }
                   />
                 </Row>
@@ -194,11 +194,11 @@ function AdminSettingsPage() {
                     type="number"
                     min={1}
                     max={MAX_IMAGES_CEILING}
-                    value={form.max_images}
+                    value={form.listing_max_images}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
-                        max_images: Number.parseInt(event.target.value, 10),
+                        listing_max_images: Number.parseInt(event.target.value, 10),
                       }))
                     }
                   />

@@ -56,12 +56,12 @@ type UpdateSidebarRequest struct {
 
 // UpdateSettingsRequest is the body of PUT /api/v1/admin/settings.
 //
-// Both fields are required rather than optional: the page sends the whole form,
-// and a partial write would let two administrators saving different tabs
-// overwrite one another with values neither of them chose.
+// A free-form map rather than a typed struct: the registry in internal/models
+// is what says which keys exist and what each one accepts, and repeating fifty
+// fields here would be a second list to keep in step with it. Unknown keys are
+// refused by the service, so the map is not a hole in the validation.
 type UpdateSettingsRequest struct {
-	RequireModeration *bool `json:"require_moderation" binding:"required"`
-	MaxImages         *int  `json:"max_images"         binding:"required,min=1,max=50"`
+	Settings map[string]any `json:"settings" binding:"required"`
 }
 
 // AdminResponse is the public view of an administrator. It has no password

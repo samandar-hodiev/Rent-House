@@ -79,13 +79,13 @@ func (s *ApartmentService) applySettings(
 		return "", err
 	}
 
-	if len(req.Images) > settings.MaxImages {
-		return "", fmt.Errorf("%w: %d allowed", ErrTooManyImages, settings.MaxImages)
+	if len(req.Images) > settings.ListingMaxImages {
+		return "", fmt.Errorf("%w: %d allowed", ErrTooManyImages, settings.ListingMaxImages)
 	}
 
 	// A draft is nobody's business but its owner's, so moderation has nothing
 	// to say about it. Only the act of publishing is held back.
-	if req.Publish && settings.RequireModeration {
+	if req.Publish && settings.ListingModerationRequired {
 		return models.ApartmentStatusPending, nil
 	}
 	return statusFor(req.Publish), nil
