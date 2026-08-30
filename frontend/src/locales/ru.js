@@ -5,7 +5,6 @@ export default {
   "placeholder.profile.description": "Здесь будут показаны данные профиля пользователя.",
   "placeholder.owner.title": "Панель владельца",
   "placeholder.owner.description": "Здесь создаются объявления и происходит управление ими.",
-  "header.languageSite": "Язык сайта",
   "notFound.title": "Страница не найдена",
   "notFound.body": "Страница, которую вы ищете, не существует.",
   "notFound.action": "Вернуться на главную",

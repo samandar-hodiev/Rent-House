@@ -5,7 +5,6 @@ export default {
   "placeholder.profile.description": "Foydalanuvchi profili ma'lumotlari bu yerda ko'rsatiladi.",
   "placeholder.owner.title": "Uy egasi paneli",
   "placeholder.owner.description": "E'lonlarni yaratish va boshqarish bu yerda amalga oshiriladi.",
-  "header.languageSite": "Sayt tili",
   "notFound.title": "Sahifa topilmadi",
   "notFound.body": "Siz qidirayotgan sahifa mavjud emas.",
   "notFound.action": "Bosh sahifaga qaytish",

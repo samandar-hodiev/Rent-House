@@ -17,48 +17,83 @@ function interpolate(template, params) {
   )
 }
 
-function readStoredLocale() {
+/**
+ * What this browser last chose, and which site default it was choosing against.
+ *
+ * Both halves matter. A language picked from the header is that reader's, and
+ * reloading must not undo it — but it was a choice made about one particular
+ * site default, and when the owner changes that default the site is saying
+ * something new. Without the second half a choice made once was permanent: the
+ * owner could switch the marketplace to Russian and a reader who had ever
+ * touched the selector would never see it, with nothing on screen to explain
+ * why. Recording the default the choice was made against is what lets a later
+ * change of it be heard.
+ */
+function readStoredChoice() {
   if (typeof window === 'undefined') return null
-  const stored = window.localStorage.getItem(STORAGE_KEY)
-  return stored && TRANSLATIONS[stored] ? stored : null
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+
+    // Older versions stored the bare code. Such a value has no idea which site
+    // default it was answering, so it is treated as no choice at all and the
+    // site's language applies again.
+    if (!raw.startsWith('{')) return null
+
+    const parsed = JSON.parse(raw)
+    if (!TRANSLATIONS[parsed?.locale]) return null
+    return { locale: parsed.locale, siteDefault: parsed.siteDefault ?? null }
+  } catch {
+    return null
+  }
 }
 
 export function LocaleProvider({ children }) {
-  // Null until somebody chooses: the site's own default then applies, and a
-  // visitor who has chosen keeps their choice.
-  const [chosen, setLocaleState] = useState(readStoredLocale)
-  const { settings } = useSiteSettings()
+  const [choice, setChoice] = useState(readStoredChoice)
+  const { settings, state } = useSiteSettings()
 
-  // The owner sets which language the site opens in. It is applied only where
-  // nobody has expressed a preference — changing a system default must never
-  // reach in and change what a person already decided for themselves.
+  // Which language the marketplace opens in, as its owner set it. Never a
+  // literal in this file: an unknown code falls back to the project's own
+  // default rather than to a language nobody configured.
   const siteDefault = TRANSLATIONS[settings.default_language]
     ? settings.default_language
     : DEFAULT_LOCALE
-  const locale = chosen ?? siteDefault
 
-  const setLocale = useCallback((nextLocale) => {
-    if (!TRANSLATIONS[nextLocale]) return
-    setLocaleState(nextLocale)
-    window.localStorage.setItem(STORAGE_KEY, nextLocale)
-  }, [])
+  // A choice still stands while it was made against the site default that is
+  // in force. Until the configuration has actually been read, the stored
+  // choice is honoured as-is — otherwise every page would open in the fallback
+  // language for a moment and then jump.
+  const settled = state !== 'loading'
+  const choiceStands =
+    choice !== null && (!settled || choice.siteDefault === siteDefault)
+  const locale = choiceStands ? choice.locale : siteDefault
 
-  /**
-   * Stop following a language of one's own and follow the site's again.
-   *
-   * Without this, choosing a language once was permanent: the choice outranks
-   * the site default by design, so a reader who picked Uzbek in March would
-   * never see the site the owner reconfigured in August, and would have no way
-   * to ask for it. Clearing the stored value is what "follow the site" means.
-   */
-  const followSiteLanguage = useCallback(() => {
-    setLocaleState(null)
+  // A choice the site default has moved past is dropped rather than kept
+  // around: it would otherwise come back if the owner ever set that default
+  // again, which is not something the reader asked for.
+  useEffect(() => {
+    if (!settled || choice === null || choice.siteDefault === siteDefault) return
+    setChoice(null)
     try {
       window.localStorage.removeItem(STORAGE_KEY)
     } catch {
-      // Private browsing can refuse; the choice then lasts for the tab.
+      // Private browsing can refuse writes; the value is ignored either way.
     }
-  }, [])
+  }, [settled, choice, siteDefault])
+
+  const setLocale = useCallback(
+    (nextLocale) => {
+      if (!TRANSLATIONS[nextLocale]) return
+      const next = { locale: nextLocale, siteDefault }
+      setChoice(next)
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      } catch {
+        // Private browsing can refuse; the choice then lasts for the tab.
+      }
+    },
+    [siteDefault],
+  )
 
   const t = useCallback(
     (key, params) => {
@@ -76,17 +111,8 @@ export function LocaleProvider({ children }) {
   }, [locale])
 
   const value = useMemo(
-    () => ({
-      locale,
-      setLocale,
-      t,
-      // Which language the site would use on its own, and whether that is what
-      // the reader is currently seeing. The selector shows both.
-      siteDefault,
-      followingSite: chosen === null,
-      followSiteLanguage,
-    }),
-    [locale, setLocale, t, siteDefault, chosen, followSiteLanguage],
+    () => ({ locale, setLocale, t, siteDefault }),
+    [locale, setLocale, t, siteDefault],
   )
 
   return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>

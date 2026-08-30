@@ -12,7 +12,7 @@ const VIEWPORT_MARGIN = 12
 
 // Settings is a popover next to its sidebar entry rather than a body section.
 function DashboardSettingsMenu({ onNavigate }) {
-  const { t, locale, setLocale, followingSite, followSiteLanguage } = useLocale()
+  const { t, locale, setLocale } = useLocale()
   const { resolvedTheme, setTheme } = useTheme()
   const navigate = useNavigate()
 
@@ -68,26 +68,13 @@ function DashboardSettingsMenu({ onNavigate }) {
         >
           <p className="text-xs font-medium text-text-muted">{t('dashboard.language')}</p>
           <div className="mt-1.5 flex gap-1.5">
-            {/* The site's own language, alongside the three: choosing one here
-                used to be permanent, with no way back to whatever the site is
-                configured to open in. */}
-            <button
-              type="button"
-              onClick={followSiteLanguage}
-              aria-pressed={followingSite}
-              className={optionClass(followingSite)}
-              title={t('header.languageSite')}
-              aria-label={t('header.languageSite')}
-            >
-              <span aria-hidden="true">🌐</span>
-            </button>
             {LANGUAGES.map((language) => (
               <button
                 key={language.code}
                 type="button"
                 onClick={() => setLocale(language.code)}
-                aria-pressed={!followingSite && locale === language.code}
-                className={optionClass(!followingSite && locale === language.code)}
+                aria-pressed={locale === language.code}
+                className={optionClass(locale === language.code)}
                 // The full name is what the option means; the code is what it
                 // says. Announced in full for anyone who cannot see the flag.
                 title={language.label}

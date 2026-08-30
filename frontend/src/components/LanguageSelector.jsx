@@ -4,7 +4,7 @@ import { useDismiss } from '../hooks/useDismiss'
 import { useLocale } from '../context/LocaleContext'
 
 function LanguageSelector() {
-  const { locale, setLocale, t, followingSite, siteDefault, followSiteLanguage } = useLocale()
+  const { locale, setLocale, t } = useLocale()
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef(null)
 
@@ -18,12 +18,6 @@ function LanguageSelector() {
     close()
   }
 
-  const followSite = () => {
-    followSiteLanguage()
-    close()
-  }
-
-  const siteLanguage = LANGUAGES.find((language) => language.code === siteDefault)
 
   return (
     <div ref={containerRef} className="relative shrink-0">
@@ -45,31 +39,6 @@ function LanguageSelector() {
           aria-label={t('header.languageLabel')}
           className="absolute right-0 top-full z-40 mt-2 w-40 rounded-md border border-border bg-surface p-1 shadow-md"
         >
-          {/* First, and separated: following the site is what everybody starts
-              out doing, and until this existed a language chosen once could
-              never be given back — the site could be reconfigured and this
-              reader would never see it. */}
-          <li role="none">
-            <button
-              type="button"
-              role="menuitem"
-              onClick={followSite}
-              className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-surface-secondary ${
-                followingSite ? 'font-medium text-primary' : 'text-text-primary'
-              }`}
-            >
-              <span aria-hidden="true">🌐</span>
-              <span className="min-w-0">
-                {t('header.languageSite')}
-                {siteLanguage ? (
-                  <span className="ml-1 text-xs text-text-muted">({siteLanguage.label})</span>
-                ) : null}
-              </span>
-            </button>
-          </li>
-
-          <li role="none" aria-hidden="true" className="my-1 border-t border-border" />
-
           {LANGUAGES.map((language) => (
             <li key={language.code} role="none">
               <button
@@ -77,7 +46,7 @@ function LanguageSelector() {
                 role="menuitem"
                 onClick={() => handleSelect(language.code)}
                 className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-surface-secondary ${
-                  !followingSite && language.code === locale
+                  language.code === locale
                     ? 'font-medium text-primary'
                     : 'text-text-primary'
                 }`}

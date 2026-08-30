@@ -5,7 +5,6 @@ export default {
   "placeholder.profile.description": "Profile details will appear here.",
   "placeholder.owner.title": "Owner dashboard",
   "placeholder.owner.description": "Listings are created and managed here.",
-  "header.languageSite": "Site language",
   "notFound.title": "Page not found",
   "notFound.body": "The page you are looking for does not exist.",
   "notFound.action": "Back to the home page",
