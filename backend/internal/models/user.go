@@ -49,9 +49,9 @@ type User struct {
 
 	AvatarURL *string `gorm:"column:avatar_url;type:text" json:"avatar_url,omitempty"`
 	// "active" or "blocked". A blocked account cannot sign in; see AuthService.
-	Status string `gorm:"column:status;type:varchar(20);not null;default:active" json:"status"`
-	Language  string  `gorm:"column:language;type:varchar(2);not null;default:uz" json:"language"`
-	Theme     string  `gorm:"column:theme;type:varchar(5);not null;default:light" json:"theme"`
+	Status   string `gorm:"column:status;type:varchar(20);not null;default:active" json:"status"`
+	Language string `gorm:"column:language;type:varchar(2);not null;default:uz" json:"language"`
+	Theme    string `gorm:"column:theme;type:varchar(5);not null;default:light" json:"theme"`
 
 	Timestamps
 

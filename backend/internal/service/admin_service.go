@@ -54,10 +54,32 @@ const adminBcryptCost = 12
 type AdminService struct {
 	admins *repository.AdminRepository
 	tokens *token.Service
+	// The marketplace's configuration, for the rules that are the owner's to
+	// set — the password policy a new administrator's password must satisfy.
+	// Optional: a nil settings service falls back to the built-in minimum, so
+	// the admin bootstrap command can build this service without one.
+	settings *SettingsService
 }
 
-func NewAdminService(admins *repository.AdminRepository, tokens *token.Service) *AdminService {
-	return &AdminService{admins: admins, tokens: tokens}
+func NewAdminService(
+	admins *repository.AdminRepository, tokens *token.Service, settings *SettingsService,
+) *AdminService {
+	return &AdminService{admins: admins, tokens: tokens, settings: settings}
+}
+
+// passwordPolicy is the rule a new administrator password must satisfy.
+func (s *AdminService) passwordPolicy(ctx context.Context) PasswordPolicy {
+	if s.settings == nil {
+		return PasswordPolicy{MinLength: minAdminPasswordLength}
+	}
+	current, err := s.settings.Get(ctx)
+	if err != nil {
+		return PasswordPolicy{MinLength: minAdminPasswordLength}
+	}
+	return PasswordPolicy{
+		MinLength:     current.PasswordMinLength,
+		RequireStrong: current.PasswordRequireStrong,
+	}
 }
 
 // Session is what a successful sign-in produces.
@@ -168,6 +190,13 @@ func (s *AdminService) Create(
 			return nil, ErrOwnerAlreadyExists
 		}
 		return nil, ErrInvalidAdminRole
+	}
+
+	// The owner's own policy, applied here rather than in the request binding:
+	// the rule lives in the configuration and can change between one request
+	// and the next, which a compile-time tag cannot follow.
+	if err := ValidatePassword(s.passwordPolicy(ctx), input.Password); err != nil {
+		return nil, err
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), adminBcryptCost)
@@ -476,6 +505,74 @@ func (s *AdminService) Permissions(ctx context.Context) ([]RolePermission, error
 
 	sort.Slice(out, func(i, j int) bool { return out[i].Section < out[j].Section })
 	return out, nil
+}
+
+// RoleSection is one thing a role may or may not reach.
+type RoleSection struct {
+	Section string `json:"section"`
+	Allowed bool   `json:"allowed"`
+}
+
+// RoleInfo describes one role the dashboard can offer.
+type RoleInfo struct {
+	ID string `json:"id"`
+	// Assignable says whether a new administrator may be created with this
+	// role right now. Reason names why not, so the form can explain itself
+	// instead of showing an option that silently fails.
+	Assignable bool          `json:"assignable"`
+	Reason     string        `json:"reason,omitempty"`
+	Sections   []RoleSection `json:"sections"`
+}
+
+// PasswordPolicy is what a new password must satisfy.
+type PasswordPolicy struct {
+	MinLength     int  `json:"min_length"`
+	RequireStrong bool `json:"require_strong"`
+}
+
+// RoleCatalog is everything the "add administrator" form needs to be correct
+// without guessing: which roles exist, what each one may do, which of them can
+// be created now, and the password rule the server will apply.
+type RoleCatalog struct {
+	Roles          []RoleInfo     `json:"roles"`
+	PasswordPolicy PasswordPolicy `json:"password_policy"`
+}
+
+// Roles lists the roles this system has.
+//
+// Built from Permissions, which is itself derived from the rules the middleware
+// enforces and the sections the owner configured — so the form can never offer
+// a role, or promise a permission, that the server would refuse. There is no
+// separate table of role descriptions to drift out of step.
+func (s *AdminService) Roles(ctx context.Context) (*RoleCatalog, error) {
+	matrix, err := s.Permissions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	owner := RoleInfo{ID: models.AdminRoleOwner, Assignable: false, Reason: "owner_exists"}
+	superAdmin := RoleInfo{ID: models.AdminRoleSuperAdmin, Assignable: true}
+	for _, row := range matrix {
+		owner.Sections = append(owner.Sections, RoleSection{Section: row.Section, Allowed: row.Owner})
+		superAdmin.Sections = append(superAdmin.Sections,
+			RoleSection{Section: row.Section, Allowed: row.SuperAdmin})
+	}
+
+	// Only true today — the schema allows exactly one owner — but read rather
+	// than assumed, so the form stays right if that ever changes.
+	owners, err := s.admins.CountOwners(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if owners == 0 {
+		owner.Assignable = true
+		owner.Reason = ""
+	}
+
+	return &RoleCatalog{
+		Roles:          []RoleInfo{owner, superAdmin},
+		PasswordPolicy: s.passwordPolicy(ctx),
+	}, nil
 }
 
 // UpdateProfile changes the calling administrator's own name and picture.

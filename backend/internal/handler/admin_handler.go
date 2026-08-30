@@ -718,6 +718,23 @@ func (h *AdminHandler) Permissions(c *gin.Context) {
 	response.OK(c, "Permissions", gin.H{"permissions": rows})
 }
 
+// Roles handles GET /api/v1/admin/roles.
+//
+// What the "add administrator" form needs to be correct: which roles exist,
+// what each one may reach, which of them can be created right now, and the
+// password rule the server will apply. All of it derived from the rules the
+// middleware enforces, so the form cannot offer something the server refuses.
+func (h *AdminHandler) Roles(c *gin.Context) {
+	catalog, err := h.admins.Roles(c.Request.Context())
+	if err != nil {
+		logger.Errorf("roles: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not load roles")
+		return
+	}
+	response.OK(c, "Roles", catalog)
+}
+
 // SetUserStatus handles PATCH /api/v1/admin/users/:id/status.
 func (h *AdminHandler) SetUserStatus(c *gin.Context) {
 	actor, ok := middleware.AdminFrom(c)
@@ -867,6 +884,10 @@ func (h *AdminHandler) writeAdminError(c *gin.Context, err error, action string)
 		response.Error(c, http.StatusBadRequest, "invalid_role", "Invalid role")
 	case errors.Is(err, service.ErrInvalidAdminStatus):
 		response.Error(c, http.StatusBadRequest, "invalid_status", "Invalid status")
+	case errors.Is(err, service.ErrWeakPassword):
+		// The message names the rule that was broken, so the form can say what
+		// to change rather than that something was wrong.
+		response.Error(c, http.StatusBadRequest, "weak_password", err.Error())
 	default:
 		logger.Errorf("%s: %v", action, err)
 		response.Error(c, http.StatusInternalServerError, "internal_error",

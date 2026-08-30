@@ -76,7 +76,10 @@ func run() error {
 		return err
 	}
 
-	admins := service.NewAdminService(repository.NewAdminRepository(db), tokens)
+	// No settings service: this command creates the first owner, before there
+	// is anybody to have configured a password policy. The built-in minimum
+	// applies, which is what EnsureOwner already checks against.
+	admins := service.NewAdminService(repository.NewAdminRepository(db), tokens, nil)
 	created, err := admins.EnsureOwner(context.Background(), name, email, password)
 	if err != nil {
 		return err

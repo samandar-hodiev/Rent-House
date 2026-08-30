@@ -111,6 +111,25 @@ export async function saveSidebarSections(sections, { token, signal } = {}) {
 }
 
 /**
+ * The roles this system has, and what each one may reach.
+ *
+ * Derived by the server from the rules its own middleware enforces, so the
+ * form cannot offer a role — or promise a permission — that the server would
+ * refuse. It also carries the password policy the server will apply, so the
+ * form checks the same rule rather than a copy of it.
+ */
+export async function fetchRoles({ token, signal } = {}) {
+  const data = await request('/admin/roles', { token, signal })
+  return {
+    roles: data?.roles ?? [],
+    passwordPolicy: {
+      minLength: data?.password_policy?.min_length ?? 8,
+      requireStrong: Boolean(data?.password_policy?.require_strong),
+    },
+  }
+}
+
+/**
  * How the marketplace is configured.
  *
  * The owner's, both ways — the server refuses anybody else, so the page being

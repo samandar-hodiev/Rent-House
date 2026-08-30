@@ -29,9 +29,11 @@ type CreateAdminRequest struct {
 	Name  string `json:"name"  binding:"required,min=2,max=200"`
 	Email string `json:"email" binding:"required,email,max=255"`
 	Role  string `json:"role"  binding:"required,oneof=super_admin"`
-	// bcrypt ignores anything past 72 bytes, so a longer password would be
-	// silently truncated. The minimum matches the marketplace's.
-	Password string `json:"password" binding:"required,min=8,max=72"`
+	// No minimum here: the length a password must reach is the owner's to set
+	// on the settings page, and a binding tag is fixed at compile time. The
+	// service applies the configured policy. The maximum stays, because bcrypt
+	// ignores anything past 72 bytes whatever the configuration says.
+	Password string `json:"password" binding:"required,max=72"`
 }
 
 func (r *CreateAdminRequest) Normalize() {

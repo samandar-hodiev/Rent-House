@@ -26,11 +26,15 @@ export function ToastProvider({ children }) {
     setToasts((current) => current.filter((toast) => toast.id !== id))
   }, [])
 
-  const showToast = useCallback((message) => {
+  // `lines` is an optional second row or two under the message — what was
+  // created, in what role, in what state. A confirmation that names the thing
+  // is worth more than one that says an unnamed something worked.
+  const showToast = useCallback((message, lines) => {
     // A counter would do, but two toasts raised in the same tick would collide
     // on it; the timestamp plus a random suffix will not.
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-    setToasts((current) => [...current, { id, message }])
+    const detail = Array.isArray(lines) ? lines.filter(Boolean) : []
+    setToasts((current) => [...current, { id, message, lines: detail }])
   }, [])
 
   // A timer per toast rather than one shared: a card raised later must not be
@@ -64,7 +68,14 @@ export function ToastProvider({ children }) {
                   <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary-light text-primary-hover dark:text-primary">
                     <Check aria-hidden="true" size={13} strokeWidth={3} />
                   </span>
-                  <p className="min-w-0 flex-1 text-sm text-text-primary">{toast.message}</p>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm text-text-primary">{toast.message}</span>
+                    {toast.lines.map((line) => (
+                      <span key={line} className="mt-0.5 block text-xs text-text-muted">
+                        {line}
+                      </span>
+                    ))}
+                  </span>
                   <button
                     type="button"
                     onClick={() => dismiss(toast.id)}
@@ -76,7 +87,11 @@ export function ToastProvider({ children }) {
                 </div>
               ))}
             </div>,
-            document.body,
+            // Inside the dashboard's own root when that is what is on screen,
+            // so a toast raised there takes the dashboard's theme rather than
+            // the public site's. The two are never mounted together, so this
+            // is a choice of host, not a guess about which one raised it.
+            document.getElementById('admin-root') ?? document.body,
           )
         : null}
     </ToastContext.Provider>

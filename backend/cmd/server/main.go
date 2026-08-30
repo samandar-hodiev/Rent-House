@@ -336,7 +336,7 @@ func newRouter(
 	// visitor's token is refused here, and an administrator's is refused by the
 	// marketplace. Sharing one account table would mean the public registration
 	// endpoint writes rows the admin authorization has to be careful about.
-	adminService := service.NewAdminService(repository.NewAdminRepository(db), tokens)
+	adminService := service.NewAdminService(repository.NewAdminRepository(db), tokens, settingsService)
 	// Every figure the dashboard shows is counted by PostgreSQL; this service
 	// only shapes the counts into series.
 	adminStats := service.NewAdminStatsService(repository.NewAdminStatsRepository(db))
@@ -423,6 +423,12 @@ func newRouter(
 			// What each role may reach. Readable by any administrator: it
 			// describes the rules, and knowing them grants nothing.
 			authed.GET("/permissions", adminHandler.Permissions)
+
+			// The roles this system has and what each one may reach, for the
+			// form that creates an administrator. Readable by any
+			// administrator for the same reason as /permissions: it describes
+			// the rules, and knowing them grants nothing.
+			authed.GET("/roles", adminHandler.Roles)
 
 			// What administrators have done. Behind its own section, which the
 			// owner can withdraw like any other.
