@@ -20,7 +20,7 @@ function Footer() {
           <p className="mt-0.5 text-sm text-text-muted">{t('footer.tagline')}</p>
         </div>
 
-        <nav aria-label="Qo'shimcha havolalar" className="flex flex-wrap gap-x-5 gap-y-1">
+        <nav aria-label={t('a11y.footerNav')} className="flex flex-wrap gap-x-5 gap-y-1">
           <Link to={ROUTES.search} className="text-sm text-text-secondary hover:text-primary">
             {t('footer.linkSearch')}
           </Link>

@@ -1,10 +1,13 @@
 import PagePlaceholder from '../components/PagePlaceholder'
+import { useLocale } from '../context/LocaleContext'
 
 function SearchPage() {
+  const { t } = useLocale()
+
   return (
     <PagePlaceholder
-      title="Qidiruv natijalari"
-      description="Filtrlar va e'lonlar ro'yxati bu yerda ko'rsatiladi."
+      title={t('placeholder.search.title')}
+      description={t('placeholder.search.description')}
     />
   )
 }

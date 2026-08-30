@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ROUTES } from '../../routes/paths'
+import { useSiteSettings } from '../../context/SiteSettingsContext'
 
 // An architectural glyph — a roofline over a window — rather than a literal
 // house icon. Inline SVG so it inherits the theme's primary colour and costs
@@ -19,6 +20,11 @@ function BrandMark() {
 // Sits above the card on every auth screen. Compact on purpose — it identifies
 // the product, it is not the subject of the page.
 function AuthBrand() {
+  // The marketplace's own name, the same one the header shows. Written into
+  // this component it would be the one place the site is still called
+  // something else after an owner renames it.
+  const { settings } = useSiteSettings()
+
   return (
     <Link
       to={ROUTES.home}
@@ -26,7 +32,7 @@ function AuthBrand() {
     >
       <BrandMark />
       <span className="text-[1.0625rem] font-semibold tracking-tight text-text-primary">
-        RentHouse
+        {settings.site_brand_name || settings.site_name}
       </span>
     </Link>
   )

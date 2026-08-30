@@ -1,10 +1,13 @@
 import PagePlaceholder from '../components/PagePlaceholder'
+import { useLocale } from '../context/LocaleContext'
 
 function ProfilePage() {
+  const { t } = useLocale()
+
   return (
     <PagePlaceholder
-      title="Profil"
-      description="Foydalanuvchi profili ma'lumotlari bu yerda ko'rsatiladi."
+      title={t('placeholder.profile.title')}
+      description={t('placeholder.profile.description')}
     />
   )
 }

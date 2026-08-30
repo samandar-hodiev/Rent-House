@@ -218,7 +218,7 @@ function ApartmentDetailsPage() {
 
   return (
     <Container className="py-8 pb-24 lg:pb-8">
-      <nav aria-label="Breadcrumb" className="mb-6 flex items-center gap-1.5 text-sm">
+      <nav aria-label={t('a11y.breadcrumb')} className="mb-6 flex items-center gap-1.5 text-sm">
         <Link to={ROUTES.home} className="text-text-secondary hover:text-primary">
           {t('breadcrumb.home')}
         </Link>

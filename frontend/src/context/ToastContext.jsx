@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useLocale } from './LocaleContext'
 import { Check, X } from 'lucide-react'
 
 // Long enough to read a sentence, short enough not to sit over the page.
@@ -20,6 +21,10 @@ const ToastContext = createContext(null)
  * page, and the confirmation has to outlive the route change to be read at all.
  */
 export function ToastProvider({ children }) {
+  // The stack's own labels — the region and the close button — are read only by
+  // screen readers, which is exactly why they were the last two strings still
+  // written in one language.
+  const { t: label } = useLocale()
   const [toasts, setToasts] = useState([])
 
   const dismiss = useCallback((id) => {
@@ -57,7 +62,7 @@ export function ToastProvider({ children }) {
               // the gaps between them do not swallow clicks meant for the page.
               className="pointer-events-none fixed right-4 top-4 z-[80] flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2"
               role="region"
-              aria-label="Bildirishnomalar"
+              aria-label={label('a11y.toasts')}
             >
               {toasts.map((toast) => (
                 <div
@@ -79,7 +84,7 @@ export function ToastProvider({ children }) {
                   <button
                     type="button"
                     onClick={() => dismiss(toast.id)}
-                    aria-label="Yopish"
+                    aria-label={label('a11y.close')}
                     className="-mr-1 -mt-1 flex size-7 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-surface-secondary hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     <X aria-hidden="true" size={14} />

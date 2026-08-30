@@ -74,7 +74,7 @@ function Header() {
 
           <SearchBar />
 
-          <nav aria-label="Asosiy navigatsiya" className="flex shrink-0 items-center gap-7">
+          <nav aria-label={t('a11y.mainNav')} className="flex shrink-0 items-center gap-7">
             <NavLink to={ROUTES.map} className={navLinkClass}>
               {t('header.mapNav')}
             </NavLink>
@@ -117,7 +117,7 @@ function Header() {
             {/* The same components the wide header uses, in the same order —
                 this is one layout in two shapes, not a second header. */}
             <nav
-              aria-label="Asosiy navigatsiya"
+              aria-label={t('a11y.mainNav')}
               className="flex shrink-0 items-center gap-5"
             >
               <NavLink to={ROUTES.map} className={navLinkClass}>
@@ -181,7 +181,7 @@ function Header() {
           {isMenuOpen ? (
             <nav
               id="mobile-nav-menu"
-              aria-label="Asosiy navigatsiya"
+              aria-label={t('a11y.mainNav')}
               className="flex flex-col gap-1 border-t border-border py-3"
             >
               {/* Where you can go. Saved apartments are no longer here: they

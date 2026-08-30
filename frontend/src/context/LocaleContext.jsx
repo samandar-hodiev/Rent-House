@@ -43,6 +43,23 @@ export function LocaleProvider({ children }) {
     window.localStorage.setItem(STORAGE_KEY, nextLocale)
   }, [])
 
+  /**
+   * Stop following a language of one's own and follow the site's again.
+   *
+   * Without this, choosing a language once was permanent: the choice outranks
+   * the site default by design, so a reader who picked Uzbek in March would
+   * never see the site the owner reconfigured in August, and would have no way
+   * to ask for it. Clearing the stored value is what "follow the site" means.
+   */
+  const followSiteLanguage = useCallback(() => {
+    setLocaleState(null)
+    try {
+      window.localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      // Private browsing can refuse; the choice then lasts for the tab.
+    }
+  }, [])
+
   const t = useCallback(
     (key, params) => {
       const dict = TRANSLATIONS[locale] ?? TRANSLATIONS[DEFAULT_LOCALE]
@@ -58,7 +75,19 @@ export function LocaleProvider({ children }) {
     document.documentElement.setAttribute('lang', locale)
   }, [locale])
 
-  const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t])
+  const value = useMemo(
+    () => ({
+      locale,
+      setLocale,
+      t,
+      // Which language the site would use on its own, and whether that is what
+      // the reader is currently seeing. The selector shows both.
+      siteDefault,
+      followingSite: chosen === null,
+      followSiteLanguage,
+    }),
+    [locale, setLocale, t, siteDefault, chosen, followSiteLanguage],
+  )
 
   return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
 }

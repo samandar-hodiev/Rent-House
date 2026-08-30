@@ -74,6 +74,19 @@ export function SiteSettingsProvider({ children }) {
       if (error?.name === 'AbortError') return
       // The declared defaults stand. A marketplace that cannot read its own
       // configuration must stay open rather than close itself.
+      //
+      // Said out loud in development, because the failure is otherwise silent
+      // and looks exactly like a setting that does not work: the site name,
+      // the language it opens in and the maintenance notice all quietly fall
+      // back, and the usual cause is the API being on an origin this build was
+      // not told about.
+      if (import.meta.env.DEV) {
+        console.warn(
+          '[RentHouse] Could not read /settings — falling back to the built-in ' +
+            'defaults. Check VITE_API_URL and the API\'s allowed origins.',
+          error,
+        )
+      }
       setState('ready')
     }
   }, [])
