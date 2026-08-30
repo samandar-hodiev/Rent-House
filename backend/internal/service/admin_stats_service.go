@@ -8,7 +8,8 @@ import (
 )
 
 // The dashboard reports in local time. A day boundary at midnight UTC would put
-// a Tashkent evening into the following day.
+// a Tashkent evening into the following day. Which local time is the owner's to
+// set on the settings page; this is the fallback when it cannot be read.
 const dashboardZone = "Asia/Tashkent"
 
 // How much of each series the charts show. Chosen here rather than by the
@@ -26,15 +27,35 @@ const (
 // on its axis regardless.
 type AdminStatsService struct {
 	stats *repository.AdminStatsRepository
+	// The configured timezone decides where a day begins for every figure on
+	// the dashboard. Optional: nil falls back to the constant above.
+	settings *SettingsService
 }
 
-func NewAdminStatsService(stats *repository.AdminStatsRepository) *AdminStatsService {
-	return &AdminStatsService{stats: stats}
+func NewAdminStatsService(
+	stats *repository.AdminStatsRepository, settings *SettingsService,
+) *AdminStatsService {
+	return &AdminStatsService{stats: stats, settings: settings}
+}
+
+// zone is the timezone every figure is bucketed by.
+func (s *AdminStatsService) zone(ctx context.Context) string {
+	if s.settings == nil {
+		return dashboardZone
+	}
+	configured := s.settings.MustGet(ctx).Timezone
+	if configured == "" {
+		return dashboardZone
+	}
+	if _, err := time.LoadLocation(configured); err != nil {
+		return dashboardZone
+	}
+	return configured
 }
 
 // Overview is the row of headline figures.
 func (s *AdminStatsService) Overview(ctx context.Context) (*repository.Overview, error) {
-	return s.stats.CountOverview(ctx, dashboardZone)
+	return s.stats.CountOverview(ctx, s.zone(ctx))
 }
 
 // Districts returns every district with its live listing count, busiest first.
@@ -68,7 +89,7 @@ type Growth struct {
 // All six series in one call: they are small, and fetching them together means
 // switching between Kunlik and Oylik is instant rather than a round trip.
 func (s *AdminStatsService) Growth(ctx context.Context) (*Growth, error) {
-	location, err := time.LoadLocation(dashboardZone)
+	location, err := time.LoadLocation(s.zone(ctx))
 	if err != nil {
 		// A machine without tzdata. UTC is wrong by five hours, which is far
 		// better than no dashboard at all.
@@ -113,7 +134,7 @@ func (s *AdminStatsService) bucket(
 	starts := periodStarts(now, granularity, points, location)
 
 	rows, err := s.stats.CountNewByPeriod(
-		ctx, table, granularity, dashboardZone, starts[0], excludeDeleted,
+		ctx, table, granularity, s.zone(ctx), starts[0], excludeDeleted,
 	)
 	if err != nil {
 		return nil, err

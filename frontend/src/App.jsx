@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ChatProvider } from './context/ChatContext'
 import { ListingsProvider } from './context/ListingsContext'
@@ -28,6 +28,8 @@ import DashboardEditProfilePage from './pages/DashboardEditProfilePage'
 import CreateListingPage from './pages/CreateListingPage'
 import NotFoundPage from './pages/NotFoundPage'
 import { ToastProvider } from './context/ToastContext'
+import { SiteSettingsProvider, useSiteSettings } from './context/SiteSettingsContext'
+import MaintenancePage from './pages/MaintenancePage'
 import AdminLayout, { AdminRoot } from './components/admin/AdminLayout'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import AdminUsersPage from './pages/admin/AdminUsersPage'
@@ -51,8 +53,29 @@ import { ADMIN_ROUTES } from './routes/adminPaths'
 import { LISTING_STATUS } from './data/listingStatus'
 import { ROUTES } from './routes/paths'
 
+/**
+ * Closes the marketplace while maintenance mode is on.
+ *
+ * The dashboard is exempt — it is how maintenance gets turned off again — and
+ * so is the sign-in page that leads to it. Everything else, including a URL
+ * typed by hand, gets the notice instead of the app.
+ *
+ * The protection is the server's: every public endpoint answers 503 while this
+ * is on, so a visitor who bypasses the interface entirely is refused all the
+ * same. This is what makes the refusal legible rather than a wall of errors.
+ */
+function MaintenanceGate({ children }) {
+  const { settings } = useSiteSettings()
+  const { pathname } = useLocation()
+
+  const forAdmins = pathname === '/admin' || pathname.startsWith('/admin/')
+  if (settings.maintenance_mode && !forAdmins) return <MaintenancePage />
+  return children
+}
+
 function App() {
   return (
+    <SiteSettingsProvider>
     <LocaleProvider>
       <ThemeProvider>
         <AuthProvider>
@@ -67,6 +90,7 @@ function App() {
                     {/* Mounted above the routes so a message arriving while
                         the reader is anywhere in the app still reaches them. */}
                     <MessageNotifications />
+                    <MaintenanceGate>
                     <Routes>
                       <Route element={<RootLayout />}>
                         <Route path={ROUTES.home} element={<HomePage />} />
@@ -218,6 +242,7 @@ function App() {
                         </Route>
                       </Route>
                     </Routes>
+                    </MaintenanceGate>
                   </BrowserRouter>
                   </ToastProvider>
                 </WishlistProvider>
@@ -227,6 +252,7 @@ function App() {
         </AuthProvider>
       </ThemeProvider>
     </LocaleProvider>
+    </SiteSettingsProvider>
   )
 }
 

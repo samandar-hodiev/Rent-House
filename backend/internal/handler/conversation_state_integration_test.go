@@ -41,6 +41,7 @@ func newChatHarness(t *testing.T) *chatHarness {
 		hub,
 		nil,
 		func(id uuid.UUID) string { return "http://test/attachments/" + id.String() },
+		service.NewSettingsService(repository.NewSettingsRepository(h.db)),
 	)
 	chatHandler := NewChatHandler(chatService)
 

@@ -1,4 +1,8 @@
 export default {
+  "maintenance.title": "Maintenance under way",
+  "maintenance.body": "The site is being worked on right now. Please try again shortly.",
+  "maintenance.retry": "Try again",
+  "maintenance.support": "Questions:",
   'brand.name': 'RentHouse',
 
   'header.mapNav': 'Search on map',

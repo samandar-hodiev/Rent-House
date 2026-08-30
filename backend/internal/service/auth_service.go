@@ -67,7 +67,31 @@ var (
 	ErrVerificationNotFound = errors.New("verification not found")
 	ErrVerificationExpired  = errors.New("verification expired")
 	ErrTooManyAttempts      = errors.New("too many verification attempts")
-	ErrInvalidCode          = errors.New("invalid verification code")
+
+	// ErrRegistrationClosed is registration switched off for the whole
+	// marketplace on the settings page.
+	ErrRegistrationClosed = errors.New("registration is closed")
+
+	// ErrMethodDisabled is a verification channel the owner has turned off —
+	// registering by email when only phone is accepted, or the other way round.
+	ErrMethodDisabled = errors.New("that way of registering is switched off")
+
+	// ErrProfileEditDisabled is profile editing switched off.
+	ErrProfileEditDisabled = errors.New("editing a profile is switched off")
+
+	// ErrAvatarRequired is a profile left without a picture while the
+	// marketplace asks every account to have one.
+	ErrAvatarRequired = errors.New("a profile picture is required")
+
+	// ErrContactBlocked is an attempt to register again with the contact of an
+	// account an administrator has blocked.
+	ErrContactBlocked = errors.New("that contact belongs to a blocked account")
+
+	// ErrAccountLocked is too many failed sign-ins for one identifier. The
+	// message carries how long is left, because "try again later" without a
+	// number is not something anybody can act on.
+	ErrAccountLocked = errors.New("too many failed sign-in attempts")
+	ErrInvalidCode   = errors.New("invalid verification code")
 
 	// ErrInvalidRegistrationToken covers an unknown, expired, unverified or
 	// already-used registration token.
@@ -100,6 +124,15 @@ type AuthService struct {
 	smsSender     notify.Sender
 	emailSender   notify.Sender
 	policy        config.OTP
+	// Failed sign-ins, for the lockout the settings page configures. Optional:
+	// nil means no lockout is enforced, which is how the service behaved before
+	// the setting existed.
+	attempts *repository.LoginAttemptRepository
+	// How the marketplace is configured. Read on each request rather than at
+	// start-up, so switching registration off takes effect on the next attempt
+	// instead of the next deployment. Optional: tests that predate it pass nil
+	// and get the configured defaults.
+	settings *SettingsService
 
 	// now is injectable so tests can move time without sleeping.
 	now func() time.Time
@@ -112,6 +145,8 @@ func NewAuthService(
 	smsSender notify.Sender,
 	emailSender notify.Sender,
 	policy config.OTP,
+	settings *SettingsService,
+	attempts *repository.LoginAttemptRepository,
 ) *AuthService {
 	return &AuthService{
 		users:         users,
@@ -120,7 +155,46 @@ func NewAuthService(
 		smsSender:     smsSender,
 		emailSender:   emailSender,
 		policy:        policy,
+		settings:      settings,
+		attempts:      attempts,
 		now:           time.Now,
+	}
+}
+
+// site is the configuration in force, or the declared defaults when it cannot
+// be read. The marketplace keeps working either way.
+func (s *AuthService) site(ctx context.Context) *Settings {
+	if s.settings == nil {
+		return Defaults()
+	}
+	return s.settings.MustGet(ctx)
+}
+
+// otpPolicy overlays the owner's choices onto the deployment's configuration.
+//
+// The environment sets what the deployment can do; the settings page sets what
+// the marketplace does within that. Only the two values the page offers are
+// overlaid — the rest of the policy stays where it was.
+func (s *AuthService) otpPolicy(ctx context.Context) config.OTP {
+	policy := s.policy
+	current := s.site(ctx)
+	if current.OTPExpiryMinutes > 0 {
+		policy.Expiry = time.Duration(current.OTPExpiryMinutes) * time.Minute
+	}
+	if current.OTPResendCooldown > 0 {
+		policy.ResendCooldown = time.Duration(current.OTPResendCooldown) * time.Second
+	}
+	return policy
+}
+
+// passwordPolicy is the rule every password on the marketplace must satisfy —
+// one at registration, one at reset, and the same one the dashboard applies to
+// an administrator.
+func (s *AuthService) passwordPolicy(ctx context.Context) PasswordPolicy {
+	current := s.site(ctx)
+	return PasswordPolicy{
+		MinLength:     current.PasswordMinLength,
+		RequireStrong: current.PasswordRequireStrong,
 	}
 }
 
@@ -134,6 +208,24 @@ func (s *AuthService) RequestRegistrationCode(
 	contact := req.Contact()
 	if contact == "" {
 		return nil, ErrContactMismatch
+	}
+
+	// Whether the marketplace is taking new accounts at all, and by which
+	// channel. Checked before a code is generated or sent, so a closed
+	// marketplace costs nothing to knock on.
+	site := s.site(ctx)
+	if !site.UserRegistrationEnabled {
+		return nil, ErrRegistrationClosed
+	}
+	switch req.Method {
+	case models.VerificationMethodEmail:
+		if !site.RegistrationEmailEnabled {
+			return nil, ErrMethodDisabled
+		}
+	case models.VerificationMethodPhone:
+		if !site.RegistrationPhoneEnabled {
+			return nil, ErrMethodDisabled
+		}
 	}
 	// The unused contact must be absent, so a request cannot claim to verify a
 	// phone while also carrying an email.
@@ -149,10 +241,20 @@ func (s *AuthService) RequestRegistrationCode(
 		return nil, err
 	}
 	if taken {
+		// Blocked accounts are told apart from merely existing ones only when
+		// the owner has decided their contacts may not be reused — otherwise
+		// the answer is the same either way and reveals nothing.
+		if !site.BlockedContactReuseAllowed {
+			blocked, err := s.users.ContactIsBlocked(ctx, req.Method, contact)
+			if err == nil && blocked {
+				return nil, ErrContactBlocked
+			}
+		}
 		return nil, ErrContactTaken
 	}
 
 	now := s.now()
+	policy := s.otpPolicy(ctx)
 
 	// Cooldown: checked against the newest verification for this contact,
 	// whether or not it was used, so resending cannot be hammered.
@@ -160,7 +262,7 @@ func (s *AuthService) RequestRegistrationCode(
 		ctx, models.VerificationPurposeRegistration, req.Method, contact)
 	switch {
 	case err == nil:
-		if elapsed := now.Sub(latest.LastSentAt); elapsed < s.policy.ResendCooldown {
+		if elapsed := now.Sub(latest.LastSentAt); elapsed < policy.ResendCooldown {
 			return nil, ErrResendTooSoon
 		}
 	case errors.Is(err, repository.ErrVerificationNotFound):
@@ -189,7 +291,7 @@ func (s *AuthService) RequestRegistrationCode(
 		Purpose:    models.VerificationPurposeRegistration,
 		Method:     req.Method,
 		CodeHash:   codeHash,
-		ExpiresAt:  now.Add(s.policy.Expiry),
+		ExpiresAt:  now.Add(policy.Expiry),
 		LastSentAt: now,
 	}
 	if req.Method == models.VerificationMethodPhone {
@@ -223,8 +325,8 @@ func (s *AuthService) RequestRegistrationCode(
 		VerificationID:    verification.ID.String(),
 		Method:            req.Method,
 		Delivery:          delivery,
-		ExpiresIn:         int64(s.policy.Expiry.Seconds()),
-		ResendAfter:       int64(s.policy.ResendCooldown.Seconds()),
+		ExpiresIn:         int64(policy.Expiry.Seconds()),
+		ResendAfter:       int64(policy.ResendCooldown.Seconds()),
 		AttemptsRemaining: s.policy.MaxAttempts,
 	}, nil
 }
@@ -343,6 +445,13 @@ func (s *AuthService) CompleteRegistration(
 		return nil, ErrContactTaken
 	}
 
+	// The owner's password rule, applied at the moment the password is set.
+	// The same function the dashboard uses for an administrator, so "strong
+	// passwords required" means one thing across the whole system.
+	if err := ValidatePassword(s.passwordPolicy(ctx), req.Password); err != nil {
+		return nil, err
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcryptCost)
 	if err != nil {
 		return nil, fmt.Errorf("hash password: %w", err)
@@ -379,11 +488,29 @@ func (s *AuthService) CompleteRegistration(
 		return nil, err
 	}
 
-	return s.authResponse(user)
+	return s.authResponse(ctx, user)
 }
 
 // Login verifies credentials and returns the user with an access token.
 func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest) (*dto.AuthResponse, error) {
+	now := s.now()
+	site := s.site(ctx)
+
+	// Checked before the password is even compared, and keyed on what was
+	// typed rather than on the account it names — an identifier that belongs
+	// to no account must lock the same way, or the lockout becomes a way to
+	// learn which addresses are registered.
+	if s.attempts != nil {
+		until, err := s.attempts.LockedUntil(ctx, req.Identifier, now)
+		if err != nil {
+			return nil, err
+		}
+		if !until.IsZero() {
+			return nil, fmt.Errorf("%w: try again in %d minute(s)",
+				ErrAccountLocked, minutesUntil(until, now))
+		}
+	}
+
 	user, err := s.users.FindByIdentifier(ctx, req.Identifier)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
@@ -391,14 +518,14 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest) (*dto.Aut
 			// make "unknown user" measurably faster than "wrong password",
 			// which leaks account existence through response time.
 			_, _ = bcrypt.GenerateFromPassword([]byte(req.Password), bcryptCost)
-			return nil, ErrInvalidCredentials
+			return nil, s.recordFailure(ctx, req.Identifier, site, now)
 		}
 		return nil, err
 	}
 
 	// CompareHashAndPassword is constant-time with respect to the hash.
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		return nil, ErrInvalidCredentials
+		return nil, s.recordFailure(ctx, req.Identifier, site, now)
 	}
 
 	// Checked after the password, not before: telling somebody who guessed an
@@ -409,7 +536,53 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest) (*dto.Aut
 		return nil, ErrAccountBlocked
 	}
 
-	return s.authResponse(user)
+	// The streak ends with a correct password.
+	if s.attempts != nil {
+		if err := s.attempts.Succeed(ctx, req.Identifier); err != nil {
+			logger.Errorf("clear login attempts: %v", err)
+		}
+	}
+
+	return s.authResponse(ctx, user)
+}
+
+// recordFailure counts one wrong answer and reports what the caller is told.
+//
+// Always the same error for a wrong password, until the allowance runs out —
+// then a lockout error naming the wait. Whether the identifier exists never
+// changes which of the two comes back.
+func (s *AuthService) recordFailure(
+	ctx context.Context, identifier string, site *Settings, now time.Time,
+) error {
+	if s.attempts == nil {
+		return ErrInvalidCredentials
+	}
+	until, err := s.attempts.Fail(
+		ctx, identifier, site.LoginMaxAttempts,
+		time.Duration(site.LoginLockMinutes)*time.Minute, now,
+	)
+	if err != nil {
+		// A counter that cannot be written must not stop somebody signing in.
+		logger.Errorf("record failed login: %v", err)
+		return ErrInvalidCredentials
+	}
+	if !until.IsZero() {
+		return fmt.Errorf("%w: try again in %d minute(s)",
+			ErrAccountLocked, minutesUntil(until, now))
+	}
+	return ErrInvalidCredentials
+}
+
+// minutesUntil rounds up, so "1 minute" never means "any moment now".
+func minutesUntil(until, now time.Time) int {
+	minutes := int(until.Sub(now).Minutes())
+	if float64(minutes) < until.Sub(now).Minutes() {
+		minutes++
+	}
+	if minutes < 1 {
+		minutes = 1
+	}
+	return minutes
 }
 
 // CurrentUser loads the user behind a validated token.
@@ -580,6 +753,10 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, password string)
 		return err
 	}
 
+	if err := ValidatePassword(s.passwordPolicy(ctx), password); err != nil {
+		return err
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
 		return fmt.Errorf("hash password: %w", err)
@@ -614,6 +791,11 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, password string)
 func (s *AuthService) UpdateProfile(
 	ctx context.Context, userID uuid.UUID, req dto.UpdateProfileRequest,
 ) (*dto.UserResponse, error) {
+	site := s.site(ctx)
+	if !site.UserProfileEditEnabled {
+		return nil, ErrProfileEditDisabled
+	}
+
 	user, err := s.users.FindByID(ctx, userID)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
@@ -660,6 +842,12 @@ func (s *AuthService) UpdateProfile(
 
 	if req.AvatarURL != nil {
 		if *req.AvatarURL == "" {
+			// Removing the picture is refused while the marketplace asks every
+			// account to have one — otherwise the requirement would hold for
+			// new accounts and for nobody else.
+			if site.UserAvatarRequired {
+				return nil, ErrAvatarRequired
+			}
 			fields["avatar_url"] = nil
 		} else {
 			// Stored as a path, never as the absolute URL the upload endpoint
@@ -709,8 +897,17 @@ func (s *AuthService) sender(method string) notify.Sender {
 	return s.emailSender
 }
 
-func (s *AuthService) authResponse(user *models.User) (*dto.AuthResponse, error) {
-	accessToken, _, err := s.tokens.Generate(user.ID)
+func (s *AuthService) authResponse(ctx context.Context, user *models.User) (*dto.AuthResponse, error) {
+	// How long a session lasts is the owner's to set. Read at the moment the
+	// token is signed, so a change applies to the next sign-in rather than to
+	// the next deployment; tokens already issued keep the life they were given,
+	// which is what a signed expiry means.
+	ttl := time.Duration(s.site(ctx).JWTExpirationHours) * time.Hour
+	if ttl <= 0 {
+		ttl = s.tokens.ExpiresIn()
+	}
+
+	accessToken, _, err := s.tokens.GenerateScoped(user.ID, token.ScopeUser, ttl)
 	if err != nil {
 		return nil, fmt.Errorf("generate token: %w", err)
 	}
@@ -719,7 +916,7 @@ func (s *AuthService) authResponse(user *models.User) (*dto.AuthResponse, error)
 		User:        dto.NewUserResponse(user),
 		AccessToken: accessToken,
 		TokenType:   "Bearer",
-		ExpiresIn:   int64(s.tokens.ExpiresIn().Seconds()),
+		ExpiresIn:   int64(ttl.Seconds()),
 	}, nil
 }
 

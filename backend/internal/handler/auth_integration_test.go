@@ -152,6 +152,11 @@ func newHarness(t *testing.T) *harness {
 		repository.NewUserRepository(db),
 		repository.NewVerificationRepository(db),
 		tokens, codes, codes, policy,
+		// The real settings service and the real attempt counter: these tests
+		// exercise the rules the marketplace actually runs under, including the
+		// ones an owner can change.
+		service.NewSettingsService(repository.NewSettingsRepository(db)),
+		repository.NewLoginAttemptRepository(db),
 	)
 	h := NewAuthHandler(authService, "http://localhost:5173")
 
@@ -1111,6 +1116,8 @@ func TestProviderRejectionIsReportedAsADeliveryFailure(t *testing.T) {
 		repository.NewUserRepository(h.db),
 		repository.NewVerificationRepository(h.db),
 		h.tokens, refusing, refusing, h.policy,
+		service.NewSettingsService(repository.NewSettingsRepository(h.db)),
+		repository.NewLoginAttemptRepository(h.db),
 	)
 
 	router := gin.New()

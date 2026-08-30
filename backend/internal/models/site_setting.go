@@ -28,16 +28,17 @@ const (
 
 // The cards the dashboard draws, in the order it draws them.
 const (
-	CategoryGeneral      = "general"
-	CategoryLocalization = "localization"
-	CategoryMaintenance  = "maintenance"
-	CategoryListings     = "listings"
-	CategoryModeration   = "moderation"
-	CategoryUsers        = "users"
-	CategoryChat         = "chat"
-	CategoryMedia        = "media"
-	CategorySecurity     = "security"
-	CategorySystem       = "system"
+	CategoryGeneral       = "general"
+	CategoryLocalization  = "localization"
+	CategoryMaintenance   = "maintenance"
+	CategoryListings      = "listings"
+	CategoryModeration    = "moderation"
+	CategoryUsers         = "users"
+	CategoryChat          = "chat"
+	CategoryMedia         = "media"
+	CategoryNotifications = "notifications"
+	CategorySecurity      = "security"
+	CategorySystem        = "system"
 )
 
 // SettingCategories is the display order. A category absent from this list is
@@ -45,7 +46,8 @@ const (
 var SettingCategories = []string{
 	CategoryGeneral, CategoryLocalization, CategoryMaintenance,
 	CategoryListings, CategoryModeration, CategoryUsers,
-	CategoryChat, CategoryMedia, CategorySecurity, CategorySystem,
+	CategoryChat, CategoryMedia, CategoryNotifications,
+	CategorySecurity, CategorySystem,
 }
 
 // SettingDef declares one setting.
@@ -71,9 +73,10 @@ type SettingDef struct {
 // a compile error instead of a silently missing setting.
 const (
 	SettingSiteName        = "site_name"
+	SettingSiteBrandName   = "site_brand_name"
 	SettingSiteDescription = "site_description"
-	SettingSiteLogoURL     = "site_logo_url"
-	SettingSiteFaviconURL  = "site_favicon_url"
+	SettingSupportEmail    = "support_email"
+	SettingSupportPhone    = "support_phone"
 
 	SettingDefaultLanguage = "default_language"
 	SettingDefaultCurrency = "default_currency"
@@ -84,6 +87,7 @@ const (
 	SettingMaintenanceMessage = "maintenance_message"
 
 	SettingListingModerationRequired     = "listing_moderation_required"
+	SettingListingMinImages              = "listing_min_images"
 	SettingListingMaxImages              = "listing_max_images"
 	SettingListingMaxTitleLength         = "listing_max_title_length"
 	SettingListingMaxDescriptionLength   = "listing_max_description_length"
@@ -92,6 +96,7 @@ const (
 	SettingListingOwnerCanEdit           = "listing_owner_can_edit"
 	SettingListingOwnerCanDelete         = "listing_owner_can_delete"
 	SettingListingRepublishAllowed       = "listing_republish_allowed"
+	SettingListingDraftsAllowed          = "listing_drafts_allowed"
 	SettingListingEditModerationRequired = "listing_edit_moderation_required"
 
 	SettingBlockReasonRequired = "block_reason_required"
@@ -104,31 +109,35 @@ const (
 	SettingUserProfileEditEnabled     = "user_profile_edit_enabled"
 	SettingBlockedContactReuseAllowed = "blocked_contact_reuse_allowed"
 
-	SettingChatEnabled          = "chat_enabled"
-	SettingUserMessagingEnabled = "user_messaging_enabled"
-	SettingContactOwnerEnabled  = "contact_owner_enabled"
-	SettingMessageMaxLength     = "message_max_length"
-	SettingMessageEditAllowed   = "message_edit_allowed"
-	SettingMessageDeleteAllowed = "message_delete_allowed"
+	SettingChatEnabled            = "chat_enabled"
+	SettingUserMessagingEnabled   = "user_messaging_enabled"
+	SettingContactOwnerEnabled    = "contact_owner_enabled"
+	SettingMessageMaxLength       = "message_max_length"
+	SettingMessageEditAllowed     = "message_edit_allowed"
+	SettingMessageEditWindow      = "message_edit_window_minutes"
+	SettingChatAttachmentsAllowed = "chat_attachments_allowed"
+	SettingMessageDeleteAllowed   = "message_delete_allowed"
 
-	SettingMediaMaxImageMB          = "media_max_image_mb"
-	SettingMediaAllowedImageFormats = "media_allowed_image_formats"
-	SettingMediaMaxAvatarMB         = "media_max_avatar_mb"
-	SettingMediaMaxListingImageMB   = "media_max_listing_image_mb"
-	SettingMediaImageCompression    = "media_image_compression"
-	SettingMediaUploadQuality       = "media_upload_quality"
+	SettingMediaMaxImageMB               = "media_max_image_mb"
+	SettingMediaMaxAvatarMB              = "media_max_avatar_mb"
+	SettingMediaMaxAttachmentMB          = "media_max_attachment_mb"
+	SettingMediaAllowedImageFormats      = "media_allowed_image_formats"
+	SettingMediaAllowedAttachmentFormats = "media_allowed_attachment_formats"
 
 	SettingJWTExpirationHours    = "jwt_expiration_hours"
 	SettingLoginMaxAttempts      = "login_max_attempts"
 	SettingLoginLockMinutes      = "login_lock_minutes"
 	SettingPasswordMinLength     = "password_min_length"
 	SettingPasswordRequireStrong = "password_require_strong"
-	SettingAllowMultipleSessions = "allow_multiple_sessions"
+	SettingOTPExpiryMinutes      = "otp_expiry_minutes"
+	SettingOTPResendCooldown     = "otp_resend_cooldown_seconds"
 
 	SettingTimezone              = "timezone"
 	SettingDefaultCountry        = "default_country"
 	SettingDefaultCity           = "default_city"
 	SettingPaginationDefaultSize = "pagination_default_size"
+
+	SettingNotifyNewMessage = "notify_new_message"
 )
 
 // Values the closed-set settings accept.
@@ -143,12 +152,14 @@ var SettingDefs = []SettingDef{
 	// General ---------------------------------------------------------------
 	{Key: SettingSiteName, Type: SettingString, Category: CategoryGeneral,
 		Default: "RentHouse", MaxLen: 60},
+	{Key: SettingSiteBrandName, Type: SettingString, Category: CategoryGeneral,
+		Default: "RentHouse", MaxLen: 30},
 	{Key: SettingSiteDescription, Type: SettingString, Category: CategoryGeneral,
 		Default: "Toshkent shahrida uy-joy ijarasi uchun platforma.", MaxLen: 300},
-	{Key: SettingSiteLogoURL, Type: SettingString, Category: CategoryGeneral,
-		Default: "", MaxLen: 2048},
-	{Key: SettingSiteFaviconURL, Type: SettingString, Category: CategoryGeneral,
-		Default: "", MaxLen: 2048},
+	{Key: SettingSupportEmail, Type: SettingString, Category: CategoryGeneral,
+		Default: "support@renthouse.uz", MaxLen: 255},
+	{Key: SettingSupportPhone, Type: SettingString, Category: CategoryGeneral,
+		Default: "+998 71 200 00 00", MaxLen: 40},
 
 	// Language and formats --------------------------------------------------
 	{Key: SettingDefaultLanguage, Type: SettingString, Category: CategoryLocalization,
@@ -169,6 +180,12 @@ var SettingDefs = []SettingDef{
 	// Listings --------------------------------------------------------------
 	{Key: SettingListingModerationRequired, Type: SettingBool, Category: CategoryListings,
 		Default: "false"},
+	{Key: SettingListingMinImages, Type: SettingInt, Category: CategoryListings,
+		// Zero, because that is how listings have always worked here: a
+		// listing could be published without a photograph. Every default in
+		// this registry is the behaviour that was already in place, so seeding
+		// changes nothing until an owner decides otherwise.
+		Default: "0", Min: 0, Max: 10},
 	{Key: SettingListingMaxImages, Type: SettingInt, Category: CategoryListings,
 		Default: "20", Min: 1, Max: 50},
 	{Key: SettingListingMaxTitleLength, Type: SettingInt, Category: CategoryListings,
@@ -184,6 +201,8 @@ var SettingDefs = []SettingDef{
 	{Key: SettingListingOwnerCanDelete, Type: SettingBool, Category: CategoryListings,
 		Default: "true"},
 	{Key: SettingListingRepublishAllowed, Type: SettingBool, Category: CategoryListings,
+		Default: "true"},
+	{Key: SettingListingDraftsAllowed, Type: SettingBool, Category: CategoryListings,
 		Default: "true"},
 
 	// Moderation ------------------------------------------------------------
@@ -219,22 +238,28 @@ var SettingDefs = []SettingDef{
 		Default: "4000", Min: 1, Max: 10000},
 	{Key: SettingMessageEditAllowed, Type: SettingBool, Category: CategoryChat,
 		Default: "true"},
+	{Key: SettingMessageEditWindow, Type: SettingInt, Category: CategoryChat,
+		// Minutes after sending during which a message may still be corrected.
+		// Zero means no window at all, which is what "no time limit" is not —
+		// so the floor is one minute and the ceiling a day.
+		Default: "15", Min: 1, Max: 1440},
+	{Key: SettingChatAttachmentsAllowed, Type: SettingBool, Category: CategoryChat,
+		Default: "true"},
 	{Key: SettingMessageDeleteAllowed, Type: SettingBool, Category: CategoryChat,
 		Default: "true"},
 
 	// Media -----------------------------------------------------------------
 	{Key: SettingMediaMaxImageMB, Type: SettingInt, Category: CategoryMedia,
 		Default: "5", Min: 1, Max: 25},
-	{Key: SettingMediaAllowedImageFormats, Type: SettingJSON, Category: CategoryMedia,
-		Default: `["jpg","png","webp"]`, Options: []string{"jpg", "png", "webp", "gif"}},
 	{Key: SettingMediaMaxAvatarMB, Type: SettingInt, Category: CategoryMedia,
 		Default: "2", Min: 1, Max: 10},
-	{Key: SettingMediaMaxListingImageMB, Type: SettingInt, Category: CategoryMedia,
-		Default: "5", Min: 1, Max: 25},
-	{Key: SettingMediaImageCompression, Type: SettingBool, Category: CategoryMedia,
-		Default: "false"},
-	{Key: SettingMediaUploadQuality, Type: SettingInt, Category: CategoryMedia,
-		Default: "82", Min: 40, Max: 100},
+	{Key: SettingMediaMaxAttachmentMB, Type: SettingInt, Category: CategoryMedia,
+		Default: "20", Min: 1, Max: 50},
+	{Key: SettingMediaAllowedImageFormats, Type: SettingJSON, Category: CategoryMedia,
+		Default: `["jpg","png","webp","gif"]`, Options: []string{"jpg", "png", "webp", "gif"}},
+	{Key: SettingMediaAllowedAttachmentFormats, Type: SettingJSON, Category: CategoryMedia,
+		Default: `["pdf","doc","docx","xls","xlsx","txt","zip"]`,
+		Options: []string{"pdf", "doc", "docx", "xls", "xlsx", "txt", "zip"}},
 
 	// Security --------------------------------------------------------------
 	{Key: SettingJWTExpirationHours, Type: SettingInt, Category: CategorySecurity,
@@ -249,8 +274,10 @@ var SettingDefs = []SettingDef{
 		Default: "8", Min: 6, Max: 72},
 	{Key: SettingPasswordRequireStrong, Type: SettingBool, Category: CategorySecurity,
 		Default: "false"},
-	{Key: SettingAllowMultipleSessions, Type: SettingBool, Category: CategorySecurity,
-		Default: "true"},
+	{Key: SettingOTPExpiryMinutes, Type: SettingInt, Category: CategorySecurity,
+		Default: "5", Min: 1, Max: 60},
+	{Key: SettingOTPResendCooldown, Type: SettingInt, Category: CategorySecurity,
+		Default: "60", Min: 15, Max: 600},
 
 	// System ----------------------------------------------------------------
 	{Key: SettingTimezone, Type: SettingString, Category: CategorySystem,
@@ -261,6 +288,16 @@ var SettingDefs = []SettingDef{
 		Default: "Tashkent", MaxLen: 60},
 	{Key: SettingPaginationDefaultSize, Type: SettingInt, Category: CategorySystem,
 		Default: "20", Options: []string{"10", "20", "50", "100"}},
+
+	// Notifications ---------------------------------------------------------
+	//
+	// One setting, because one kind of notification exists: the card the app
+	// raises when a message arrives. Notifications for new listings, for
+	// moderation and for complaints have nothing to generate them yet, and a
+	// switch for a notification that is never sent would say the marketplace
+	// is configured a way it is not.
+	{Key: SettingNotifyNewMessage, Type: SettingBool, Category: CategoryNotifications,
+		Default: "true"},
 }
 
 // SettingDefFor finds one declaration by key.

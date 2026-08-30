@@ -48,6 +48,23 @@ var (
 	// limit. The binding tag enforces the ceiling the schema can take; this
 	// enforces the number the owner actually chose.
 	ErrTooManyImages = errors.New("too many images for one listing")
+
+	// ErrTooFewImages is a listing published with fewer photographs than the
+	// marketplace asks for. Drafts are exempt: a draft is somewhere to put a
+	// listing that is not finished yet.
+	ErrTooFewImages = errors.New("not enough images for one listing")
+
+	// ErrTitleTooLong and ErrDescriptionTooLong are the configured lengths.
+	ErrTitleTooLong       = errors.New("title is longer than allowed")
+	ErrDescriptionTooLong = errors.New("description is longer than allowed")
+
+	// ErrDraftsDisabled, ErrEditingDisabled, ErrDeletionDisabled and
+	// ErrRepublishDisabled are actions the owner has switched off for the
+	// whole marketplace on the settings page.
+	ErrDraftsDisabled    = errors.New("drafts are switched off")
+	ErrEditingDisabled   = errors.New("editing a listing is switched off")
+	ErrDeletionDisabled  = errors.New("deleting a listing is switched off")
+	ErrRepublishDisabled = errors.New("republishing a listing is switched off")
 )
 
 // ApartmentService holds the listing rules: who may change what, which fields a
@@ -72,23 +89,53 @@ func NewApartmentService(
 // not in the handler for the usual reason: every path that writes a listing
 // goes through this, so there is no route that can be added later and forget.
 func (s *ApartmentService) applySettings(
-	ctx context.Context, req dto.ApartmentWriteRequest,
+	ctx context.Context, req dto.ApartmentWriteRequest, editing bool,
 ) (string, error) {
 	settings, err := s.settings.Get(ctx)
 	if err != nil {
 		return "", err
 	}
 
+	if len([]rune(req.Title)) > settings.ListingMaxTitleLength {
+		return "", fmt.Errorf("%w: %d characters allowed",
+			ErrTitleTooLong, settings.ListingMaxTitleLength)
+	}
+	if len([]rune(req.Description)) > settings.ListingMaxDescriptionLength {
+		return "", fmt.Errorf("%w: %d characters allowed",
+			ErrDescriptionTooLong, settings.ListingMaxDescriptionLength)
+	}
 	if len(req.Images) > settings.ListingMaxImages {
 		return "", fmt.Errorf("%w: %d allowed", ErrTooManyImages, settings.ListingMaxImages)
 	}
 
-	// A draft is nobody's business but its owner's, so moderation has nothing
-	// to say about it. Only the act of publishing is held back.
-	if req.Publish && settings.ListingModerationRequired {
+	if !req.Publish {
+		// A draft is a listing that is not finished. Switching drafts off means
+		// a listing is written to be published or not written at all.
+		if !settings.ListingDraftsAllowed {
+			return "", ErrDraftsDisabled
+		}
+		return models.ApartmentStatusDraft, nil
+	}
+
+	// Published listings must carry enough photographs to be worth looking at.
+	// Checked only on publication, so a draft can be saved half-finished.
+	if len(req.Images) < settings.ListingMinImages {
+		return "", fmt.Errorf("%w: %d needed", ErrTooFewImages, settings.ListingMinImages)
+	}
+
+	// Moderation. On creation the switch is the listings one; on an edit it is
+	// the moderation section's own, because re-checking every edit is a
+	// separate decision from checking every new listing.
+	if editing {
+		if settings.ListingModerationRequired && settings.ListingEditModerationRequired {
+			return models.ApartmentStatusPending, nil
+		}
+		return models.ApartmentStatusActive, nil
+	}
+	if settings.ListingModerationRequired {
 		return models.ApartmentStatusPending, nil
 	}
-	return statusFor(req.Publish), nil
+	return models.ApartmentStatusActive, nil
 }
 
 // Create publishes or drafts a new listing owned by `ownerID`.
@@ -105,7 +152,7 @@ func (s *ApartmentService) Create(
 	}
 
 	apartment.OwnerID = ownerID
-	apartment.Status, err = s.applySettings(ctx, req)
+	apartment.Status, err = s.applySettings(ctx, req, false)
 	if err != nil {
 		return nil, err
 	}
@@ -212,13 +259,18 @@ func (s *ApartmentService) Update(
 	if err := s.assertOwner(ctx, id, actorID); err != nil {
 		return nil, err
 	}
+	if err := s.assertAllowed(ctx, func(current *Settings) bool {
+		return current.ListingOwnerCanEdit
+	}, ErrEditingDisabled); err != nil {
+		return nil, err
+	}
 
 	apartment, amenityIDs, err := s.build(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	status, err := s.applySettings(ctx, req)
+	status, err := s.applySettings(ctx, req, true)
 	if err != nil {
 		return nil, err
 	}
@@ -290,6 +342,21 @@ func (s *ApartmentService) ChangeStatus(
 		return nil, ErrInvalidStatusChange
 	}
 
+	// Bringing a closed or drafted listing back into public view is publishing
+	// it again, and the owner of the marketplace can switch that off.
+	if target == models.ApartmentStatusActive {
+		if err := s.assertAllowed(ctx, func(settings *Settings) bool {
+			return settings.ListingRepublishAllowed
+		}, ErrRepublishDisabled); err != nil {
+			return nil, err
+		}
+		// And it goes back through moderation if the marketplace asks for it,
+		// rather than straight to the public.
+		if settings, err := s.settings.Get(ctx); err == nil && settings.ListingModerationRequired {
+			target = models.ApartmentStatusPending
+		}
+	}
+
 	fields := map[string]any{"status": target}
 	if target == models.ApartmentStatusActive {
 		// Re-published: it needs a date, and keeping the original would date a
@@ -354,6 +421,11 @@ func allowedTransition(from, to string) bool {
 // to everybody else.
 func (s *ApartmentService) Delete(ctx context.Context, id uuid.UUID, actorID uuid.UUID) error {
 	if err := s.assertOwner(ctx, id, actorID); err != nil {
+		return err
+	}
+	if err := s.assertAllowed(ctx, func(current *Settings) bool {
+		return current.ListingOwnerCanDelete
+	}, ErrDeletionDisabled); err != nil {
 		return err
 	}
 
@@ -608,6 +680,23 @@ func (s *ApartmentService) get(
 	}
 	response := dto.NewApartmentResponse(apartment, includeOwnerContact)
 	return &response, nil
+}
+
+// assertAllowed refuses an action the marketplace has switched off.
+//
+// A failed read allows the action: the settings are how the owner narrows what
+// the marketplace does, and a database hiccup should not narrow it further.
+func (s *ApartmentService) assertAllowed(
+	ctx context.Context, allowed func(*Settings) bool, refusal error,
+) error {
+	settings, err := s.settings.Get(ctx)
+	if err != nil {
+		return nil
+	}
+	if !allowed(settings) {
+		return refusal
+	}
+	return nil
 }
 
 // utilitiesOr fills in the marketplace's default for an owner who did not say.

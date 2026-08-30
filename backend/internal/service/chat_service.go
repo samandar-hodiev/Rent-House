@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -64,6 +65,22 @@ var (
 	// ErrAttachmentNotEditable is an edit aimed at a message whose content is a
 	// file rather than words.
 	ErrAttachmentNotEditable = errors.New("an attachment message cannot be edited")
+
+	// Actions the owner of the marketplace has switched off for everybody on
+	// the settings page. Separate errors rather than one, so the client can say
+	// which thing is unavailable instead of "chat is off" for all of them.
+	ErrChatDisabled        = errors.New("chat is switched off")
+	ErrMessagingDisabled   = errors.New("messaging between users is switched off")
+	ErrContactOwnerOff     = errors.New("contacting a listing owner is switched off")
+	ErrEditingDisabledChat = errors.New("editing a message is switched off")
+	ErrDeletingDisabled    = errors.New("deleting a message is switched off")
+	ErrAttachmentsDisabled = errors.New("attachments are switched off")
+
+	// ErrMessageTooLong is a message past the configured length.
+	ErrMessageTooLong = errors.New("message is longer than allowed")
+
+	// ErrEditWindowPassed is a correction attempted too long after sending.
+	ErrEditWindowPassed = errors.New("the time to edit this message has passed")
 )
 
 // Attachment is a file on its way into a message, as the handler hands it over.
@@ -95,7 +112,11 @@ type ChatService struct {
 	// attachmentURL builds the protected download URL for an attachment id.
 	// Injected so the service does not need to know the server's own address.
 	attachmentURL func(id uuid.UUID) string
-	now           func() time.Time
+	// How the marketplace is configured: whether chat is open at all, how long
+	// a message may be, whether it may be edited or withdrawn. Read per
+	// request, so switching chat off takes effect on the next message.
+	settings *SettingsService
+	now      func() time.Time
 }
 
 func NewChatService(
@@ -106,11 +127,22 @@ func NewChatService(
 	hub *realtime.Hub,
 	files storage.Storage,
 	attachmentURL func(id uuid.UUID) string,
+	settings *SettingsService,
 ) *ChatService {
 	return &ChatService{
 		chat: chat, apartments: apartments, users: users, blocks: blocks,
-		hub: hub, files: files, attachmentURL: attachmentURL, now: time.Now,
+		hub: hub, files: files, attachmentURL: attachmentURL,
+		settings: settings, now: time.Now,
 	}
+}
+
+// site is the configuration in force, or the declared defaults when it cannot
+// be read — a database hiccup must not close the chat.
+func (s *ChatService) site(ctx context.Context) *Settings {
+	if s.settings == nil {
+		return Defaults()
+	}
+	return s.settings.MustGet(ctx)
 }
 
 // SetClock replaces the service's clock. Tests only.
@@ -129,6 +161,16 @@ func (s *ChatService) SetClock(now func() time.Time) { s.now = now }
 func (s *ChatService) StartConversation(
 	ctx context.Context, actorID, apartmentID uuid.UUID,
 ) (*dto.ConversationResponse, error) {
+	site := s.site(ctx)
+	if !site.ChatEnabled {
+		return nil, ErrChatDisabled
+	}
+	// Opening a thread about a listing is the "contact the owner" action, which
+	// the marketplace can close without closing chat itself.
+	if !site.ContactOwnerEnabled {
+		return nil, ErrContactOwnerOff
+	}
+
 	apartment, err := s.apartments.FindByID(ctx, apartmentID)
 	if err != nil {
 		if errors.Is(err, repository.ErrApartmentNotFound) {
@@ -307,6 +349,16 @@ func (s *ChatService) SendMessage(
 	ctx context.Context, conversationID, actorID uuid.UUID, body string,
 	attachment *Attachment, apartmentID *uuid.UUID, replyTo *uuid.UUID,
 ) (*dto.MessageResponse, error) {
+	site := s.site(ctx)
+	switch {
+	case !site.ChatEnabled:
+		return nil, ErrChatDisabled
+	case !site.UserMessagingEnabled:
+		return nil, ErrMessagingDisabled
+	case attachment != nil && (!site.ChatAttachmentsAllowed):
+		return nil, ErrAttachmentsDisabled
+	}
+
 	if err := s.assertParticipant(ctx, conversationID, actorID); err != nil {
 		return nil, err
 	}
@@ -326,6 +378,12 @@ func (s *ChatService) SendMessage(
 	body = strings.TrimSpace(body)
 	if body == "" && attachment == nil {
 		return nil, ErrEmptyMessage
+	}
+	// Counted in characters rather than bytes: a limit that lets through fewer
+	// Cyrillic letters than Latin ones would be a rule nobody could predict.
+	if len([]rune(body)) > site.MessageMaxLength {
+		return nil, fmt.Errorf("%w: %d characters allowed",
+			ErrMessageTooLong, site.MessageMaxLength)
 	}
 
 	// The listing this message is about, if the sender was looking at one. It
@@ -410,6 +468,36 @@ func (s *ChatService) SendMessage(
 }
 
 // storeAttachment writes an upload to storage and builds its row.
+// AttachmentKinds is what the client may send right now: the built-in
+// categories narrowed by the configured sizes and formats. The limits endpoint
+// reads its answer from here, so the file picker and the server cannot
+// disagree about what is acceptable.
+func (s *ChatService) AttachmentKinds(ctx context.Context) map[string]storage.Kind {
+	out := make(map[string]storage.Kind, len(storage.Kinds))
+	for name, kind := range storage.Kinds {
+		out[name] = s.attachmentKind(ctx, kind)
+	}
+	return out
+}
+
+// attachmentKind applies the configured limits to one category.
+func (s *ChatService) attachmentKind(ctx context.Context, kind storage.Kind) storage.Kind {
+	site := s.site(ctx)
+	const megabyte = 1 << 20
+
+	switch kind.Name {
+	case storage.KindImage:
+		return kind.Restrict(int64(site.MediaMaxImageMB)*megabyte, site.MediaAllowedImageFormats)
+	case storage.KindFile:
+		return kind.Restrict(
+			int64(site.MediaMaxAttachmentMB)*megabyte, site.MediaAllowedAttachmentFormats)
+	default:
+		// Voice notes have no format setting — the browser decides what it
+		// records — but they are still bounded by the attachment size.
+		return kind.Restrict(int64(site.MediaMaxAttachmentMB)*megabyte, nil)
+	}
+}
+
 func (s *ChatService) storeAttachment(
 	ctx context.Context, attachment *Attachment,
 ) (*models.MessageAttachment, error) {
@@ -417,6 +505,10 @@ func (s *ChatService) storeAttachment(
 	if !ok {
 		return nil, ErrUnsupportedAttachment
 	}
+	// Narrowed to what the marketplace currently allows before a byte is
+	// written, so the limit is enforced by the thing doing the storing rather
+	// than checked somewhere and hoped for here.
+	kind = s.attachmentKind(ctx, kind)
 
 	saved, err := s.files.SaveKind(ctx, kind, attachment.ContentType, attachment.Reader)
 	if err != nil {
@@ -479,12 +571,26 @@ func (s *ChatService) OpenAttachment(
 func (s *ChatService) EditMessage(
 	ctx context.Context, messageID, actorID uuid.UUID, body string,
 ) (*dto.MessageResponse, error) {
+	site := s.site(ctx)
+	if !site.MessageEditAllowed {
+		return nil, ErrEditingDisabledChat
+	}
+
 	message, err := s.authorizeMessage(ctx, messageID, actorID, true)
 	if err != nil {
 		return nil, err
 	}
 	if message.DeletedAt != nil {
 		return nil, ErrMessageDeleted
+	}
+	// A correction is for what was just said. Past the window the other person
+	// has read it and probably answered, and rewriting it then changes the
+	// record of a conversation rather than fixing a typo.
+	if window := time.Duration(site.MessageEditWindow) * time.Minute; window > 0 {
+		if s.now().UTC().Sub(message.CreatedAt.UTC()) > window {
+			return nil, fmt.Errorf("%w: %d minute(s)",
+				ErrEditWindowPassed, site.MessageEditWindow)
+		}
 	}
 	// An attachment is immutable: editing the caption of a photograph would
 	// leave the two people looking at different things, and swapping the file
@@ -495,6 +601,10 @@ func (s *ChatService) EditMessage(
 	}
 	if strings.TrimSpace(body) == "" {
 		return nil, ErrEmptyMessage
+	}
+	if len([]rune(body)) > site.MessageMaxLength {
+		return nil, fmt.Errorf("%w: %d characters allowed",
+			ErrMessageTooLong, site.MessageMaxLength)
 	}
 
 	editedAt := s.now().UTC()
@@ -519,6 +629,13 @@ func (s *ChatService) DeleteMessage(
 	ctx context.Context, messageID, actorID uuid.UUID, scope string,
 ) (*dto.MessageResponse, error) {
 	authorOnly := scope == dto.DeleteScopeEveryone
+	// Only withdrawal is governed: hiding a message from your own view changes
+	// nothing for anybody else, and a marketplace that forbade it would be
+	// dictating what its users may keep on their own screen.
+	if authorOnly && !s.site(ctx).MessageDeleteAllowed {
+		return nil, ErrDeletingDisabled
+	}
+
 	message, err := s.authorizeMessage(ctx, messageID, actorID, authorOnly)
 	if err != nil {
 		return nil, err
@@ -559,6 +676,12 @@ func (s *ChatService) DeleteMessages(
 ) (*dto.DeleteMessagesResponse, error) {
 	if len(ids) == 0 {
 		return &dto.DeleteMessagesResponse{Deleted: []dto.MessageResponse{}}, nil
+	}
+	// The same rule as the single-message path: withdrawing from both sides is
+	// what the marketplace can switch off, and a bulk endpoint must not be the
+	// way around it.
+	if scope == dto.DeleteScopeEveryone && !s.site(ctx).MessageDeleteAllowed {
+		return nil, ErrDeletingDisabled
 	}
 
 	// Duplicates in the selection would otherwise be counted twice.

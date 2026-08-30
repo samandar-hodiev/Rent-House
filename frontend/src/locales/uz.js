@@ -1,4 +1,8 @@
 export default {
+  "maintenance.title": "Texnik ishlar olib borilmoqda",
+  "maintenance.body": "Hozirda saytimizda texnik ishlar olib borilmoqda. Iltimos, birozdan so‘ng qayta urinib ko‘ring.",
+  "maintenance.retry": "Qayta urinish",
+  "maintenance.support": "Savollar bo‘lsa:",
   'brand.name': 'RentHouse',
 
   'header.mapNav': 'Xaritada qidirish',

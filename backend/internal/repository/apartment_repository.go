@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -330,6 +331,28 @@ func (r *ApartmentRepository) CountByOwner(
 		return 0, fmt.Errorf("count apartments: %w", err)
 	}
 	return count, nil
+}
+
+// CloseExpired closes every active listing published before `cutoff`.
+//
+// Only active listings: a draft was never published, and a listing already
+// closed has nothing to expire. published_at is cleared alongside the status,
+// which ck_apartments_published_at requires of anything that is not active —
+// and it is also why the owner sees "closed" rather than a listing that claims
+// to have been live since a date it no longer is.
+func (r *ApartmentRepository) CloseExpired(ctx context.Context, cutoff time.Time) (int64, error) {
+	result := r.db.WithContext(ctx).
+		Model(&models.Apartment{}).
+		Where("status = ? AND published_at IS NOT NULL AND published_at < ?",
+			models.ApartmentStatusActive, cutoff).
+		Updates(map[string]any{
+			"status":       models.ApartmentStatusClosed,
+			"published_at": nil,
+		})
+	if result.Error != nil {
+		return 0, fmt.Errorf("close expired listings: %w", result.Error)
+	}
+	return result.RowsAffected, nil
 }
 
 // applyPublishedAt keeps published_at in step with status, which the schema

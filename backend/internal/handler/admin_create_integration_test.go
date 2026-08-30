@@ -15,6 +15,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -75,7 +76,7 @@ func newAdminHarness(t *testing.T) *adminHarness {
 
 	handler := NewAdminHandler(
 		admins,
-		service.NewAdminStatsService(repository.NewAdminStatsRepository(tx)),
+		service.NewAdminStatsService(repository.NewAdminStatsRepository(tx), settings),
 		service.NewAdminListingService(
 			repository.NewAdminListingRepository(tx), repository.NewApartmentRepository(tx),
 		),
@@ -105,6 +106,85 @@ func newAdminHarness(t *testing.T) *adminHarness {
 		tx: tx, router: router, tokens: tokens,
 		admins: admins, settings: settings, owner: &found,
 	}
+}
+
+// publicRouter builds the marketplace's own API with the same middleware
+// cmd/server puts in front of it — including the maintenance check, which is
+// what several of these tests are about.
+func (h *adminHarness) publicRouter(t *testing.T) *gin.Engine {
+	t.Helper()
+
+	apartments := repository.NewApartmentRepository(h.tx)
+	analytics, err := service.NewAnalyticsService(
+		repository.NewAnalyticsRepository(h.tx), apartments, integrationSecret)
+	if err != nil {
+		t.Fatalf("analytics: %v", err)
+	}
+
+	authService := service.NewAuthService(
+		repository.NewUserRepository(h.tx),
+		repository.NewVerificationRepository(h.tx),
+		h.tokens, silentSender{}, silentSender{}, testPolicy(),
+		h.settings, repository.NewLoginAttemptRepository(h.tx),
+	)
+	apartmentHandler := NewApartmentHandler(
+		service.NewApartmentService(apartments, h.settings), analytics)
+	authHandler := NewAuthHandler(authService, "http://localhost:5173")
+
+	router := gin.New()
+	v1 := router.Group("/api/v1", middleware.Maintenance(h.settings))
+	v1.GET("/settings", NewSettingsHandler(h.settings).Public)
+	v1.GET("/apartments", apartmentHandler.List)
+	v1.POST("/auth/register/request", authHandler.RequestRegistrationCode)
+	return router
+}
+
+// silentSender stands in for the SMS and email providers: these tests never
+// read a code, and a real provider would be a network call.
+type silentSender struct{}
+
+func (silentSender) Send(context.Context, string, string) error { return nil }
+
+// configureSettings writes settings the way the dashboard does.
+func configureSettings(t *testing.T, h *adminHarness, patch map[string]any) {
+	t.Helper()
+	if _, err := h.settings.Update(t.Context(), patch, &h.owner.ID); err != nil {
+		t.Fatalf("configure %v: %v", patch, err)
+	}
+}
+
+// doPublic and doPublicJSON send one request to the marketplace API.
+func doPublic(t *testing.T, router *gin.Engine, method, path string) (int, map[string]any) {
+	t.Helper()
+	return doPublicJSON(t, router, method, path, nil)
+}
+
+func doPublicJSON(
+	t *testing.T, router *gin.Engine, method, path string, body any,
+) (int, map[string]any) {
+	t.Helper()
+
+	var reader *bytes.Reader
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("encode body: %v", err)
+		}
+		reader = bytes.NewReader(encoded)
+	} else {
+		reader = bytes.NewReader(nil)
+	}
+
+	req := httptest.NewRequest(method, path, reader)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	var decoded map[string]any
+	if rec.Body.Len() > 0 {
+		_ = json.Unmarshal(rec.Body.Bytes(), &decoded)
+	}
+	return rec.Code, decoded
 }
 
 // tokenFor signs an admin-scoped token, which is what the middleware validates.

@@ -277,6 +277,26 @@ func (h *ApartmentHandler) writeError(c *gin.Context, err error, operation strin
 		// The message carries the configured limit, so the form can tell the
 		// owner the number rather than that there was one.
 		response.Error(c, http.StatusBadRequest, "too_many_images", err.Error())
+	case errors.Is(err, service.ErrTooFewImages):
+		response.Error(c, http.StatusBadRequest, "too_few_images", err.Error())
+	case errors.Is(err, service.ErrTitleTooLong):
+		response.Error(c, http.StatusBadRequest, "title_too_long", err.Error())
+	case errors.Is(err, service.ErrDescriptionTooLong):
+		response.Error(c, http.StatusBadRequest, "description_too_long", err.Error())
+	// Switched off for the whole marketplace rather than refused for this
+	// caller: 403 with a code the form can turn into an explanation.
+	case errors.Is(err, service.ErrDraftsDisabled):
+		response.Error(c, http.StatusForbidden, "drafts_disabled",
+			"Saving a listing as a draft is switched off")
+	case errors.Is(err, service.ErrEditingDisabled):
+		response.Error(c, http.StatusForbidden, "editing_disabled",
+			"Editing a listing is switched off")
+	case errors.Is(err, service.ErrDeletionDisabled):
+		response.Error(c, http.StatusForbidden, "deletion_disabled",
+			"Deleting a listing is switched off")
+	case errors.Is(err, service.ErrRepublishDisabled):
+		response.Error(c, http.StatusForbidden, "republish_disabled",
+			"Republishing a listing is switched off")
 	default:
 		logger.Errorf("%s: %v", operation, err)
 		response.Error(c, http.StatusInternalServerError, "internal_error", "Something went wrong")

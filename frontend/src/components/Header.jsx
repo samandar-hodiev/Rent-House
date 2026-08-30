@@ -3,6 +3,7 @@ import { Link, NavLink } from 'react-router-dom'
 import { Map } from 'lucide-react'
 import { ROUTES } from '../routes/paths'
 import { useLocale } from '../context/LocaleContext'
+import { useSiteSettings } from '../context/SiteSettingsContext'
 import { useAuth } from '../context/AuthContext'
 import { useDismiss } from '../hooks/useDismiss'
 import {
@@ -45,6 +46,10 @@ function CloseIcon() {
 
 function Header() {
   const { t } = useLocale()
+  // The marketplace's own name, as its owner set it — never a string
+  // written into the interface.
+  const { settings } = useSiteSettings()
+  const brand = settings.site_brand_name || settings.site_name
   const { isAuthenticated } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuRef = useRef(null)
@@ -64,7 +69,7 @@ function Header() {
             to={ROUTES.home}
             className="shrink-0 text-lg font-semibold tracking-tight text-text-primary"
           >
-            {t('brand.name')}
+            {brand}
           </Link>
 
           <SearchBar />
@@ -106,7 +111,7 @@ function Header() {
               to={ROUTES.home}
               className="shrink-0 text-lg font-semibold tracking-tight text-text-primary"
             >
-              {t('brand.name')}
+              {brand}
             </Link>
 
             {/* The same components the wide header uses, in the same order —
@@ -150,7 +155,7 @@ function Header() {
               to={ROUTES.home}
               className="shrink-0 text-lg font-semibold tracking-tight text-text-primary"
             >
-              {t('brand.name')}
+              {brand}
             </Link>
 
             <div className="flex shrink-0 items-center gap-1">

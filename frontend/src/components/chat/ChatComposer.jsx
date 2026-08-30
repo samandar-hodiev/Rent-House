@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CornerUpLeft, Loader2, Mic, Paperclip, Send, Square, X } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
+import { useSiteSettings } from '../../context/SiteSettingsContext'
 import { canRecord, useVoiceRecorder } from '../../hooks/useVoiceRecorder'
 import { formatBytes, formatDuration } from './MessageAttachment'
 import MessageQuote from './MessageQuote'
@@ -33,6 +34,10 @@ function ChatComposer({
   onDraftChange,
 }) {
   const { t } = useLocale()
+  // What the marketplace currently allows. The server refuses a message
+  // past the limit and an attachment while they are switched off; this is
+  // so the composer stops offering what would be refused.
+  const { settings } = useSiteSettings()
   const recorder = useVoiceRecorder()
 
   // Seeded from the stored draft and reset whenever the thread changes, so
@@ -278,6 +283,7 @@ function ChatComposer({
           }}
         />
 
+        {settings.chat_attachments_allowed ? (
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
@@ -288,10 +294,12 @@ function ChatComposer({
         >
           <Paperclip aria-hidden="true" size={18} />
         </button>
+        ) : null}
 
         <input
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
+          maxLength={settings.message_max_length}
           placeholder={t('chat.placeholder')}
           aria-label={t('chat.placeholder')}
           className="h-10 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"

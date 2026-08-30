@@ -14,6 +14,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -79,8 +80,18 @@ func newListingHarness(t *testing.T) *listingHarness {
 	me.DELETE("/favorites/:apartmentId", favoriteHandler.Unsave)
 	me.GET("/dashboard/summary", favoriteHandler.Summary)
 
-	// Each test starts from a known table. Listings are the subject here, so
-	// leftovers from a previous run would make counts meaningless.
+	// These tests assert totals across the whole table — "one listing matches
+	// this search" — which is only true of a table they emptied first.
+	//
+	// Emptying it is destructive, and TEST_DATABASE_DSN is as easily pointed at
+	// a development database as at a throwaway one. Nothing warns you either
+	// way: the suite passes, and the listings are gone. So the wipe happens
+	// only when whoever is running the suite has said the database is
+	// disposable, and these tests skip otherwise.
+	if os.Getenv("RENTHOUSE_TEST_DESTRUCTIVE") != "1" {
+		t.Skip("listing tests empty the apartments table; " +
+			"set RENTHOUSE_TEST_DESTRUCTIVE=1 to run them against a disposable database")
+	}
 	if err := h.db.Exec("DELETE FROM apartments").Error; err != nil {
 		t.Fatalf("clear apartments: %v", err)
 	}

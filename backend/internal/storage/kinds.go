@@ -109,6 +109,48 @@ var Kinds = map[string]Kind{
 	},
 }
 
+// Restrict narrows a category to what the marketplace currently allows.
+//
+// A copy, never a mutation of the shared Kind: the package-level allow-list is
+// the widest the system will ever accept — what the schema and the browser can
+// safely handle — and a setting can only make it narrower. Storage stays a sink
+// that knows nothing about configuration; the caller decides the policy and
+// hands the narrowed category in.
+//
+// `formats` are extension tokens without the dot ("jpg", "pdf"). An empty list
+// leaves the types alone, so a misconfigured setting cannot make uploading
+// impossible. `maxBytes` of zero leaves the ceiling alone, and a value above
+// the built-in ceiling is ignored for the same reason.
+func (k Kind) Restrict(maxBytes int64, formats []string) Kind {
+	narrowed := k
+	if maxBytes > 0 && maxBytes < k.MaxBytes {
+		narrowed.MaxBytes = maxBytes
+	}
+	if len(formats) == 0 {
+		return narrowed
+	}
+
+	allowed := make(map[string]bool, len(formats))
+	for _, format := range formats {
+		allowed["."+strings.ToLower(strings.TrimPrefix(strings.TrimSpace(format), "."))] = true
+	}
+
+	filtered := make(map[string]string, len(k.extensions))
+	for mime, extension := range k.extensions {
+		if allowed[extension] {
+			filtered[mime] = extension
+		}
+	}
+	if len(filtered) == 0 {
+		// Every type filtered out means the setting names formats this build
+		// does not support. Refusing everything would be worse than ignoring a
+		// setting that cannot be satisfied.
+		return narrowed
+	}
+	narrowed.extensions = filtered
+	return narrowed
+}
+
 // KindFor returns the category by name.
 func KindFor(name string) (Kind, bool) {
 	kind, ok := Kinds[strings.ToLower(strings.TrimSpace(name))]

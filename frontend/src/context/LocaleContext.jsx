@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import uz from '../locales/uz'
 import ru from '../locales/ru'
 import en from '../locales/en'
 import { DEFAULT_LOCALE } from '../locales/languages'
+import { useSiteSettings } from './SiteSettingsContext'
 
 const TRANSLATIONS = { uz, ru, en }
 const STORAGE_KEY = 'renthouse_locale'
@@ -17,13 +18,24 @@ function interpolate(template, params) {
 }
 
 function readStoredLocale() {
-  if (typeof window === 'undefined') return DEFAULT_LOCALE
+  if (typeof window === 'undefined') return null
   const stored = window.localStorage.getItem(STORAGE_KEY)
-  return stored && TRANSLATIONS[stored] ? stored : DEFAULT_LOCALE
+  return stored && TRANSLATIONS[stored] ? stored : null
 }
 
 export function LocaleProvider({ children }) {
-  const [locale, setLocaleState] = useState(readStoredLocale)
+  // Null until somebody chooses: the site's own default then applies, and a
+  // visitor who has chosen keeps their choice.
+  const [chosen, setLocaleState] = useState(readStoredLocale)
+  const { settings } = useSiteSettings()
+
+  // The owner sets which language the site opens in. It is applied only where
+  // nobody has expressed a preference — changing a system default must never
+  // reach in and change what a person already decided for themselves.
+  const siteDefault = TRANSLATIONS[settings.default_language]
+    ? settings.default_language
+    : DEFAULT_LOCALE
+  const locale = chosen ?? siteDefault
 
   const setLocale = useCallback((nextLocale) => {
     if (!TRANSLATIONS[nextLocale]) return
@@ -39,6 +51,12 @@ export function LocaleProvider({ children }) {
     },
     [locale],
   )
+
+  // The document says which language it is written in, for screen readers and
+  // for hyphenation.
+  useEffect(() => {
+    document.documentElement.setAttribute('lang', locale)
+  }, [locale])
 
   const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t])
 

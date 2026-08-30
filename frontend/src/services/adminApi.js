@@ -137,7 +137,7 @@ export async function fetchRoles({ token, signal } = {}) {
  */
 export async function fetchSiteSettings({ token, signal } = {}) {
   const data = await request('/admin/settings', { token, signal })
-  return data?.settings ?? {}
+  return { settings: data?.settings ?? {}, updatedAt: data?.updated_at ?? null }
 }
 
 // Only the keys that changed. The page saves one section at a time, and sending
@@ -150,7 +150,7 @@ export async function saveSiteSettings(patch, { token, signal } = {}) {
     token,
     signal,
   })
-  return data?.settings ?? {}
+  return { settings: data?.settings ?? {}, updatedAt: data?.updated_at ?? null }
 }
 
 /**

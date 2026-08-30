@@ -14,6 +14,7 @@ import (
 	"github.com/samandar-hodiev/Rent-House/backend/internal/models"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/repository"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/token"
+	"github.com/samandar-hodiev/Rent-House/backend/pkg/logger"
 )
 
 // What a caller can act on. Everything else is an internal error.
@@ -365,10 +366,18 @@ const minBlockReasonLength = 3
 func (s *AdminService) SetUserStatus(
 	ctx context.Context, actor *models.Admin, id uuid.UUID, status, reason string,
 ) error {
+	site := Defaults()
+	if s.settings != nil {
+		site = s.settings.MustGet(ctx)
+	}
+
 	switch status {
 	case models.UserStatusBlocked:
 		trimmed := strings.TrimSpace(reason)
-		if len(trimmed) < minBlockReasonLength {
+		// Whether a reason is compulsory is the owner's to decide. When it is
+		// not, a reason given anyway is still recorded — the history is the
+		// point, and an optional field is not a discarded one.
+		if site.BlockReasonRequired && len(trimmed) < minBlockReasonLength {
 			return ErrBlockReasonRequired
 		}
 		if err := s.admins.BlockUser(ctx, id, actor.ID, trimmed); err != nil {
@@ -376,6 +385,23 @@ func (s *AdminService) SetUserStatus(
 				return ErrAdminNotFound
 			}
 			return err
+		}
+
+		// What happens to what they had published. Blocking an account stops
+		// its owner signing in; whether their listings stay in front of the
+		// public is a separate decision, and this is where the owner's answer
+		// is applied.
+		switch site.BlockListingsAction {
+		case models.BlockListingsClose:
+			if err := s.admins.SetOwnerListingsStatus(
+				ctx, id, models.ApartmentStatusClosed); err != nil {
+				logger.Errorf("close listings of blocked user: %v", err)
+			}
+		case models.BlockListingsModerate:
+			if err := s.admins.SetOwnerListingsStatus(
+				ctx, id, models.ApartmentStatusPending); err != nil {
+				logger.Errorf("send listings of blocked user to moderation: %v", err)
+			}
 		}
 		return nil
 
@@ -429,7 +455,12 @@ func (s *AdminService) AuditLogs(ctx context.Context, page, limit int) (*AuditPa
 	}
 	switch {
 	case limit < 1:
-		limit = 20
+		// The page size the owner chose, so every table in the dashboard opens
+		// the same way.
+		limit = Defaults().PaginationDefaultSize
+		if s.settings != nil {
+			limit = s.settings.MustGet(ctx).PaginationDefaultSize
+		}
 	case limit > maxUserPageSize:
 		limit = maxUserPageSize
 	}

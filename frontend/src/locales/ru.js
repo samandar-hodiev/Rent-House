@@ -1,4 +1,8 @@
 export default {
+  "maintenance.title": "Ведутся технические работы",
+  "maintenance.body": "Сейчас на сайте ведутся технические работы. Пожалуйста, попробуйте позже.",
+  "maintenance.retry": "Повторить",
+  "maintenance.support": "Вопросы:",
   'brand.name': 'RentHouse',
 
   'header.mapNav': 'Поиск на карте',

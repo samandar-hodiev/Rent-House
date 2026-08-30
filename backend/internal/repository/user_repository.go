@@ -107,6 +107,27 @@ func (r *UserRepository) ExistsByContact(ctx context.Context, method, contact st
 	return count > 0, nil
 }
 
+// ContactIsBlocked reports whether the account holding this contact has been
+// blocked by an administrator.
+//
+// Asked only when the marketplace refuses to let a blocked account's contact be
+// used again: the answer distinguishes "taken" from "blocked", which is worth
+// telling somebody only when it changes what they can do about it.
+func (r *UserRepository) ContactIsBlocked(ctx context.Context, method, contact string) (bool, error) {
+	column := "phone"
+	if method == models.VerificationMethodEmail {
+		column = "email"
+	}
+
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&models.User{}).
+		Where(column+" = ? AND status = ?", contact, models.UserStatusBlocked).
+		Count(&count).Error; err != nil {
+		return false, fmt.Errorf("check blocked contact: %w", err)
+	}
+	return count > 0, nil
+}
+
 // FindByIdentifier loads a user by email or phone.
 //
 // Which column to search is decided by the shape of the value, so a login form

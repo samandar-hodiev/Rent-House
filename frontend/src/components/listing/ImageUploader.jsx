@@ -3,6 +3,7 @@ import { ImagePlus, Loader2, Star, Trash2, TriangleAlert } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useLocale } from '../../context/LocaleContext'
 import { MAX_IMAGES } from '../../data/listingForm'
+import { useSiteSettings } from '../../context/SiteSettingsContext'
 import { uploadApartmentImage } from '../../services/apartmentsApi'
 
 // Photo picker with drag & drop, previews, remove and cover selection.
@@ -15,13 +16,21 @@ import { uploadApartmentImage } from '../../services/apartmentsApi'
 // gallery is empty for everyone but its author.
 function ImageUploader({ images, coverImageId, onChange, onCoverChange, error }) {
   const { t } = useLocale()
+  // How many photographs a listing may carry, and how large each may be,
+  // are the marketplace's to decide. The server refuses anything past
+  // them; this is so the picker stops asking rather than the upload
+  // failing after it was sent. MAX_IMAGES is the fallback for a first
+  // paint before the configuration has landed.
+  const { settings } = useSiteSettings()
+  const maxImages = settings.listing_max_images || MAX_IMAGES
+  const maxImageBytes = (settings.media_max_image_mb || 5) * 1024 * 1024
   const { token } = useAuth()
   const inputId = useId()
   const errorId = `${inputId}-error`
   const inputRef = useRef(null)
   const [isDragging, setIsDragging] = useState(false)
 
-  const remaining = MAX_IMAGES - images.length
+  const remaining = maxImages - images.length
 
   // Release every object URL when the form unmounts.
   const imagesRef = useRef(images)
@@ -61,23 +70,30 @@ function ImageUploader({ images, coverImageId, onChange, onCoverChange, error })
   }
 
   const addFiles = (fileList) => {
-    const picked = [...fileList].filter((file) => file.type.startsWith('image/')).slice(0, remaining)
+    const picked = [...fileList]
+      .filter((file) => file.type.startsWith('image/'))
+      .slice(0, remaining)
     if (picked.length === 0) return
 
     const added = picked.map((file, index) => ({
       id: `${Date.now()}-${index}-${file.name}`,
       name: file.name,
       url: URL.createObjectURL(file),
-      uploading: true,
+      // A file past the marketplace's size is marked as failed here rather
+      // than sent and refused: the tile says so immediately, and the server
+      // is spared an upload it would reject.
+      uploading: file.size <= maxImageBytes,
       uploadedUrl: null,
-      failed: false,
+      failed: file.size > maxImageBytes,
     }))
 
     onChange((current) => [...current, ...added])
     // The first photo added becomes the cover, matching what the card shows.
     if (!coverImageId) onCoverChange(added[0].id)
 
-    added.forEach((image, index) => upload(image, picked[index]))
+    added.forEach((image, index) => {
+      if (!image.failed) upload(image, picked[index])
+    })
   }
 
   const removeImage = (imageId) => {
@@ -115,7 +131,7 @@ function ImageUploader({ images, coverImageId, onChange, onCoverChange, error })
         <ImagePlus aria-hidden="true" size={24} className="text-text-muted" />
         <p className="mt-3 text-sm font-medium text-text-primary">{t('listing.imagesEmpty')}</p>
         <p className="mt-1 text-xs text-text-muted">
-          {t('listing.imagesHint', { max: MAX_IMAGES })}
+          {t('listing.imagesHint', { max: maxImages })}
         </p>
 
         <button
@@ -155,7 +171,7 @@ function ImageUploader({ images, coverImageId, onChange, onCoverChange, error })
       {images.length > 0 ? (
         <>
           <p className="text-xs text-text-muted">
-            {t('listing.imagesCount', { count: images.length, max: MAX_IMAGES })}
+            {t('listing.imagesCount', { count: images.length, max: maxImages })}
           </p>
 
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">

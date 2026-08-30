@@ -495,6 +495,27 @@ func (r *AdminRepository) UserBlockHistory(
 	return rows, nil
 }
 
+// SetOwnerListingsStatus moves every listing this account currently has in
+// public view into another status.
+//
+// Only listings that are actually visible are touched: a draft is already
+// invisible, and a closed or deleted listing has been dealt with already.
+// published_at is cleared alongside, which the schema requires of anything that
+// is not active.
+func (r *AdminRepository) SetOwnerListingsStatus(
+	ctx context.Context, ownerID uuid.UUID, status string,
+) error {
+	err := r.db.WithContext(ctx).
+		Model(&models.Apartment{}).
+		Where("owner_id = ? AND status IN ?", ownerID,
+			[]string{models.ApartmentStatusActive, models.ApartmentStatusPending}).
+		Updates(map[string]any{"status": status, "published_at": nil}).Error
+	if err != nil {
+		return fmt.Errorf("update listings of user: %w", err)
+	}
+	return nil
+}
+
 // RecordAudit writes one entry of the admin action log.
 //
 // Best effort by design: the caller ignores the error. An action that succeeded

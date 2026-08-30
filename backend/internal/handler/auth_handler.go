@@ -47,6 +47,17 @@ func (h *AuthHandler) RequestRegistrationCode(c *gin.Context) {
 		case errors.Is(err, service.ErrContactMismatch):
 			response.Error(c, http.StatusBadRequest, "contact_mismatch",
 				"Provide exactly the contact that matches the chosen method")
+		// Switched off for the whole marketplace rather than refused for this
+		// caller: 403 with a code the sign-up form turns into an explanation.
+		case errors.Is(err, service.ErrRegistrationClosed):
+			response.Error(c, http.StatusForbidden, "registration_closed",
+				"Registration is currently closed")
+		case errors.Is(err, service.ErrMethodDisabled):
+			response.Error(c, http.StatusForbidden, "method_disabled",
+				"That way of registering is currently unavailable")
+		case errors.Is(err, service.ErrContactBlocked):
+			response.Error(c, http.StatusForbidden, "contact_blocked",
+				"This contact belongs to a blocked account")
 		case errors.Is(err, service.ErrContactTaken):
 			response.Error(c, http.StatusConflict, "contact_taken",
 				"This phone or email is already registered")
@@ -126,6 +137,9 @@ func (h *AuthHandler) CompleteRegistration(c *gin.Context) {
 		case errors.Is(err, service.ErrInvalidRegistrationToken):
 			response.Error(c, http.StatusUnauthorized, "invalid_registration_token",
 				"This registration session is no longer valid. Start again")
+		case errors.Is(err, service.ErrWeakPassword):
+			// The message names the rule the configured policy applied.
+			response.Error(c, http.StatusBadRequest, "weak_password", err.Error())
 		case errors.Is(err, service.ErrContactTaken):
 			response.Error(c, http.StatusConflict, "contact_taken",
 				"This phone or email is already registered")
@@ -155,6 +169,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		case errors.Is(err, service.ErrInvalidCredentials):
 			// One message for a wrong password and for an unknown account.
 			response.Error(c, http.StatusUnauthorized, "invalid_credentials", "Invalid credentials")
+		case errors.Is(err, service.ErrAccountLocked):
+			// 429: the credentials were not judged at all, the caller is being
+			// asked to wait. The message carries the wait.
+			response.Error(c, http.StatusTooManyRequests, "account_locked", err.Error())
 		case errors.Is(err, service.ErrAccountBlocked):
 			// Said plainly: the password was right, and the person needs to
 			// know why they still cannot get in.
@@ -262,6 +280,12 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		switch {
 		case errors.Is(err, service.ErrUserNotFound):
 			response.Error(c, http.StatusUnauthorized, "invalid_token", "Invalid token")
+		case errors.Is(err, service.ErrProfileEditDisabled):
+			response.Error(c, http.StatusForbidden, "profile_edit_disabled",
+				"Editing a profile is currently switched off")
+		case errors.Is(err, service.ErrAvatarRequired):
+			response.Error(c, http.StatusBadRequest, "avatar_required",
+				"This marketplace requires a profile picture")
 		case errors.Is(err, service.ErrNameRequired):
 			response.Error(c, http.StatusBadRequest, "validation_failed",
 				"First name and last name cannot be empty")

@@ -32,9 +32,10 @@ var ErrInvalidSetting = errors.New("invalid setting")
 // quietly missing at runtime.
 type Settings struct {
 	SiteName        string `setting:"site_name"        json:"site_name"`
+	SiteBrandName   string `setting:"site_brand_name"  json:"site_brand_name"`
 	SiteDescription string `setting:"site_description" json:"site_description"`
-	SiteLogoURL     string `setting:"site_logo_url"    json:"site_logo_url"`
-	SiteFaviconURL  string `setting:"site_favicon_url" json:"site_favicon_url"`
+	SupportEmail    string `setting:"support_email"    json:"support_email"`
+	SupportPhone    string `setting:"support_phone"    json:"support_phone"`
 
 	DefaultLanguage string `setting:"default_language" json:"default_language"`
 	DefaultCurrency string `setting:"default_currency" json:"default_currency"`
@@ -45,6 +46,7 @@ type Settings struct {
 	MaintenanceMessage string `setting:"maintenance_message" json:"maintenance_message"`
 
 	ListingModerationRequired     bool `setting:"listing_moderation_required"      json:"listing_moderation_required"`
+	ListingMinImages              int  `setting:"listing_min_images"               json:"listing_min_images"`
 	ListingMaxImages              int  `setting:"listing_max_images"               json:"listing_max_images"`
 	ListingMaxTitleLength         int  `setting:"listing_max_title_length"         json:"listing_max_title_length"`
 	ListingMaxDescriptionLength   int  `setting:"listing_max_description_length"   json:"listing_max_description_length"`
@@ -53,6 +55,7 @@ type Settings struct {
 	ListingOwnerCanEdit           bool `setting:"listing_owner_can_edit"           json:"listing_owner_can_edit"`
 	ListingOwnerCanDelete         bool `setting:"listing_owner_can_delete"         json:"listing_owner_can_delete"`
 	ListingRepublishAllowed       bool `setting:"listing_republish_allowed"        json:"listing_republish_allowed"`
+	ListingDraftsAllowed          bool `setting:"listing_drafts_allowed"           json:"listing_drafts_allowed"`
 	ListingEditModerationRequired bool `setting:"listing_edit_moderation_required" json:"listing_edit_moderation_required"`
 
 	BlockReasonRequired bool   `setting:"block_reason_required" json:"block_reason_required"`
@@ -65,31 +68,35 @@ type Settings struct {
 	UserProfileEditEnabled     bool `setting:"user_profile_edit_enabled"     json:"user_profile_edit_enabled"`
 	BlockedContactReuseAllowed bool `setting:"blocked_contact_reuse_allowed" json:"blocked_contact_reuse_allowed"`
 
-	ChatEnabled          bool `setting:"chat_enabled"           json:"chat_enabled"`
-	UserMessagingEnabled bool `setting:"user_messaging_enabled" json:"user_messaging_enabled"`
-	ContactOwnerEnabled  bool `setting:"contact_owner_enabled"  json:"contact_owner_enabled"`
-	MessageMaxLength     int  `setting:"message_max_length"     json:"message_max_length"`
-	MessageEditAllowed   bool `setting:"message_edit_allowed"   json:"message_edit_allowed"`
-	MessageDeleteAllowed bool `setting:"message_delete_allowed" json:"message_delete_allowed"`
+	ChatEnabled            bool `setting:"chat_enabled"           json:"chat_enabled"`
+	UserMessagingEnabled   bool `setting:"user_messaging_enabled" json:"user_messaging_enabled"`
+	ContactOwnerEnabled    bool `setting:"contact_owner_enabled"  json:"contact_owner_enabled"`
+	MessageMaxLength       int  `setting:"message_max_length"     json:"message_max_length"`
+	MessageEditAllowed     bool `setting:"message_edit_allowed"   json:"message_edit_allowed"`
+	MessageEditWindow      int  `setting:"message_edit_window_minutes" json:"message_edit_window_minutes"`
+	ChatAttachmentsAllowed bool `setting:"chat_attachments_allowed" json:"chat_attachments_allowed"`
+	MessageDeleteAllowed   bool `setting:"message_delete_allowed" json:"message_delete_allowed"`
 
-	MediaMaxImageMB          int      `setting:"media_max_image_mb"          json:"media_max_image_mb"`
-	MediaAllowedImageFormats []string `setting:"media_allowed_image_formats" json:"media_allowed_image_formats"`
-	MediaMaxAvatarMB         int      `setting:"media_max_avatar_mb"         json:"media_max_avatar_mb"`
-	MediaMaxListingImageMB   int      `setting:"media_max_listing_image_mb"  json:"media_max_listing_image_mb"`
-	MediaImageCompression    bool     `setting:"media_image_compression"     json:"media_image_compression"`
-	MediaUploadQuality       int      `setting:"media_upload_quality"        json:"media_upload_quality"`
+	MediaMaxImageMB               int      `setting:"media_max_image_mb"      json:"media_max_image_mb"`
+	MediaMaxAvatarMB              int      `setting:"media_max_avatar_mb"     json:"media_max_avatar_mb"`
+	MediaMaxAttachmentMB          int      `setting:"media_max_attachment_mb" json:"media_max_attachment_mb"`
+	MediaAllowedImageFormats      []string `setting:"media_allowed_image_formats"      json:"media_allowed_image_formats"`
+	MediaAllowedAttachmentFormats []string `setting:"media_allowed_attachment_formats" json:"media_allowed_attachment_formats"`
 
 	JWTExpirationHours    int  `setting:"jwt_expiration_hours"     json:"jwt_expiration_hours"`
 	LoginMaxAttempts      int  `setting:"login_max_attempts"       json:"login_max_attempts"`
 	LoginLockMinutes      int  `setting:"login_lock_minutes"       json:"login_lock_minutes"`
 	PasswordMinLength     int  `setting:"password_min_length"      json:"password_min_length"`
 	PasswordRequireStrong bool `setting:"password_require_strong"  json:"password_require_strong"`
-	AllowMultipleSessions bool `setting:"allow_multiple_sessions"  json:"allow_multiple_sessions"`
+	OTPExpiryMinutes      int  `setting:"otp_expiry_minutes"          json:"otp_expiry_minutes"`
+	OTPResendCooldown     int  `setting:"otp_resend_cooldown_seconds" json:"otp_resend_cooldown_seconds"`
 
 	Timezone              string `setting:"timezone"               json:"timezone"`
 	DefaultCountry        string `setting:"default_country"        json:"default_country"`
 	DefaultCity           string `setting:"default_city"           json:"default_city"`
 	PaginationDefaultSize int    `setting:"pagination_default_size" json:"pagination_default_size"`
+
+	NotifyNewMessage bool `setting:"notify_new_message" json:"notify_new_message"`
 }
 
 // settingsCacheTTL bounds how stale a read can be.
@@ -492,15 +499,16 @@ func contains(list []string, want string) bool {
 // PublicSettings is the part of the configuration the marketplace itself needs.
 //
 // A separate shape, not the whole record: the public site has no business
-// knowing how many login attempts are allowed before an account locks, or how
-// long a token lives. What is here is what a browser must know to render the
-// site the way the owner configured it — and each field is also enforced by the
-// server, so nothing here is load-bearing for security.
+// knowing how many login attempts are allowed before an account locks. What is
+// here is what a browser must know to render the site the way the owner
+// configured it and to stop a form before it is refused — and every one of
+// these is enforced by the server too, so nothing here is load-bearing.
 type PublicSettings struct {
 	SiteName        string `json:"site_name"`
+	SiteBrandName   string `json:"site_brand_name"`
 	SiteDescription string `json:"site_description"`
-	SiteLogoURL     string `json:"site_logo_url"`
-	SiteFaviconURL  string `json:"site_favicon_url"`
+	SupportEmail    string `json:"support_email"`
+	SupportPhone    string `json:"support_phone"`
 
 	DefaultLanguage string `json:"default_language"`
 	DefaultCurrency string `json:"default_currency"`
@@ -519,14 +527,18 @@ type PublicSettings struct {
 	ProfileEditEnabled       bool `json:"user_profile_edit_enabled"`
 	AvatarRequired           bool `json:"user_avatar_required"`
 
-	ChatEnabled          bool `json:"chat_enabled"`
-	MessagingEnabled     bool `json:"user_messaging_enabled"`
-	ContactOwnerEnabled  bool `json:"contact_owner_enabled"`
-	MessageMaxLength     int  `json:"message_max_length"`
-	MessageEditAllowed   bool `json:"message_edit_allowed"`
-	MessageDeleteAllowed bool `json:"message_delete_allowed"`
+	ChatEnabled            bool `json:"chat_enabled"`
+	MessagingEnabled       bool `json:"user_messaging_enabled"`
+	ContactOwnerEnabled    bool `json:"contact_owner_enabled"`
+	MessageMaxLength       int  `json:"message_max_length"`
+	MessageEditAllowed     bool `json:"message_edit_allowed"`
+	MessageEditWindow      int  `json:"message_edit_window_minutes"`
+	MessageDeleteAllowed   bool `json:"message_delete_allowed"`
+	ChatAttachmentsAllowed bool `json:"chat_attachments_allowed"`
+	NotifyNewMessage       bool `json:"notify_new_message"`
 
 	ListingModerationRequired   bool `json:"listing_moderation_required"`
+	ListingMinImages            int  `json:"listing_min_images"`
 	ListingMaxImages            int  `json:"listing_max_images"`
 	ListingMaxTitleLength       int  `json:"listing_max_title_length"`
 	ListingMaxDescriptionLength int  `json:"listing_max_description_length"`
@@ -535,11 +547,11 @@ type PublicSettings struct {
 	ListingOwnerCanEdit         bool `json:"listing_owner_can_edit"`
 	ListingOwnerCanDelete       bool `json:"listing_owner_can_delete"`
 	ListingRepublishAllowed     bool `json:"listing_republish_allowed"`
+	ListingDraftsAllowed        bool `json:"listing_drafts_allowed"`
 
-	MediaMaxImageMB          int      `json:"media_max_image_mb"`
-	MediaAllowedImageFormats []string `json:"media_allowed_image_formats"`
-	MediaMaxAvatarMB         int      `json:"media_max_avatar_mb"`
-	MediaMaxListingImageMB   int      `json:"media_max_listing_image_mb"`
+	MediaMaxImageMB      int `json:"media_max_image_mb"`
+	MediaMaxAvatarMB     int `json:"media_max_avatar_mb"`
+	MediaMaxAttachmentMB int `json:"media_max_attachment_mb"`
 
 	PasswordMinLength     int  `json:"password_min_length"`
 	PasswordRequireStrong bool `json:"password_require_strong"`
@@ -550,9 +562,10 @@ type PublicSettings struct {
 func (s *Settings) Public() *PublicSettings {
 	return &PublicSettings{
 		SiteName:        s.SiteName,
+		SiteBrandName:   s.SiteBrandName,
 		SiteDescription: s.SiteDescription,
-		SiteLogoURL:     s.SiteLogoURL,
-		SiteFaviconURL:  s.SiteFaviconURL,
+		SupportEmail:    s.SupportEmail,
+		SupportPhone:    s.SupportPhone,
 
 		DefaultLanguage: s.DefaultLanguage,
 		DefaultCurrency: s.DefaultCurrency,
@@ -571,14 +584,18 @@ func (s *Settings) Public() *PublicSettings {
 		ProfileEditEnabled:       s.UserProfileEditEnabled,
 		AvatarRequired:           s.UserAvatarRequired,
 
-		ChatEnabled:          s.ChatEnabled,
-		MessagingEnabled:     s.UserMessagingEnabled,
-		ContactOwnerEnabled:  s.ContactOwnerEnabled,
-		MessageMaxLength:     s.MessageMaxLength,
-		MessageEditAllowed:   s.MessageEditAllowed,
-		MessageDeleteAllowed: s.MessageDeleteAllowed,
+		ChatEnabled:            s.ChatEnabled,
+		MessagingEnabled:       s.UserMessagingEnabled,
+		ContactOwnerEnabled:    s.ContactOwnerEnabled,
+		MessageMaxLength:       s.MessageMaxLength,
+		MessageEditAllowed:     s.MessageEditAllowed,
+		MessageEditWindow:      s.MessageEditWindow,
+		MessageDeleteAllowed:   s.MessageDeleteAllowed,
+		ChatAttachmentsAllowed: s.ChatAttachmentsAllowed,
+		NotifyNewMessage:       s.NotifyNewMessage,
 
 		ListingModerationRequired:   s.ListingModerationRequired,
+		ListingMinImages:            s.ListingMinImages,
 		ListingMaxImages:            s.ListingMaxImages,
 		ListingMaxTitleLength:       s.ListingMaxTitleLength,
 		ListingMaxDescriptionLength: s.ListingMaxDescriptionLength,
@@ -587,11 +604,11 @@ func (s *Settings) Public() *PublicSettings {
 		ListingOwnerCanEdit:         s.ListingOwnerCanEdit,
 		ListingOwnerCanDelete:       s.ListingOwnerCanDelete,
 		ListingRepublishAllowed:     s.ListingRepublishAllowed,
+		ListingDraftsAllowed:        s.ListingDraftsAllowed,
 
-		MediaMaxImageMB:          s.MediaMaxImageMB,
-		MediaAllowedImageFormats: s.MediaAllowedImageFormats,
-		MediaMaxAvatarMB:         s.MediaMaxAvatarMB,
-		MediaMaxListingImageMB:   s.MediaMaxListingImageMB,
+		MediaMaxImageMB:      s.MediaMaxImageMB,
+		MediaMaxAvatarMB:     s.MediaMaxAvatarMB,
+		MediaMaxAttachmentMB: s.MediaMaxAttachmentMB,
 
 		PasswordMinLength:     s.PasswordMinLength,
 		PasswordRequireStrong: s.PasswordRequireStrong,

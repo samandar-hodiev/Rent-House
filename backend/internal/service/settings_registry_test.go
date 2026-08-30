@@ -51,10 +51,6 @@ func TestSettingsStructMatchesRegistry(t *testing.T) {
 // registry would refuse is a marketplace that cannot start from empty.
 func TestDeclaredDefaultsAreValid(t *testing.T) {
 	for _, def := range models.SettingDefs {
-		if def.Key == models.SettingSiteLogoURL || def.Key == models.SettingSiteFaviconURL {
-			// Empty is the point: no logo has been uploaded yet.
-			continue
-		}
 		if _, err := normalizeSetting(def, def.Default); err != nil {
 			t.Errorf("default for %s is not valid: %v", def.Key, err)
 		}

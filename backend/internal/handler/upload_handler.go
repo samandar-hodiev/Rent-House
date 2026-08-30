@@ -1,13 +1,16 @@
 package handler
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/samandar-hodiev/Rent-House/backend/internal/middleware"
+	"github.com/samandar-hodiev/Rent-House/backend/internal/service"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/storage"
 	"github.com/samandar-hodiev/Rent-House/backend/pkg/logger"
 	"github.com/samandar-hodiev/Rent-House/backend/pkg/response"
@@ -24,14 +27,21 @@ const formField = "image"
 // both sides. The owner uploads as they pick, and the listing then references
 // URLs.
 type UploadHandler struct {
-	files storage.Storage
+	settings *service.SettingsService
+	files    storage.Storage
 	// baseURL is the public origin uploaded files are reachable at. Empty means
 	// "work it out from the request", which is what development wants.
 	baseURL string
 }
 
-func NewUploadHandler(files storage.Storage, baseURL string) *UploadHandler {
-	return &UploadHandler{files: files, baseURL: strings.TrimRight(baseURL, "/")}
+func NewUploadHandler(
+	files storage.Storage, settings *service.SettingsService, baseURL string,
+) *UploadHandler {
+	return &UploadHandler{
+		files:    files,
+		settings: settings,
+		baseURL:  strings.TrimRight(baseURL, "/"),
+	}
 }
 
 // UploadImage handles POST /api/v1/uploads/images.
@@ -45,6 +55,12 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 		return
 	}
 
+	// What this picture is for. A profile picture and a listing photograph are
+	// bounded separately, and the caller says which it is sending — an
+	// unrecognised value is treated as a listing photograph, which is the
+	// stricter default of the two by configuration rather than by assumption.
+	kind := h.kindFor(c.Request.Context(), c.PostForm("purpose"))
+
 	header, err := c.FormFile(formField)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "validation_failed",
@@ -53,10 +69,11 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 	}
 
 	// Checked before opening the file, so an oversized upload is refused
-	// without reading it.
-	if header.Size > storage.MaxImageBytes {
+	// without reading it. The ceiling is the configured one, and the message
+	// carries it rather than a number written into the sentence.
+	if header.Size > kind.MaxBytes {
 		response.Error(c, http.StatusRequestEntityTooLarge, "file_too_large",
-			"The image is larger than 5 MB")
+			fmt.Sprintf("The image is larger than %d MB", kind.MaxBytes/(1<<20)))
 		return
 	}
 
@@ -70,11 +87,17 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 
 	// The browser's declared type is a hint; storage re-checks it against its
 	// allow-list and decides the extension itself.
-	path, err := h.files.Save(c.Request.Context(), header.Header.Get("Content-Type"), file)
+	path, err := h.files.SaveKind(c.Request.Context(), kind, header.Header.Get("Content-Type"), file)
 	if err != nil {
 		if errors.Is(err, storage.ErrUnsupportedType) {
 			response.Error(c, http.StatusUnsupportedMediaType, "unsupported_type",
-				"Only JPEG, PNG and WebP images are accepted")
+				"That image format is not accepted")
+			return
+		}
+		var tooLarge storage.ErrTooLarge
+		if errors.As(err, &tooLarge) {
+			response.Error(c, http.StatusRequestEntityTooLarge, "file_too_large",
+				fmt.Sprintf("The image is larger than %d MB", kind.MaxBytes/(1<<20)))
 			return
 		}
 		logger.Errorf("upload image: save: %v", err)
@@ -86,7 +109,27 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 	// origin in development and may sit behind a different host in production,
 	// so a bare "/uploads/..." would resolve against the wrong server and 404.
 	// What goes into the database is a URL that works from anywhere.
-	response.Success(c, http.StatusCreated, "Image uploaded", gin.H{"url": h.absolute(c, path)})
+	response.Success(c, http.StatusCreated, "Image uploaded",
+		gin.H{"url": h.absolute(c, path.URL)})
+}
+
+// kindFor narrows the image category to the limits configured for this use.
+//
+// The formats are the marketplace's; only the size differs between a profile
+// picture and a listing photograph.
+func (h *UploadHandler) kindFor(ctx context.Context, purpose string) storage.Kind {
+	const megabyte = 1 << 20
+	site := service.Defaults()
+	if h.settings != nil {
+		site = h.settings.MustGet(ctx)
+	}
+
+	megabytes := site.MediaMaxImageMB
+	if strings.EqualFold(strings.TrimSpace(purpose), "avatar") {
+		megabytes = site.MediaMaxAvatarMB
+	}
+	return storage.Kinds[storage.KindImage].
+		Restrict(int64(megabytes)*megabyte, site.MediaAllowedImageFormats)
 }
 
 // absolute turns a stored path into a full URL.

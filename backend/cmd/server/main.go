@@ -217,7 +217,7 @@ func newRouter(
 	authService := service.NewAuthService(
 		users, verifications, tokens,
 		delivery.sms, delivery.email,
-		cfg.OTP,
+		cfg.OTP, settingsService, repository.NewLoginAttemptRepository(db),
 	)
 	// The first allowed origin is where the app is served from, and so where a
 	// password-reset link must point.
@@ -324,6 +324,11 @@ func newRouter(
 		me.GET("/dashboard/summary", favoriteHandler.Summary)
 	}
 
+	// Listings that have been up longer than the marketplace allows. Started
+	// only when something is there to sweep; the setting is off by default, so
+	// this costs one query an hour until an owner turns it on.
+	go service.NewListingExpiry(apartments, settingsService).Run(context.Background())
+
 	// Uploaded files: listing photographs and chat attachments share one store.
 	files, err := storage.NewLocalStorage(cfg.UploadDir, cfg.UploadPublicPath)
 	if err != nil {
@@ -339,7 +344,7 @@ func newRouter(
 	adminService := service.NewAdminService(repository.NewAdminRepository(db), tokens, settingsService)
 	// Every figure the dashboard shows is counted by PostgreSQL; this service
 	// only shapes the counts into series.
-	adminStats := service.NewAdminStatsService(repository.NewAdminStatsRepository(db))
+	adminStats := service.NewAdminStatsService(repository.NewAdminStatsRepository(db), settingsService)
 	// Read-only: an administrator inspects listings, and the owner's own
 	// endpoints remain the only way to change one.
 	adminListings := service.NewAdminListingService(
@@ -467,6 +472,7 @@ func newRouter(
 		func(id uuid.UUID) string {
 			return strings.TrimRight(cfg.PublicBaseURL, "/") + "/api/v1/attachments/" + id.String()
 		},
+		settingsService,
 	)
 	chatHandler := handler.NewChatHandler(chatService)
 
@@ -528,7 +534,7 @@ func newRouter(
 	// go through the authorized endpoint above.
 	router.Static(files.PublicPath(), files.Dir())
 	v1.POST("/uploads/images",
-		middleware.Auth(tokens), handler.NewUploadHandler(files, cfg.PublicBaseURL).UploadImage)
+		middleware.Auth(tokens), handler.NewUploadHandler(files, settingsService, cfg.PublicBaseURL).UploadImage)
 
 	return router, nil
 }

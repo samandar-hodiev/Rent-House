@@ -104,9 +104,10 @@ func TestSettingsGovernListingWrites(t *testing.T) {
 
 	// Moderation off — the marketplace's default, and how it behaved before it
 	// was configurable. Publishing goes live.
-	if _, err := settings.Set(ctx, service.Settings{RequireModeration: false, MaxImages: 20}); err != nil {
-		t.Fatalf("set settings: %v", err)
-	}
+	configure(t, settings, map[string]any{
+		models.SettingListingModerationRequired: false,
+		models.SettingListingMaxImages:          20,
+	})
 	live, err := apartments.Create(ctx, ownerID, writeRequest(districtSlug, true, 1))
 	if err != nil {
 		t.Fatalf("create with moderation off: %v", err)
@@ -116,9 +117,7 @@ func TestSettingsGovernListingWrites(t *testing.T) {
 	}
 
 	// Moderation on. The same request must now wait for an administrator.
-	if _, err := settings.Set(ctx, service.Settings{RequireModeration: true, MaxImages: 20}); err != nil {
-		t.Fatalf("set settings: %v", err)
-	}
+	configure(t, settings, map[string]any{models.SettingListingModerationRequired: true})
 	held, err := apartments.Create(ctx, ownerID, writeRequest(districtSlug, true, 1))
 	if err != nil {
 		t.Fatalf("create with moderation on: %v", err)
@@ -150,9 +149,10 @@ func TestSettingsGovernListingWrites(t *testing.T) {
 	}
 
 	// The image limit is the owner's number, not the binding tag's.
-	if _, err := settings.Set(ctx, service.Settings{RequireModeration: false, MaxImages: 3}); err != nil {
-		t.Fatalf("set settings: %v", err)
-	}
+	configure(t, settings, map[string]any{
+		models.SettingListingModerationRequired: false,
+		models.SettingListingMaxImages:          3,
+	})
 	if _, err := apartments.Create(ctx, ownerID, writeRequest(districtSlug, true, 4)); !errors.Is(err, service.ErrTooManyImages) {
 		t.Fatalf("four images against a limit of three: got %v, want ErrTooManyImages", err)
 	}
@@ -166,24 +166,25 @@ func TestSettingsClampAndDefault(t *testing.T) {
 	ctx := context.Background()
 	settings := service.NewSettingsService(repository.NewSettingsRepository(tx))
 
-	// Above the ceiling is clamped rather than accepted: a listing with two
-	// hundred photographs is a denial of service dressed as a preference.
-	saved, err := settings.Set(ctx, service.Settings{RequireModeration: true, MaxImages: 500})
-	if err != nil {
-		t.Fatalf("set: %v", err)
+	// Out of range is refused rather than quietly clamped: an owner who typed
+	// 500 meant something, and storing 50 without saying so would leave the
+	// page showing a number nobody chose.
+	if _, err := settings.Update(ctx, map[string]any{
+		models.SettingListingMaxImages: 500,
+	}, nil); !errors.Is(err, service.ErrInvalidSetting) {
+		t.Fatalf("500 images: got %v, want ErrInvalidSetting", err)
 	}
-	if saved.MaxImages != 50 {
-		t.Fatalf("clamp: got %d, want 50", saved.MaxImages)
+	if _, err := settings.Update(ctx, map[string]any{
+		models.SettingListingMaxImages: 0,
+	}, nil); !errors.Is(err, service.ErrInvalidSetting) {
+		t.Fatalf("no images: got %v, want ErrInvalidSetting", err)
 	}
-
-	// Below one is raised to one: zero images allowed would close the
-	// marketplace, which is not what a settings field is for.
-	saved, err = settings.Set(ctx, service.Settings{RequireModeration: false, MaxImages: 0})
-	if err != nil {
-		t.Fatalf("set: %v", err)
-	}
-	if saved.MaxImages != 1 {
-		t.Fatalf("floor: got %d, want 1", saved.MaxImages)
+	// A key the registry does not know is refused too, so a typo cannot write
+	// a setting nothing will ever read.
+	if _, err := settings.Update(ctx, map[string]any{
+		"not_a_setting": true,
+	}, nil); !errors.Is(err, service.ErrInvalidSetting) {
+		t.Fatalf("unknown key: got %v, want ErrInvalidSetting", err)
 	}
 
 	// A key that has never been written reads as its default rather than as an
@@ -195,7 +196,20 @@ func TestSettingsClampAndDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if fresh.RequireModeration || fresh.MaxImages != 20 {
-		t.Fatalf("defaults: got %+v, want {false 20}", *fresh)
+	if fresh.ListingModerationRequired || fresh.ListingMaxImages != 20 {
+		t.Fatalf("defaults: moderation %v, images %d; want false and 20",
+			fresh.ListingModerationRequired, fresh.ListingMaxImages)
+	}
+	if !fresh.ChatEnabled || !fresh.UserRegistrationEnabled || fresh.MaintenanceMode {
+		t.Fatal("a marketplace with no configuration must be open")
+	}
+}
+
+// configure writes settings and fails the test if they are refused, so a test
+// reads as the rule it is checking rather than as error handling.
+func configure(t *testing.T, settings *service.SettingsService, patch map[string]any) {
+	t.Helper()
+	if _, err := settings.Update(context.Background(), patch, nil); err != nil {
+		t.Fatalf("configure %v: %v", patch, err)
 	}
 }

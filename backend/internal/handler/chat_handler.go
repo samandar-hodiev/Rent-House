@@ -298,8 +298,11 @@ func (h *ChatHandler) DownloadAttachment(c *gin.Context) {
 // The client reads its file-picker filters and its size checks from here, so
 // the rules are stated once, on the server that enforces them.
 func (h *ChatHandler) AttachmentLimits(c *gin.Context) {
+	// The configured categories, not the built-in ones: what the picker offers
+	// has to be what the server will actually take.
+	kinds := h.chat.AttachmentKinds(c.Request.Context())
 	limit := func(name string) dto.AttachmentLimit {
-		kind := storage.Kinds[name]
+		kind := kinds[name]
 		return dto.AttachmentLimit{MaxBytes: kind.MaxBytes, MimeTypes: kind.MimeTypes()}
 	}
 	response.OK(c, "", dto.AttachmentLimits{
@@ -467,6 +470,30 @@ func (h *ChatHandler) writeError(c *gin.Context, err error, operation string) {
 		response.Error(c, http.StatusNotFound, "conversation_not_found", "Conversation not found")
 	case errors.Is(err, service.ErrMessageNotFound):
 		response.Error(c, http.StatusNotFound, "message_not_found", "Message not found")
+	// Switched off for the whole marketplace. 403 with a code each screen turns
+	// into its own explanation — a disabled composer, a hidden edit action.
+	case errors.Is(err, service.ErrChatDisabled):
+		response.Error(c, http.StatusForbidden, "chat_disabled",
+			"Chat is currently switched off")
+	case errors.Is(err, service.ErrMessagingDisabled):
+		response.Error(c, http.StatusForbidden, "messaging_disabled",
+			"Messaging between users is currently switched off")
+	case errors.Is(err, service.ErrContactOwnerOff):
+		response.Error(c, http.StatusForbidden, "contact_owner_disabled",
+			"Contacting a listing owner is currently switched off")
+	case errors.Is(err, service.ErrEditingDisabledChat):
+		response.Error(c, http.StatusForbidden, "message_edit_disabled",
+			"Editing a message is currently switched off")
+	case errors.Is(err, service.ErrDeletingDisabled):
+		response.Error(c, http.StatusForbidden, "message_delete_disabled",
+			"Deleting a message is currently switched off")
+	case errors.Is(err, service.ErrAttachmentsDisabled):
+		response.Error(c, http.StatusForbidden, "attachments_disabled",
+			"Attachments are currently switched off")
+	case errors.Is(err, service.ErrMessageTooLong):
+		response.Error(c, http.StatusBadRequest, "message_too_long", err.Error())
+	case errors.Is(err, service.ErrEditWindowPassed):
+		response.Error(c, http.StatusForbidden, "edit_window_passed", err.Error())
 	case errors.Is(err, service.ErrNotMessageAuthor):
 		response.Error(c, http.StatusForbidden, "not_message_author",
 			"This message belongs to another user")
