@@ -102,6 +102,22 @@ export function SiteSettingsProvider({ children }) {
     if (settings.site_name) document.title = settings.site_name
   }, [settings.site_name])
 
+  // And so is what the page says it is. This is the description a search
+  // result and a shared link show, so leaving it in the configuration without
+  // ever writing it into the document would make the field decorative.
+  useEffect(() => {
+    const description = settings.site_description?.trim()
+    if (!description) return
+
+    let tag = document.querySelector('meta[name="description"]')
+    if (!tag) {
+      tag = document.createElement('meta')
+      tag.setAttribute('name', 'description')
+      document.head.appendChild(tag)
+    }
+    tag.setAttribute('content', description)
+  }, [settings.site_description])
+
   const value = useMemo(
     () => ({ settings, state, reload: () => load() }),
     [settings, state, load],

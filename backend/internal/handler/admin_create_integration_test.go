@@ -79,6 +79,7 @@ func newAdminHarness(t *testing.T) *adminHarness {
 		service.NewAdminStatsService(repository.NewAdminStatsRepository(tx), settings),
 		service.NewAdminListingService(
 			repository.NewAdminListingRepository(tx), repository.NewApartmentRepository(tx),
+			settings,
 		),
 		settings,
 		nil, "/uploads", "",

@@ -11,6 +11,7 @@ import SegmentedField from '../components/listing/SegmentedField'
 import SelectField from '../components/listing/SelectField'
 import TextAreaField from '../components/listing/TextAreaField'
 import { useLocale } from '../context/LocaleContext'
+import { useSiteSettings } from '../context/SiteSettingsContext'
 import { useListings } from '../context/ListingsContext'
 import { DISTRICTS, districtNameKey } from '../data/districts'
 import { ApiError, NETWORK_ERROR } from '../services/apiClient'
@@ -42,6 +43,8 @@ import { listingDescription, listingTitle } from '../utils/listingText'
 // already typed.
 function ListingForm({ id, isEditMode, existing }) {
   const { t } = useLocale()
+  // The currency a new listing opens in, as the marketplace is configured.
+  const { settings } = useSiteSettings()
   const navigate = useNavigate()
   const { createListing, updateListing } = useListings()
 
@@ -54,7 +57,7 @@ function ListingForm({ id, isEditMode, existing }) {
           listingTitle(t, existing),
           listingDescription(t, existing),
         )
-      : createEmptyListing(),
+      : createEmptyListing(settings.default_currency),
   )
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState(null) // null | 'published' | 'draft'

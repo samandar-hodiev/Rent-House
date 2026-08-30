@@ -34,6 +34,7 @@ import ContactChatModal from '../components/ContactChatModal'
 import NoPhoneDialog from '../components/NoPhoneDialog'
 import ApartmentGrid from '../components/ApartmentGrid'
 import { useLocale } from '../context/LocaleContext'
+import { useSiteLocation } from '../hooks/useSiteLocation'
 import { useAuth } from '../context/AuthContext'
 import { useWishlist } from '../context/WishlistContext'
 import { useRequireAuth } from '../hooks/useRequireAuth'
@@ -89,6 +90,7 @@ function HeartIcon({ filled }) {
 function ApartmentDetailsPage() {
   const { id } = useParams()
   const { t } = useLocale()
+  const { city, country } = useSiteLocation()
   const navigate = useNavigate()
   const { isSaved, toggleWishlist } = useWishlist()
   const requireAuth = useRequireAuth()
@@ -274,7 +276,8 @@ function ApartmentDetailsPage() {
 
           <p className="mt-2 flex items-center gap-1 text-sm text-text-secondary">
             <MapPin aria-hidden="true" size={15} className="shrink-0" />
-            {district ? t(districtNameKey(district.id)) : ''}, {t('city.tashkent')} —{' '}
+            {district ? t(districtNameKey(district.id)) : ''}, {city}
+            {country ? `, ${country}` : ''} —{' '}
             {toReadableCase(apartment.address)}
           </p>
 

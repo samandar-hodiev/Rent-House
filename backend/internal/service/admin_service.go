@@ -68,6 +68,15 @@ func NewAdminService(
 	return &AdminService{admins: admins, tokens: tokens, settings: settings}
 }
 
+// pageSize is how many rows a dashboard table shows when the client does not
+// ask for a number — the owner's choice, so every table opens the same way.
+func (s *AdminService) pageSize(ctx context.Context) int {
+	if s.settings == nil {
+		return Defaults().PaginationDefaultSize
+	}
+	return s.settings.MustGet(ctx).PaginationDefaultSize
+}
+
 // passwordPolicy is the rule a new administrator password must satisfy.
 func (s *AdminService) passwordPolicy(ctx context.Context) PasswordPolicy {
 	if s.settings == nil {
@@ -336,7 +345,7 @@ func (s *AdminService) Users(
 	}
 	switch {
 	case limit < 1:
-		limit = 10
+		limit = s.pageSize(ctx)
 	case limit > maxUserPageSize:
 		limit = maxUserPageSize
 	}
@@ -455,12 +464,7 @@ func (s *AdminService) AuditLogs(ctx context.Context, page, limit int) (*AuditPa
 	}
 	switch {
 	case limit < 1:
-		// The page size the owner chose, so every table in the dashboard opens
-		// the same way.
-		limit = Defaults().PaginationDefaultSize
-		if s.settings != nil {
-			limit = s.settings.MustGet(ctx).PaginationDefaultSize
-		}
+		limit = s.pageSize(ctx)
 	case limit > maxUserPageSize:
 		limit = maxUserPageSize
 	}

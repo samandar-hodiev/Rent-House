@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { useLocale } from '../context/LocaleContext'
+import { useSiteLocation } from '../hooks/useSiteLocation'
 import { listingTitle } from '../utils/listingText'
 import { getDistrictById, districtNameKey } from '../data/districts'
 import { apartmentDetailsPath } from '../routes/paths'
@@ -13,6 +14,7 @@ const CONTAINER_CLASS = {
 
 function MapApartmentPreview({ apartment, onClose, variant = 'floating' }) {
   const { t } = useLocale()
+  const { city } = useSiteLocation()
   const navigate = useNavigate()
 
   const title = listingTitle(t, apartment)
@@ -40,7 +42,7 @@ function MapApartmentPreview({ apartment, onClose, variant = 'floating' }) {
         </p>
         <p className="text-sm font-medium text-text-primary">{title}</p>
         <p className="text-sm text-text-muted">
-          {district ? t(districtNameKey(district.id)) : ''}, {t('city.tashkent')}
+          {district ? t(districtNameKey(district.id)) : ''}, {city}
         </p>
         <p className="text-sm text-text-muted">
           {t('apartmentCard.specs', {

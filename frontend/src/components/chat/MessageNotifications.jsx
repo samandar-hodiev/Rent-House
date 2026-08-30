@@ -5,6 +5,7 @@ import { MessageSquare, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useChat } from '../../context/ChatContext'
 import { useLocale } from '../../context/LocaleContext'
+import { useSiteSettings } from '../../context/SiteSettingsContext'
 import { CHAT_EVENTS } from '../../services/chatSocket'
 import { useMessageSound } from '../../hooks/useMessageSound'
 import { ROUTES } from '../../routes/paths'
@@ -35,6 +36,11 @@ const PERMISSION_ASKED_KEY = 'renthouse_notify_asked'
  */
 function MessageNotifications() {
   const { t } = useLocale()
+  // Whether an arriving message raises a card at all. A notification is a
+  // choice the marketplace makes on its readers' behalf, so it is switchable —
+  // and switching it off has to stop the card rather than merely hide the
+  // setting.
+  const { settings } = useSiteSettings()
   const navigate = useNavigate()
   const { subscribe, conversations, activeConversationRef, isAuthenticated } = useChat()
   const { user } = useAuth()
@@ -64,10 +70,21 @@ function MessageNotifications() {
     [dismiss, navigate],
   )
 
+  // Read inside the subscription, which is created once, so switching the
+  // setting off takes effect on the next message rather than on the next
+  // sign-in.
+  const notifyRef = useRef(settings.notify_new_message)
+  notifyRef.current = settings.notify_new_message
+
   useEffect(() => {
     if (!isAuthenticated) return undefined
 
     const unsubscribe = subscribe((envelope) => {
+      // Switched off for the marketplace: no card, no browser notification.
+      // The message itself still arrives and the thread still updates — this
+      // governs the announcement, not the delivery.
+      if (!notifyRef.current) return
+
       const { event, conversation_id: conversationId, payload } = envelope
       if (event !== CHAT_EVENTS.messageNew) return
 

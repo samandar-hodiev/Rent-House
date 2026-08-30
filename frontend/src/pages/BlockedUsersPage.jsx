@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useChat } from '../context/ChatContext'
 import { useLocale } from '../context/LocaleContext'
 import { fetchBlockedUsers } from '../services/chatApi'
-import { formatMessageTime } from '../utils/formatChatTime'
+import { useSiteFormat } from '../hooks/useSiteFormat'
 import { ROUTES } from '../routes/paths'
 import UserAvatar from '../components/dashboard/UserAvatar'
 import UnblockDialog from '../components/chat/UnblockDialog'
@@ -35,6 +35,7 @@ const REASON_LABELS = {
  */
 function BlockedUsersPage() {
   const { t, locale } = useLocale()
+  const { formatDate } = useSiteFormat()
   const { token } = useAuth()
   // The same method the chat menus call, so there is one unblock in the
   // application and the conversation list refreshes with it.
@@ -135,8 +136,11 @@ function BlockedUsersPage() {
                     {person.name}
                   </span>
                   <span className="text-xs text-text-muted">
+                    {/* A date, written the way the marketplace writes dates.
+                        This used to print a clock time — "Bloklangan: 14:05" —
+                        which says nothing about when it happened. */}
                     {t('blocked.blockedOn', {
-                      date: formatMessageTime(person.createdAt, locale),
+                      date: formatDate(person.createdAt),
                     })}
                   </span>
 

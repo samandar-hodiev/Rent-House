@@ -94,6 +94,21 @@ func (r *SettingsRepository) Set(
 	return nil
 }
 
+// Clear removes every stored setting.
+//
+// Deleting rather than writing the defaults back: the defaults live in the
+// registry, and a table with no rows is exactly "nothing has been configured".
+// Writing them as rows would make a fresh marketplace and a reset one differ
+// for no reason, and would freeze today's defaults into the database where a
+// later change to them would not reach.
+func (r *SettingsRepository) Clear(ctx context.Context) (int64, error) {
+	result := r.db.WithContext(ctx).Where("1 = 1").Delete(&SiteSetting{})
+	if result.Error != nil {
+		return 0, fmt.Errorf("clear settings: %w", result.Error)
+	}
+	return result.RowsAffected, nil
+}
+
 // LastUpdated is when the configuration last changed, for the page to show.
 // Zero when nothing has ever been written.
 func (r *SettingsRepository) LastUpdated(ctx context.Context) (time.Time, error) {

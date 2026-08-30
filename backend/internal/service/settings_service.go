@@ -242,6 +242,38 @@ func (s *SettingsService) Update(
 	return changes, nil
 }
 
+// Reset returns every setting to the value the registry declares, and reports
+// which ones actually moved.
+//
+// The whole configuration at once, deliberately: a per-section reset would be a
+// second, subtler way to change things, and this is the action somebody reaches
+// for when they want to know exactly what the marketplace is doing again.
+func (s *SettingsService) Reset(ctx context.Context) ([]SettingChange, error) {
+	before, err := s.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := s.settings.Clear(ctx); err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	s.cached = nil
+	s.mu.Unlock()
+
+	defaults := Defaults()
+	changes := make([]SettingChange, 0)
+	for _, def := range models.SettingDefs {
+		was := currentValue(before, def.Key)
+		now := currentValue(defaults, def.Key)
+		if was != now {
+			changes = append(changes, SettingChange{Key: def.Key, Old: was, New: now})
+		}
+	}
+	return changes, nil
+}
+
 // LastUpdated is when the configuration last changed.
 func (s *SettingsService) LastUpdated(ctx context.Context) (time.Time, error) {
 	return s.settings.LastUpdated(ctx)

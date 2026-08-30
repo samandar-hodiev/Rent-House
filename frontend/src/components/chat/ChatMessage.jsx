@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, CheckCheck, X } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
-import { formatMessageTime } from '../../utils/formatChatTime'
+import { useSiteFormat } from '../../hooks/useSiteFormat'
 import MessageAttachment from './MessageAttachment'
 import MessageActionsMenu from './MessageActionsMenu'
 import MessageQuote from './MessageQuote'
@@ -33,6 +33,7 @@ function ChatMessage({
   quoteAuthorName,
 }) {
   const { t, locale } = useLocale()
+  const { formatTime } = useSiteFormat()
   const isText = (message.kind ?? 'text') === 'text'
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.body)
@@ -229,7 +230,7 @@ function ChatMessage({
                 }`}
               >
                 {message.isEdited ? <span>{t('chat.edited')}</span> : null}
-                <span>{formatMessageTime(message.createdAt, locale)}</span>
+                <span>{formatTime(message.createdAt)}</span>
                 {/* Ticks belong to the sender: they report whether the other
                     side has read it, which is meaningless on your own copy of
                     someone else's message. */}

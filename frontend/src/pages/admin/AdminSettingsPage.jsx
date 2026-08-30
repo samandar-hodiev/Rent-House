@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Loader2, Settings2, Wrench } from 'lucide-react'
+import { AlertTriangle, Loader2, RotateCcw, Settings2, Wrench } from 'lucide-react'
 import {
   ADMIN_SELECT, ADMIN_SELECT_STYLE, AdminCard, MockButton, PageHeading, Switch,
   useAdminFormat,
@@ -9,7 +9,7 @@ import EmptyState from '../../components/EmptyState'
 import { useAdmin } from '../../context/AdminSettingsContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useToast } from '../../context/ToastContext'
-import { fetchSiteSettings, saveSiteSettings } from '../../services/adminApi'
+import { fetchSiteSettings, resetSiteSettings, saveSiteSettings } from '../../services/adminApi'
 import { FIELD, MAINTENANCE_KEYS, SETTINGS_SECTIONS, keysOf } from './settingsSchema'
 
 const INPUT =
@@ -472,6 +472,8 @@ function AdminSettingsPage() {
   const [saved, setSaved] = useState({})
   const [updatedAt, setUpdatedAt] = useState(null)
   const [failure, setFailure] = useState('')
+  const [resetting, setResetting] = useState(false)
+  const [confirmingReset, setConfirmingReset] = useState(false)
 
   // Whether anything on the page is unsaved, for the browser's own warning.
   // Per section, so one card going clean does not clear another's warning.
@@ -532,6 +534,33 @@ function AdminSettingsPage() {
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [t])
+
+  /**
+   * Everything back to the values the marketplace shipped with.
+   *
+   * The whole configuration, not one card: this is the action for somebody who
+   * has changed several things and wants to know exactly what the marketplace
+   * is doing again. Confirmed first, because it undoes work that is not
+   * recoverable from this page — the audit log keeps a record of what each
+   * value was, which is the only way back.
+   */
+  const reset = useCallback(async () => {
+    setResetting(true)
+    setFailure('')
+    try {
+      const { settings } = await resetSiteSettings({ token })
+      setSaved(settings)
+      const at = await fetchSiteSettings({ token })
+      setUpdatedAt(at.updatedAt)
+      showToast(t('settings.resetDone'))
+      setConfirmingReset(false)
+    } catch (error) {
+      setFailure(error?.message || t('settings.resetFailed'))
+      showToast(t('settings.resetFailed'))
+    } finally {
+      setResetting(false)
+    }
+  }, [token, showToast, t])
 
   const sections = useMemo(() => SETTINGS_SECTIONS, [])
 
@@ -611,8 +640,37 @@ function AdminSettingsPage() {
               />
             ))}
           </div>
+
+          {/* Last on the page and set apart: it undoes every card above it. */}
+          <AdminCard title={t('settings.resetTitle')}>
+            <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="max-w-xl text-xs text-text-muted">{t('settings.resetBody')}</p>
+              <MockButton
+                tone="danger"
+                disabled={resetting}
+                onClick={() => setConfirmingReset(true)}
+              >
+                <span className="flex items-center gap-1.5">
+                  <RotateCcw aria-hidden="true" size={13} />
+                  {resetting ? t('settings.resetting') : t('settings.resetAction')}
+                </span>
+              </MockButton>
+            </div>
+          </AdminCard>
         </>
       )}
+
+      {confirmingReset ? (
+        <AdminConfirmDialog
+          title={t('settings.resetTitle')}
+          description={t('settings.resetConfirm')}
+          confirmLabel={t('settings.resetAction')}
+          tone="danger"
+          busy={resetting}
+          onCancel={() => setConfirmingReset(false)}
+          onConfirm={reset}
+        />
+      ) : null}
     </div>
   )
 }

@@ -111,6 +111,17 @@ export async function saveSidebarSections(sections, { token, signal } = {}) {
 }
 
 /**
+ * Back to the values the server declares as its defaults.
+ *
+ * A delete rather than a write: the defaults live in the registry, so removing
+ * everything that was stored is what "as it came" means.
+ */
+export async function resetSiteSettings({ token, signal } = {}) {
+  const data = await request('/admin/settings', { method: 'DELETE', token, signal })
+  return { settings: data?.settings ?? {}, changed: data?.changed ?? 0 }
+}
+
+/**
  * The roles this system has, and what each one may reach.
  *
  * Derived by the server from the rules its own middleware enforces, so the

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Loader2, Pin, Search, X } from 'lucide-react'
 import { useLocale } from '../../context/LocaleContext'
 import { useChat } from '../../context/ChatContext'
-import { formatMessageTime } from '../../utils/formatChatTime'
+import { useSiteFormat } from '../../hooks/useSiteFormat'
 import UserAvatar from '../dashboard/UserAvatar'
 import BlockUserDialog from './BlockUserDialog'
 import { toReadableCase } from '../../utils/readableText'
@@ -18,6 +18,7 @@ import { ArchiveConversationDialog, DeleteConversationDialog } from './Conversat
  */
 function ChatConversationList({ activeId, onSelect, showArchive = false }) {
   const { t, locale } = useLocale()
+  const { formatTime } = useSiteFormat()
   const {
     conversations,
     archivedConversations,
@@ -195,7 +196,7 @@ function ChatConversationList({ activeId, onSelect, showArchive = false }) {
                     </span>
                     {last ? (
                       <span className="shrink-0 text-[11px] text-text-muted">
-                        {formatMessageTime(last.createdAt, locale)}
+                        {formatTime(last.createdAt)}
                       </span>
                     ) : null}
                   </span>

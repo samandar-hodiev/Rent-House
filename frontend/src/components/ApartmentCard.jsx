@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { MapPin, Map } from 'lucide-react'
 import { useLocale } from '../context/LocaleContext'
+import { useSiteLocation } from '../hooks/useSiteLocation'
 import { useWishlist } from '../context/WishlistContext'
 import { useRequireAuth } from '../hooks/useRequireAuth'
 import { getDistrictById, districtNameKey } from '../data/districts'
@@ -36,6 +37,7 @@ function HeartIcon({ filled }) {
 // every existing call site is unaffected.
 function ApartmentCard({ apartment, title: titleOverride, interactive = true }) {
   const { t } = useLocale()
+  const { city } = useSiteLocation()
   const navigate = useNavigate()
   const { isSaved, toggleWishlist } = useWishlist()
   const requireAuth = useRequireAuth()
@@ -116,7 +118,7 @@ function ApartmentCard({ apartment, title: titleOverride, interactive = true }) 
 
         <p className="flex items-center gap-1 text-sm text-text-secondary">
           <MapPin aria-hidden="true" size={14} className="shrink-0" />
-          {district ? t(districtNameKey(district.id)) : ''}, {t('city.tashkent')}
+          {district ? t(districtNameKey(district.id)) : ''}, {city}
         </p>
 
         <p className="text-sm text-text-muted">

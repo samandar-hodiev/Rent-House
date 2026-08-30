@@ -77,12 +77,22 @@ export const UTILITIES = [
 
 export const RENTAL_RULES = ['pets', 'smoking', 'families', 'students']
 
-export function createEmptyListing() {
+/**
+ * A blank listing form.
+ *
+ * `currency` is a parameter rather than a constant: which currency this
+ * marketplace prices in is the owner's to set, and a new listing should open
+ * in it. An unknown value falls back to the first currency the form offers, so
+ * a misconfigured setting cannot produce a form with no currency at all.
+ */
+export function createEmptyListing(currency) {
+  const known = CURRENCIES.some((option) => option.id === currency)
+
   return {
     title: '',
     description: '',
     price: '',
-    currency: CURRENCIES[0].id,
+    currency: known ? currency : CURRENCIES[0].id,
     rentalPeriod: RENTAL_PERIODS[0].id,
     rooms: '',
     area: '',

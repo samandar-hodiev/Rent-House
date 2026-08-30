@@ -348,7 +348,7 @@ func newRouter(
 	// Read-only: an administrator inspects listings, and the owner's own
 	// endpoints remain the only way to change one.
 	adminListings := service.NewAdminListingService(
-		repository.NewAdminListingRepository(db), apartments,
+		repository.NewAdminListingRepository(db), apartments, settingsService,
 	)
 	adminHandler := handler.NewAdminHandler(
 		adminService, adminStats, adminListings, settingsService,
@@ -444,6 +444,8 @@ func newRouter(
 			// these values decide whether listings reach the public at all.
 			authed.GET("/settings", middleware.RequireOwner(), adminHandler.Settings)
 			authed.PUT("/settings", middleware.RequireOwner(), adminHandler.UpdateSettings)
+			// Back to the declared defaults, in one action.
+			authed.DELETE("/settings", middleware.RequireOwner(), adminHandler.ResetSettings)
 
 			authed.GET("/sidebar", adminHandler.Sidebar)
 			authed.PUT("/sidebar", middleware.RequireOwner(), adminHandler.UpdateSidebar)

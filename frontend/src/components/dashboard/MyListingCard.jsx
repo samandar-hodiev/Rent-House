@@ -4,6 +4,7 @@ import { Eye, Pencil, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useListings } from '../../context/ListingsContext'
 import { useLocale } from '../../context/LocaleContext'
+import { useSiteLocation } from '../../hooks/useSiteLocation'
 import { useToast } from '../../context/ToastContext'
 import { districtNameKey, getDistrictById } from '../../data/districts'
 import { LISTING_STATUS, LISTING_STATUS_CLASS } from '../../data/listingStatus'
@@ -23,6 +24,7 @@ import ListingGalleryModal from './ListingGalleryModal'
 // the summary offers viewing and editing and sends you there for the rest.
 function MyListingCard({ listing, compact = false }) {
   const { t } = useLocale()
+  const { city } = useSiteLocation()
   const navigate = useNavigate()
   const { removeListing, changeListingStatus } = useListings()
   const { showToast } = useToast()
@@ -112,7 +114,7 @@ function MyListingCard({ listing, compact = false }) {
           </div>
 
           <p className="truncate text-sm text-text-secondary">
-            {district ? t(districtNameKey(district.id)) : ''}, {t('city.tashkent')}
+            {district ? t(districtNameKey(district.id)) : ''}, {city}
           </p>
           <p className="text-base font-semibold text-text-primary">
             {formatListingPrice(t, listing)}

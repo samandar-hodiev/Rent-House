@@ -981,6 +981,42 @@ func (h *AdminHandler) UpdateSettings(c *gin.Context) {
 	response.OK(c, "Settings updated", body)
 }
 
+// ResetSettings handles DELETE /api/v1/admin/settings.
+//
+// Owner-only, like every other write here. Each value that actually moved is
+// logged on its own line, so the record of a reset says what it undid rather
+// than only that one happened.
+func (h *AdminHandler) ResetSettings(c *gin.Context) {
+	actor, ok := middleware.AdminFrom(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
+		return
+	}
+
+	changes, err := h.settings.Reset(c.Request.Context())
+	if err != nil {
+		logger.Errorf("reset settings: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not reset the settings")
+		return
+	}
+
+	for _, change := range changes {
+		h.admins.Audit(c.Request.Context(), actor, models.AuditSettingsChanged,
+			auditTarget(change), c.ClientIP(), models.AuditSuccess)
+	}
+
+	saved, err := h.settings.Get(c.Request.Context())
+	if err != nil {
+		logger.Errorf("read settings: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not load the settings")
+		return
+	}
+
+	response.OK(c, "Settings reset", gin.H{"settings": saved, "changed": len(changes)})
+}
+
 // auditTarget renders one change as the line the log will show.
 //
 // Long values are cut: the column holds 300 characters and a site description

@@ -26,12 +26,16 @@ type AdminListingService struct {
 	// same column an owner changes, and a second way to write it would be a
 	// second set of rules to keep in step.
 	apartments *repository.ApartmentRepository
+	// The page size the owner configured. Optional: nil falls back to the
+	// declared default.
+	settings *SettingsService
 }
 
 func NewAdminListingService(
 	listings *repository.AdminListingRepository, apartments *repository.ApartmentRepository,
+	settings *SettingsService,
 ) *AdminListingService {
-	return &AdminListingService{listings: listings, apartments: apartments}
+	return &AdminListingService{listings: listings, apartments: apartments, settings: settings}
 }
 
 // SetStatus moves a listing between states, as moderation.
@@ -100,7 +104,7 @@ func (s *AdminListingService) List(
 	}
 	switch {
 	case limit < 1:
-		limit = 10
+		limit = s.pageSize(ctx)
 	case limit > maxListingPageSize:
 		limit = maxListingPageSize
 	}
@@ -274,7 +278,7 @@ func (s *AdminListingService) AllChats(
 	}
 	switch {
 	case limit < 1:
-		limit = 10
+		limit = s.pageSize(ctx)
 	case limit > maxListingPageSize:
 		limit = maxListingPageSize
 	}
@@ -318,4 +322,13 @@ func (s *AdminListingService) ChatMessages(
 		return nil, err
 	}
 	return &ChatThread{Buyer: buyer, Seller: seller, Messages: messages}, nil
+}
+
+// pageSize is the owner's configured page size, shared with every other table
+// in the dashboard.
+func (s *AdminListingService) pageSize(ctx context.Context) int {
+	if s.settings == nil {
+		return Defaults().PaginationDefaultSize
+	}
+	return s.settings.MustGet(ctx).PaginationDefaultSize
 }
