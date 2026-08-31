@@ -69,7 +69,7 @@ function Field({ field, value, error, onChange, t }) {
   const description = hint === hintKey ? '' : hint
 
   const caption = (
-    <span className="min-w-0 flex-1">
+    <span className="min-w-0 sm:flex-1">
       <span id={labelId} className="block text-sm font-medium text-text-primary">
         {label}
       </span>
@@ -86,7 +86,7 @@ function Field({ field, value, error, onChange, t }) {
 
   if (field.type === FIELD.toggle) {
     return (
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-3 sm:gap-4">
         {caption}
         <Switch checked={Boolean(value)} labelledBy={labelId} onChange={onChange} />
       </div>
@@ -144,12 +144,12 @@ function Field({ field, value, error, onChange, t }) {
 
   if (field.type === FIELD.select) {
     return (
-      <label className="flex items-start justify-between gap-4">
+      <label className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         {caption}
         <select
           value={String(value ?? '')}
           onChange={(event) => onChange(readControl(field, event))}
-          className={`${ADMIN_SELECT} w-44 shrink-0`}
+          className={`${ADMIN_SELECT} w-full sm:w-44 sm:shrink-0`}
           style={ADMIN_SELECT_STYLE}
         >
           {field.options.map((option) => (
@@ -163,7 +163,7 @@ function Field({ field, value, error, onChange, t }) {
   }
 
   return (
-    <label className="flex items-start justify-between gap-4">
+    <label className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       {caption}
       <input
         type={field.type === FIELD.number ? 'number' : 'text'}
@@ -172,7 +172,9 @@ function Field({ field, value, error, onChange, t }) {
         max={field.max}
         onChange={(event) => onChange(readControl(field, event))}
         aria-invalid={Boolean(error)}
-        className={`${INPUT} ${field.type === FIELD.number ? 'w-24 text-center' : 'w-64'} shrink-0`}
+        className={`${INPUT} w-full sm:shrink-0 ${
+          field.type === FIELD.number ? 'sm:w-24 sm:text-center' : 'sm:w-64'
+        }`}
       />
     </label>
   )
@@ -324,7 +326,7 @@ function MaintenanceCard({ saved, onSave, t }) {
     <>
       <AdminCard title={t('settingsSection.maintenance.title')}>
         <div className="flex flex-col gap-4 p-4">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
             <span className="flex min-w-0 flex-1 items-start gap-3">
               <span
                 className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
@@ -342,7 +344,7 @@ function MaintenanceCard({ saved, onSave, t }) {
                 </span>
               </span>
             </span>
-            <span className="flex shrink-0 items-center gap-2">
+            <span className="flex shrink-0 items-center justify-between gap-2 sm:justify-start">
               <span
                 className={`text-xs font-medium ${on ? 'text-warning' : 'text-text-muted'}`}
               >

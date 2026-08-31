@@ -96,7 +96,13 @@ export function StatusBadge({ status }) {
 export function AdminTable({ headers, children, empty }) {
   if (empty) return empty
   return (
-    <div className="chat-scroll overflow-x-auto">
+    // `relative` is not decoration: a table cell here can hold screen-reader
+    // text, which is positioned absolutely and one pixel wide. Without a
+    // positioned ancestor its box resolves against the viewport, lands wherever
+    // the wide table put it — several hundred pixels off-screen — and the whole
+    // page gains a horizontal scrollbar that nothing visible explains. Making
+    // the scroller the containing block keeps it inside.
+    <div className="chat-scroll relative overflow-x-auto">
       <table className="w-full min-w-[720px] border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-border">
