@@ -19,8 +19,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
-import ProfilePage from './pages/ProfilePage'
-import OwnerDashboardPage from './pages/OwnerDashboardPage'
+import OwnerLandingPage from './pages/OwnerLandingPage'
 import DashboardPage from './pages/DashboardPage'
 import DashboardListingsPage from './pages/DashboardListingsPage'
 import DashboardChatsPage from './pages/DashboardChatsPage'
@@ -106,13 +105,27 @@ function App() {
                             enforcement for the owner and admin areas belongs
                             server-side and lands with those endpoints; this
                             check is UX, not a security boundary. */}
+                        {/* What this marketplace offers somebody with a flat
+                            to let. Public: it is the page the footer's "for
+                            property owners" link leads to, and putting it
+                            behind the sign-in wall would mean the page whose
+                            job is to persuade you to join could only be read
+                            once you had. */}
+                        <Route path={ROUTES.owner} element={<OwnerLandingPage />} />
+
                         <Route element={<RequireAuth />}>
                           <Route
                             path={ROUTES.wishlist}
                             element={<Navigate to={ROUTES.dashboardSaved} replace />}
                           />
-                          <Route path={ROUTES.profile} element={<ProfilePage />} />
-                          <Route path={ROUTES.owner} element={<OwnerDashboardPage />} />
+                          {/* The account overview is the profile, and it lives
+                              in the account area. This address is kept as a
+                              redirect rather than as a second page, the same
+                              way /dashboard/profile is. */}
+                          <Route
+                            path={ROUTES.profile}
+                            element={<Navigate to={ROUTES.dashboard} replace />}
+                          />
                         </Route>
                         <Route path="*" element={<NotFoundPage />} />
                       </Route>
