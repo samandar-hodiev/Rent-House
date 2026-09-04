@@ -71,6 +71,9 @@ var (
 // client is allowed to set, and when a listing becomes publicly visible.
 type ApartmentService struct {
 	apartments *repository.ApartmentRepository
+	// Who to tell when a listing needs moderating. Optional: without it the
+	// marketplace works exactly as before, silently.
+	notifications *NotificationService
 	// How the marketplace is configured. Consulted on every write rather than
 	// read once at start-up, so switching moderation on takes effect on the
 	// next listing instead of on the next deployment.
@@ -79,8 +82,11 @@ type ApartmentService struct {
 
 func NewApartmentService(
 	apartments *repository.ApartmentRepository, settings *SettingsService,
+	notifications *NotificationService,
 ) *ApartmentService {
-	return &ApartmentService{apartments: apartments, settings: settings}
+	return &ApartmentService{
+		apartments: apartments, settings: settings, notifications: notifications,
+	}
 }
 
 // applySettings enforces the configured rules on a write.
@@ -168,6 +174,16 @@ func (s *ApartmentService) Create(
 			return nil, ErrInvalidDistrict
 		}
 		return nil, err
+	}
+
+	// A listing waiting for moderation is somebody's work to do, so the
+	// dashboard is told. Nothing is told about a draft or a listing that went
+	// straight to the public: neither is waiting for anyone.
+	if apartment.Status == models.ApartmentStatusPending {
+		s.notifications.NotifyAdmins(ctx,
+			models.NotificationListingPending, models.NotificationEntityListing, apartment.ID,
+			models.JSONMap{"title": apartment.Title},
+		)
 	}
 
 	// Re-read so the response carries the district, owner and images as stored,

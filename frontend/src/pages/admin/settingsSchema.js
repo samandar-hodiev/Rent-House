@@ -136,11 +136,13 @@ export const SETTINGS_SECTIONS = [
   },
   {
     id: 'notifications',
-    // One setting, and the card says why: notifications for listings, for
-    // moderation and for complaints have nothing to generate them yet, and a
-    // switch for a notification that is never sent would be a lie.
-    note: 'settingsSection.notifications.note',
-    fields: [{ key: 'notify_new_message', type: FIELD.toggle }],
+    fields: [
+      { key: 'notify_new_message', type: FIELD.toggle },
+      { key: 'notify_new_listing', type: FIELD.toggle },
+      { key: 'notify_new_report', type: FIELD.toggle },
+      { key: 'notify_new_registration', type: FIELD.toggle },
+      { key: 'notify_moderation', type: FIELD.toggle },
+    ],
   },
   {
     id: 'moderation',

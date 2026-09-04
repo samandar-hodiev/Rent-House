@@ -48,7 +48,9 @@ func newListingHarness(t *testing.T) *listingHarness {
 	analyticsHandler := NewAnalyticsHandler(analyticsService)
 	apartmentHandler := NewApartmentHandler(
 		service.NewApartmentService(
-			apartments, service.NewSettingsService(repository.NewSettingsRepository(h.db)),
+			apartments,
+			service.NewSettingsService(repository.NewSettingsRepository(h.db)),
+			service.NewNotificationService(repository.NewNotificationRepository(h.db), nil),
 		),
 		analyticsService,
 	)

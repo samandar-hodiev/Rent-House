@@ -1,4 +1,7 @@
 export default {
+  "dashboard.notifications": "Уведомления",
+  "dashboard.markAllRead": "Отметить все прочитанными",
+  "notification.listing_moderated": "Статус объявления «{title}»: {status}",
   "report.title": "Пожаловаться",
   "report.reasonLabel": "Причина",
   "report.commentLabel": "Комментарий (необязательно)",

@@ -111,6 +111,49 @@ export async function saveSidebarSections(sections, { token, signal } = {}) {
 }
 
 /**
+ * The dashboard's notification feed.
+ *
+ * The text is not stored anywhere: each row carries a type and a payload, and
+ * the interface renders the sentence in the reader's language. A stored
+ * sentence would be frozen in whichever language it was written in.
+ */
+export async function fetchNotifications({ unread, page = 1, limit, token, signal } = {}) {
+  const query = new URLSearchParams()
+  if (unread) query.set('unread', 'true')
+  query.set('page', String(page))
+  if (limit) query.set('limit', String(limit))
+
+  const data = await request(`/admin/notifications?${query}`, { token, signal })
+  return {
+    notifications: (data?.notifications ?? []).map(toNotification),
+    unread: data?.unread ?? 0,
+    total: data?.total ?? 0,
+    page: data?.page ?? 1,
+    limit: data?.limit ?? 20,
+  }
+}
+
+export function markNotificationRead(id, { token, signal } = {}) {
+  return request(`/admin/notifications/${id}/read`, { method: 'PATCH', token, signal })
+}
+
+export function markAllNotificationsRead({ token, signal } = {}) {
+  return request('/admin/notifications/read', { method: 'POST', token, signal })
+}
+
+function toNotification(row) {
+  return {
+    id: row.id,
+    type: row.type,
+    payload: row.payload ?? {},
+    entityType: row.entity_type ?? '',
+    entityId: row.entity_id ?? '',
+    read: Boolean(row.read),
+    createdAt: row.created_at,
+  }
+}
+
+/**
  * Complaints about listings.
  *
  * Filtering, searching and paging are the server's work, like every other

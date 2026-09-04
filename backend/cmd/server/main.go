@@ -197,6 +197,18 @@ func newRouter(
 	// where the values are set, but it is the rest of the API that obeys them.
 	settingsService := service.NewSettingsService(repository.NewSettingsRepository(db))
 
+	// What people should know about. Built early because nearly every service
+	// below has something to announce, and all of them announce through this
+	// one so the rules about which notifications are switched off live in a
+	// single place.
+	notificationService := service.NewNotificationService(
+		repository.NewNotificationRepository(db), settingsService,
+	)
+	// One handler for both feeds: the dashboard's and the marketplace's are the
+	// same endpoints with a different recipient, and the recipient comes from
+	// whichever token the route requires.
+	notificationHandler := handler.NewNotificationHandler(notificationService)
+
 	v1 := router.Group("/api/v1", middleware.Maintenance(settingsService))
 
 	// The site's own configuration: its name, the language it opens in, the
@@ -220,6 +232,7 @@ func newRouter(
 		cfg.OTP, settingsService,
 		repository.NewLoginAttemptRepository(db),
 		repository.NewRefreshTokenRepository(db),
+		notificationService,
 	)
 	// The first allowed origin is where the app is served from, and so where a
 	// password-reset link must point.
@@ -269,14 +282,15 @@ func newRouter(
 	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
 
 	apartmentHandler := handler.NewApartmentHandler(
-		service.NewApartmentService(apartments, settingsService), analyticsService,
+		service.NewApartmentService(apartments, settingsService, notificationService),
+		analyticsService,
 	)
 
 	// Complaints about listings. One service, read from both sides: a visitor
 	// raises one, an administrator answers it, and the moderation threshold
 	// that withdraws a listing lives with the counting rather than beside it.
 	reportService := service.NewReportService(
-		repository.NewReportRepository(db), apartments, settingsService,
+		repository.NewReportRepository(db), apartments, settingsService, notificationService,
 	)
 
 	// One chat repository, shared: the chat service publishes messages through
@@ -337,6 +351,13 @@ func newRouter(
 		me.POST("/favorites/:apartmentId", favoriteHandler.Save)
 		me.DELETE("/favorites/:apartmentId", favoriteHandler.Unsave)
 		me.GET("/dashboard/summary", favoriteHandler.Summary)
+
+		// What this account should know about: a decision on one of their
+		// listings, most often. The recipient is the token's user, so there is
+		// no id here to aim at somebody else's feed.
+		me.GET("/notifications", notificationHandler.UserList)
+		me.POST("/notifications/read", notificationHandler.UserReadAll)
+		me.PATCH("/notifications/:id/read", notificationHandler.UserRead)
 	}
 
 	// Listings that have been up longer than the marketplace allows. Started
@@ -367,6 +388,7 @@ func newRouter(
 	// endpoints remain the only way to change one.
 	adminListings := service.NewAdminListingService(
 		repository.NewAdminListingRepository(db), apartments, settingsService,
+		notificationService,
 	)
 	// Complaints are read by the dashboard and raised from a listing page, so
 	// the handler is built once here — after the admin service it audits
@@ -438,6 +460,16 @@ func newRouter(
 				marketplaceUsers.GET("", adminHandler.Users)
 				marketplaceUsers.GET("/:id", adminHandler.UserDetail)
 				marketplaceUsers.PATCH("/:id/status", adminHandler.SetUserStatus)
+			}
+
+			// The dashboard's own feed. Behind its section like everything
+			// else, so the owner can withdraw it.
+			notifications := authed.Group("/notifications",
+				middleware.RequireSection(adminService, "notifications"))
+			{
+				notifications.GET("", notificationHandler.AdminList)
+				notifications.POST("/read", notificationHandler.AdminReadAll)
+				notifications.PATCH("/:id/read", notificationHandler.AdminRead)
 			}
 
 			// Complaints, behind their own section like every other part of

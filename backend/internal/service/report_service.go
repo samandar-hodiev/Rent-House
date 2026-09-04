@@ -39,16 +39,21 @@ type ReportService struct {
 	reports    *repository.ReportRepository
 	apartments *repository.ApartmentRepository
 	settings   *SettingsService
-	now        func() time.Time
+	// The dashboard is told when a complaint arrives; without this the
+	// section only fills up for somebody who thinks to look.
+	notifications *NotificationService
+	now           func() time.Time
 }
 
 func NewReportService(
 	reports *repository.ReportRepository,
 	apartments *repository.ApartmentRepository,
 	settings *SettingsService,
+	notifications *NotificationService,
 ) *ReportService {
 	return &ReportService{
-		reports: reports, apartments: apartments, settings: settings, now: time.Now,
+		reports: reports, apartments: apartments, settings: settings,
+		notifications: notifications, now: time.Now,
 	}
 }
 
@@ -94,6 +99,11 @@ func (s *ReportService) Create(
 		}
 		return nil, err
 	}
+
+	s.notifications.NotifyAdmins(ctx,
+		models.NotificationReportCreated, models.NotificationEntityReport, report.ID,
+		models.JSONMap{"title": apartment.Title, "reason": reason},
+	)
 
 	s.applyThreshold(ctx, apartment)
 	return report, nil

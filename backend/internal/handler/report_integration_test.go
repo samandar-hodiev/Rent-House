@@ -35,7 +35,7 @@ func newReportFixture(t *testing.T) *reportFixture {
 
 	apartments := repository.NewApartmentRepository(h.tx)
 	reports := service.NewReportService(
-		repository.NewReportRepository(h.tx), apartments, h.settings)
+		repository.NewReportRepository(h.tx), apartments, h.settings, h.notifications)
 
 	var listing models.Apartment
 	if err := h.tx.Where("status = ?", models.ApartmentStatusActive).

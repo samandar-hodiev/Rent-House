@@ -80,7 +80,10 @@ func TestSettingsGovernListingWrites(t *testing.T) {
 	ctx := context.Background()
 
 	settings := service.NewSettingsService(repository.NewSettingsRepository(tx))
-	apartments := service.NewApartmentService(repository.NewApartmentRepository(tx), settings)
+	apartments := service.NewApartmentService(
+		repository.NewApartmentRepository(tx), settings,
+		service.NewNotificationService(repository.NewNotificationRepository(tx), settings),
+	)
 
 	// Any real account: owning a listing is not a role on this marketplace,
 	// it is simply having published one.

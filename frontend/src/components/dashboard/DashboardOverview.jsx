@@ -7,6 +7,7 @@ import { useDashboardSummary } from '../../hooks/useDashboardSummary'
 import { useViewsAnalytics } from '../../hooks/useViewsAnalytics'
 import { formatCount } from '../../utils/formatPeriod'
 import { ROUTES } from '../../routes/paths'
+import DashboardNotifications from './DashboardNotifications'
 import ViewsChart from './ViewsChart'
 
 // Reading the colours from the stylesheet rather than hard-coding hexes is what
@@ -104,6 +105,10 @@ function DashboardOverview() {
       <h1 className="text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">
         {t('dashboard.overviewTitle')}
       </h1>
+
+      {/* What happened to this account's listings while they were away. Above
+          the figures because it is news, and the figures are a state. */}
+      <DashboardNotifications />
 
       {/* Three equal figures: what you have published, what is waiting to be
           read, and what you saved. Two columns on a tablet and one on a phone,

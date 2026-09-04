@@ -182,6 +182,31 @@ export function reportListing(id, { reason, comment, token, signal } = {}) {
   })
 }
 
+/**
+ * What this account should know about — a decision on one of their listings,
+ * most often. The recipient is the token's user, so there is no id to pass.
+ */
+export async function fetchMyNotifications({ token, signal, limit = 5 } = {}) {
+  const data = await request(`/me/notifications?limit=${limit}`, { token, signal })
+  return {
+    notifications: (data?.notifications ?? []).map((row) => ({
+      id: row.id,
+      type: row.type,
+      payload: row.payload ?? {},
+      entityType: row.entity_type ?? '',
+      entityId: row.entity_id ?? '',
+      read: Boolean(row.read),
+      createdAt: row.created_at,
+    })),
+    unread: data?.unread ?? 0,
+  }
+}
+
+/** Marks the whole feed read, which is what opening it means here. */
+export function markMyNotificationsRead({ token, signal } = {}) {
+  return request('/me/notifications/read', { method: 'POST', token, signal })
+}
+
 /** The signed-in user's own listings, drafts included. */
 export async function fetchMyApartments({ token, signal, ...params } = {}) {
   const query = new URLSearchParams(omitEmpty(params)).toString()

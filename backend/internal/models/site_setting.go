@@ -139,7 +139,11 @@ const (
 	SettingDefaultCity           = "default_city"
 	SettingPaginationDefaultSize = "pagination_default_size"
 
-	SettingNotifyNewMessage = "notify_new_message"
+	SettingNotifyNewMessage      = "notify_new_message"
+	SettingNotifyNewListing      = "notify_new_listing"
+	SettingNotifyNewReport       = "notify_new_report"
+	SettingNotifyNewRegistration = "notify_new_registration"
+	SettingNotifyModeration      = "notify_moderation"
 )
 
 // Values the closed-set settings accept.
@@ -304,12 +308,18 @@ var SettingDefs = []SettingDef{
 
 	// Notifications ---------------------------------------------------------
 	//
-	// One setting, because one kind of notification exists: the card the app
-	// raises when a message arrives. Notifications for new listings, for
-	// moderation and for complaints have nothing to generate them yet, and a
-	// switch for a notification that is never sent would say the marketplace
-	// is configured a way it is not.
+	// Each of these switches off one kind of notification at its source: with
+	// it off nothing is written, rather than written and hidden. What is not
+	// recorded cannot be read later, which is the honest meaning of "off".
 	{Key: SettingNotifyNewMessage, Type: SettingBool, Category: CategoryNotifications,
+		Default: "true"},
+	{Key: SettingNotifyNewListing, Type: SettingBool, Category: CategoryNotifications,
+		Default: "true"},
+	{Key: SettingNotifyNewReport, Type: SettingBool, Category: CategoryNotifications,
+		Default: "true"},
+	{Key: SettingNotifyNewRegistration, Type: SettingBool, Category: CategoryNotifications,
+		Default: "false"},
+	{Key: SettingNotifyModeration, Type: SettingBool, Category: CategoryNotifications,
 		Default: "true"},
 }
 

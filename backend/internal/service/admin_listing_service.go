@@ -29,13 +29,19 @@ type AdminListingService struct {
 	// The page size the owner configured. Optional: nil falls back to the
 	// declared default.
 	settings *SettingsService
+	// The owner of a listing is told what was decided about it. Without this a
+	// moderation decision is invisible to the one person it concerns most.
+	notifications *NotificationService
 }
 
 func NewAdminListingService(
 	listings *repository.AdminListingRepository, apartments *repository.ApartmentRepository,
-	settings *SettingsService,
+	settings *SettingsService, notifications *NotificationService,
 ) *AdminListingService {
-	return &AdminListingService{listings: listings, apartments: apartments, settings: settings}
+	return &AdminListingService{
+		listings: listings, apartments: apartments,
+		settings: settings, notifications: notifications,
+	}
 }
 
 // SetStatus moves a listing between states, as moderation.
@@ -81,6 +87,14 @@ func (s *AdminListingService) SetStatus(
 		}
 		return err
 	}
+
+	// The owner is told what was decided. Without this the one person the
+	// decision concerns most would have to notice it themselves.
+	s.notifications.NotifyUser(ctx, current.OwnerID,
+		models.NotificationListingModerated, models.NotificationEntityListing, id,
+		models.JSONMap{"title": current.Title, "status": target},
+	)
+
 	return nil
 }
 

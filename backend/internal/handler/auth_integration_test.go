@@ -158,6 +158,7 @@ func newHarness(t *testing.T) *harness {
 		service.NewSettingsService(repository.NewSettingsRepository(db)),
 		repository.NewLoginAttemptRepository(db),
 		repository.NewRefreshTokenRepository(db),
+		service.NewNotificationService(repository.NewNotificationRepository(db), nil),
 	)
 	h := NewAuthHandler(authService, "http://localhost:5173")
 
@@ -1124,6 +1125,7 @@ func TestProviderRejectionIsReportedAsADeliveryFailure(t *testing.T) {
 		service.NewSettingsService(repository.NewSettingsRepository(h.db)),
 		repository.NewLoginAttemptRepository(h.db),
 		repository.NewRefreshTokenRepository(h.db),
+		service.NewNotificationService(repository.NewNotificationRepository(h.db), nil),
 	)
 
 	router := gin.New()

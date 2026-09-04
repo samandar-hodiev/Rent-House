@@ -1,4 +1,7 @@
 export default {
+  "dashboard.notifications": "Bildirishnomalar",
+  "dashboard.markAllRead": "Hammasini o'qilgan deb belgilash",
+  "notification.listing_moderated": "\"{title}\" e'loningiz holati: {status}",
   "report.title": "Shikoyat qilish",
   "report.reasonLabel": "Sabab",
   "report.commentLabel": "Qo'shimcha izoh (ixtiyoriy)",

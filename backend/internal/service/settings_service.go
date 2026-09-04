@@ -98,7 +98,11 @@ type Settings struct {
 	DefaultCity           string `setting:"default_city"           json:"default_city"`
 	PaginationDefaultSize int    `setting:"pagination_default_size" json:"pagination_default_size"`
 
-	NotifyNewMessage bool `setting:"notify_new_message" json:"notify_new_message"`
+	NotifyNewMessage      bool `setting:"notify_new_message"      json:"notify_new_message"`
+	NotifyNewListing      bool `setting:"notify_new_listing"      json:"notify_new_listing"`
+	NotifyNewReport       bool `setting:"notify_new_report"       json:"notify_new_report"`
+	NotifyNewRegistration bool `setting:"notify_new_registration" json:"notify_new_registration"`
+	NotifyModeration      bool `setting:"notify_moderation"       json:"notify_moderation"`
 }
 
 // settingsCacheTTL bounds how stale a read can be.

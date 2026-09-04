@@ -138,6 +138,8 @@ type AuthService struct {
 	// issues access tokens alone, which is how it behaved before sessions
 	// could be ended.
 	sessions *repository.RefreshTokenRepository
+	// The dashboard is told when somebody joins, if the owner asked for it.
+	notifications *NotificationService
 	// How the marketplace is configured. Read on each request rather than at
 	// start-up, so switching registration off takes effect on the next attempt
 	// instead of the next deployment. Optional: tests that predate it pass nil
@@ -158,6 +160,7 @@ func NewAuthService(
 	settings *SettingsService,
 	attempts *repository.LoginAttemptRepository,
 	sessions *repository.RefreshTokenRepository,
+	notifications *NotificationService,
 ) *AuthService {
 	return &AuthService{
 		users:         users,
@@ -169,6 +172,7 @@ func NewAuthService(
 		settings:      settings,
 		attempts:      attempts,
 		sessions:      sessions,
+		notifications: notifications,
 		now:           time.Now,
 	}
 }
@@ -498,6 +502,15 @@ func (s *AuthService) CompleteRegistration(
 	verification.UpdatedAt = now
 	if err := s.verifications.Save(ctx, verification); err != nil {
 		return nil, err
+	}
+
+	// Somebody joined. Off by default — a marketplace that grows will not want
+	// a notification per sign-up — but available to an owner who does.
+	if s.notifications != nil {
+		s.notifications.NotifyAdmins(ctx,
+			models.NotificationUserRegistered, models.NotificationEntityUser, user.ID,
+			models.JSONMap{"name": strings.TrimSpace(user.FirstName + " " + user.LastName)},
+		)
 	}
 
 	return s.authResponse(ctx, user)

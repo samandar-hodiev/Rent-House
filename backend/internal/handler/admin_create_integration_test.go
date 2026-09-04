@@ -37,12 +37,13 @@ import (
 )
 
 type adminHarness struct {
-	tx       *gorm.DB
-	router   *gin.Engine
-	tokens   *token.Service
-	admins   *service.AdminService
-	settings *service.SettingsService
-	owner    *models.Admin
+	tx            *gorm.DB
+	router        *gin.Engine
+	tokens        *token.Service
+	admins        *service.AdminService
+	settings      *service.SettingsService
+	notifications *service.NotificationService
+	owner         *models.Admin
 }
 
 func newAdminHarness(t *testing.T) *adminHarness {
@@ -71,6 +72,8 @@ func newAdminHarness(t *testing.T) *adminHarness {
 	}
 
 	settings := service.NewSettingsService(repository.NewSettingsRepository(tx))
+	notifications := service.NewNotificationService(
+		repository.NewNotificationRepository(tx), settings)
 	adminRepo := repository.NewAdminRepository(tx)
 	admins := service.NewAdminService(adminRepo, tokens, settings, repository.NewRefreshTokenRepository(tx))
 
@@ -79,7 +82,7 @@ func newAdminHarness(t *testing.T) *adminHarness {
 		service.NewAdminStatsService(repository.NewAdminStatsRepository(tx), settings),
 		service.NewAdminListingService(
 			repository.NewAdminListingRepository(tx), repository.NewApartmentRepository(tx),
-			settings,
+			settings, notifications,
 		),
 		settings,
 		nil, "/uploads", "",
@@ -105,7 +108,7 @@ func newAdminHarness(t *testing.T) *adminHarness {
 
 	return &adminHarness{
 		tx: tx, router: router, tokens: tokens,
-		admins: admins, settings: settings, owner: &found,
+		admins: admins, settings: settings, notifications: notifications, owner: &found,
 	}
 }
 
@@ -127,10 +130,10 @@ func (h *adminHarness) publicRouter(t *testing.T) *gin.Engine {
 		repository.NewVerificationRepository(h.tx),
 		h.tokens, silentSender{}, silentSender{}, testPolicy(),
 		h.settings, repository.NewLoginAttemptRepository(h.tx),
-		repository.NewRefreshTokenRepository(h.tx),
+		repository.NewRefreshTokenRepository(h.tx), h.notifications,
 	)
 	apartmentHandler := NewApartmentHandler(
-		service.NewApartmentService(apartments, h.settings), analytics)
+		service.NewApartmentService(apartments, h.settings, h.notifications), analytics)
 	authHandler := NewAuthHandler(authService, "http://localhost:5173")
 
 	router := gin.New()

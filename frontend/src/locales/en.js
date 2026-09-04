@@ -1,4 +1,7 @@
 export default {
+  "dashboard.notifications": "Notifications",
+  "dashboard.markAllRead": "Mark all as read",
+  "notification.listing_moderated": "Your listing \"{title}\" is now {status}",
   "report.title": "Report this listing",
   "report.reasonLabel": "Reason",
   "report.commentLabel": "Anything to add (optional)",
