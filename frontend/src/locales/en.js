@@ -500,24 +500,6 @@ export default {
   'apartmentCard.wishlistRemove': 'Remove from saved',
   'apartmentCard.detailsAriaLabel': 'View details: {title}',
 
-  'apartmentTitle.1': 'Cozy 2-room apartment',
-  'apartmentTitle.2': '3-room family apartment',
-  'apartmentTitle.3': 'Newly renovated 1-room apartment',
-  'apartmentTitle.4': 'Apartment near Magic City',
-  'apartmentTitle.5': 'House with a yard, quiet area',
-  'apartmentTitle.6': '2-room apartment near the center',
-  'apartmentTitle.7': '4-room apartment with a wide balcony',
-  'apartmentTitle.8': 'Small studio-style room',
-  'apartmentTitle.9': 'Yunusobod, new 3-room apartment',
-  'apartmentTitle.10': 'Sergeli, newly built housing',
-  'apartmentTitle.11': 'Mirzo Ulugbek, 2-room flat by the university',
-  'apartmentTitle.12': 'Yashnobod, spacious flat near the metro',
-  'apartmentTitle.13': 'Uchtepa, family 4-room apartment',
-  'apartmentTitle.14': 'Bektemir, affordable flat in a quiet area',
-  'apartmentTitle.15': 'Yangihayot, studio in a new building',
-  'apartmentTitle.16': 'Mirobod, luxury flat near the business centre',
-  'apartmentTitle.17': 'Olmazor, comfortable flat for students',
-  'apartmentTitle.18': 'Shayxontohur, 3-room flat in the historic centre',
 
   'posted.minutesAgo': '{count} minutes ago',
   'posted.hoursAgo': '{count} hours ago',
@@ -714,42 +696,6 @@ export default {
   'listing.errorAddress': 'Enter the address',
   'listing.errorDescription': 'Enter a description',
 
-  'apartmentDescription.1':
-    'Bright and cozy apartment fully equipped with furniture and appliances. Close to the metro and shops, convenient for families.',
-  'apartmentDescription.2':
-    'Spacious family apartment in the center of Chilonzor. Near the metro station, kindergartens and schools.',
-  'apartmentDescription.3':
-    'Recently renovated apartment with new plumbing and appliances. Ideal for a single person or a couple.',
-  'apartmentDescription.4':
-    'Modern apartment within walking distance of Magic City. Panoramic windows and quality renovation.',
-  'apartmentDescription.5':
-    'Detached house with a yard in a quiet, green area. No noise, great for family relaxation.',
-  'apartmentDescription.6':
-    'Convenient apartment near the city center, within walking distance of the metro. Close to offices and universities.',
-  'apartmentDescription.7':
-    'Large 4-room apartment with a wide balcony. Suitable for big families, all rooms are bright and separate.',
-  'apartmentDescription.8':
-    'Compact and budget-friendly studio-style room for one person. All essential furniture included.',
-  'apartmentDescription.9':
-    'Spacious, bright apartment in a new residential complex. Near Yunusobod metro station.',
-  'apartmentDescription.10':
-    'Clean apartment in a newly built house, rented out for the first time. New infrastructure and spacious grounds.',
-  'apartmentDescription.11':
-    'A bright, furnished flat close to the universities and the metro station. Balcony and lift included.',
-  'apartmentDescription.12':
-    'A spacious flat near Parkent market and the metro. Unfurnished, so you can move in with your own.',
-  'apartmentDescription.13':
-    'A comfortable, fully furnished 4-room apartment for a family. Parking in the courtyard.',
-  'apartmentDescription.14':
-    'A compact flat in a quiet neighbourhood away from the noise. A good fit if you are watching the budget.',
-  'apartmentDescription.15':
-    'A modern studio in a new high-rise. Lift, security and full furnishing.',
-  'apartmentDescription.16':
-    'A luxury flat in the centre near the business districts, with air conditioning and parking.',
-  'apartmentDescription.17':
-    'A compact furnished flat next to the university. Convenient for students and young professionals.',
-  'apartmentDescription.18':
-    'A spacious flat in the historic centre on Navoiy street. Transport and shops right nearby.',
 
   'map.pageTitle': 'Map',
   'map.viewDetails': 'View details',

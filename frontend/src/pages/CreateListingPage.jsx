@@ -54,8 +54,8 @@ function ListingForm({ id, isEditMode, existing }) {
     existing
       ? listingToFormValues(
           existing,
-          listingTitle(t, existing),
-          listingDescription(t, existing),
+          listingTitle(existing),
+          listingDescription(existing),
         )
       : createEmptyListing(settings.default_currency),
   )

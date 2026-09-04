@@ -61,7 +61,7 @@ function MyListingCard({ listing, compact = false }) {
   }
   const [isGalleryOpen, setIsGalleryOpen] = useState(false)
   // An owner-edited title wins; otherwise the catalog title stays translated.
-  const title = listingTitle(t, listing)
+  const title = listingTitle(listing)
   const district = getDistrictById(listing.districtId)
   // This listing's own photos, falling back to the cover when it has just one.
   const galleryImages = listing.images?.length ? listing.images : [listing.image].filter(Boolean)

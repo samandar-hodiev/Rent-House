@@ -177,8 +177,8 @@ function ApartmentDetailsPage() {
     )
   }
 
-  const title = listingTitle(t, apartment)
-  const description = listingDescription(t, apartment)
+  const title = listingTitle(apartment)
+  const description = listingDescription(apartment)
   const district = getDistrictById(apartment.districtId)
   const saved = isSaved(apartment.id)
 

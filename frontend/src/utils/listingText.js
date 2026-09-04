@@ -1,30 +1,27 @@
 // The title and description a listing displays.
 //
-// Listings from the API carry their own text: the owner typed it, in whatever
-// language they chose, and it is stored on the row. The seeded demo catalog
-// instead keys its copy off `apartmentTitle.<id>` so it can be shown in all
-// three languages.
+// Listings carry their own text: the owner typed it, in whatever language they
+// chose, and it is stored on the row — so there is nothing to translate here.
 //
-// These helpers prefer the stored text and fall back to the translation key, so
-// both kinds of listing render through the same components without either
-// having to know which it is holding.
+// There used to be a fallback to `apartmentTitle.<id>` in the dictionary, for a
+// seeded demo catalogue whose copy existed in all three languages. That
+// catalogue is gone, and with it the only listings those keys could match: a
+// real listing has a uuid, and the fallback could only ever have rendered the
+// key itself on screen.
 //
-// Stored text is also passed through `toReadableCase`, which is why every
-// screen showing a listing agrees on how a shouted title looks. The catalog's
-// own copy is already cased correctly and is unaffected by it.
+// What remains is `toReadableCase`, which is why every screen showing a listing
+// agrees on how a shouted title looks.
 
 import { toReadableCase } from './readableText'
 
-export function listingTitle(t, listing) {
+export function listingTitle(listing) {
   if (!listing) return ''
   const stored = listing.customTitle ?? listing.title
-  if (typeof stored === 'string' && stored.trim()) return toReadableCase(stored)
-  return t(`apartmentTitle.${listing.id}`)
+  return typeof stored === 'string' ? toReadableCase(stored) : ''
 }
 
-export function listingDescription(t, listing) {
+export function listingDescription(listing) {
   if (!listing) return ''
   const stored = listing.description
-  if (typeof stored === 'string' && stored.trim()) return toReadableCase(stored)
-  return t(`apartmentDescription.${listing.id}`)
+  return typeof stored === 'string' ? toReadableCase(stored) : ''
 }

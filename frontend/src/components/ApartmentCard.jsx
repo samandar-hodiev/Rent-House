@@ -44,7 +44,7 @@ function ApartmentCard({ apartment, title: titleOverride, interactive = true }) 
   const isWishlisted = isSaved(apartment.id)
 
   const district = getDistrictById(apartment.districtId)
-  const title = titleOverride ?? listingTitle(t, apartment)
+  const title = titleOverride ?? listingTitle(apartment)
 
   // Saving a listing belongs to an account, so a signed-out visitor is sent to
   // sign in first and returned here afterwards. The button stays visible either

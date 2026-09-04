@@ -500,24 +500,6 @@ export default {
   'apartmentCard.wishlistRemove': "Saqlangandan olib tashlash",
   'apartmentCard.detailsAriaLabel': "{title}, batafsil ma'lumot",
 
-  'apartmentTitle.1': '2 xonali shinam kvartira',
-  'apartmentTitle.2': '3 xonali oilaviy kvartira',
-  'apartmentTitle.3': "Yangi ta'mirlangan 1 xonali",
-  'apartmentTitle.4': 'Magic City yaqinidagi kvartira',
-  'apartmentTitle.5': 'Hovlili uy, tinch hudud',
-  'apartmentTitle.6': 'Markazga yaqin 2 xonali',
-  'apartmentTitle.7': 'Keng balkonli 4 xonali',
-  'apartmentTitle.8': 'Yotoqxona turidagi kichik xona',
-  'apartmentTitle.9': 'Yunusobod, yangi uy 3 xona',
-  'apartmentTitle.10': 'Sergeli, yangi qurilgan turar-joy',
-  'apartmentTitle.11': "Mirzo Ulug'bek, universitet yonida 2 xonali",
-  'apartmentTitle.12': 'Yashnobod, metro yaqinidagi keng kvartira',
-  'apartmentTitle.13': 'Uchtepa, oilaviy 4 xonali kvartira',
-  'apartmentTitle.14': 'Bektemir, tinch hududda arzon kvartira',
-  'apartmentTitle.15': 'Yangihayot, yangi binoda studiya',
-  'apartmentTitle.16': 'Mirobod, biznes markaz yaqinida lyuks kvartira',
-  'apartmentTitle.17': 'Olmazor, talabalar uchun qulay kvartira',
-  'apartmentTitle.18': 'Shayxontohur, tarixiy markazda 3 xonali',
 
   'posted.minutesAgo': '{count} daqiqa oldin',
   'posted.hoursAgo': '{count} soat oldin',
@@ -715,42 +697,6 @@ export default {
   'listing.errorAddress': 'Manzilni kiriting',
   'listing.errorDescription': 'Tavsifni kiriting',
 
-  'apartmentDescription.1':
-    "Yorug' va shinam kvartira, barcha kerakli mebel va texnika bilan jihozlangan. Metro va do'konlarga yaqin, oilalar uchun qulay.",
-  'apartmentDescription.2':
-    "Chilonzor markazida joylashgan keng oilaviy kvartira. Metro bekatiga yaqin, bolalar bog'chasi va maktablar atrofida.",
-  'apartmentDescription.3':
-    "Yaqinda ta'mirlangan, yangi santexnika va elektr jihozlari o'rnatilgan shinam kvartira. Yolg'iz yoki juftliklar uchun ideal.",
-  'apartmentDescription.4':
-    "Magic City savdo-ko'ngilochar majmuasiga piyoda masofada joylashgan zamonaviy kvartira. Panoramali derazalar va sifatli ta'mir.",
-  'apartmentDescription.5':
-    'Tinch va yashil hududda joylashgan, hovlisi bor mustaqil uy. Shovqin-suronsiz, oilaviy dam olish uchun qulay.',
-  'apartmentDescription.6':
-    'Shahar markaziga yaqin, metro bekatidan piyoda erishish mumkin bo‘lgan qulay kvartira. Ofis va universitetlarga yaqin.',
-  'apartmentDescription.7':
-    'Keng balkonli, 4 xonali katta kvartira. Katta oilalar uchun mos, barcha xonalar alohida va yorug‘.',
-  'apartmentDescription.8':
-    "Kichik va tejamkor, yolg'iz yashovchilar uchun mos studiya turidagi xona. Barcha zarur mebel mavjud.",
-  'apartmentDescription.9':
-    'Yangi qurilgan turar-joy majmuasida joylashgan keng va yorug‘ kvartira. Metro Yunusobod bekatiga yaqin.',
-  'apartmentDescription.10':
-    "Yangi qurilgan uyda joylashgan, birinchi marta ijaraga beriladigan toza kvartira. Yangi infratuzilma va keng hudud.",
-  'apartmentDescription.11':
-    "Universitetlar va Buyuk Ipak Yo'li metro bekatiga yaqin, jihozlangan yorug' kvartira. Balkon va lift mavjud.",
-  'apartmentDescription.12':
-    "Parkent bozori va metroga yaqin joylashgan keng kvartira. Jihozsiz, o'z mebelingiz bilan ko'chib kelishingiz mumkin.",
-  'apartmentDescription.13':
-    "Kichik oila uchun qulay, to'liq jihozlangan 4 xonali kvartira. Hovlida avtoturargoh bor.",
-  'apartmentDescription.14':
-    'Shovqindan uzoq, tinch mahallada joylashgan ixcham kvartira. Byudjetni tejamoqchilar uchun mos.',
-  'apartmentDescription.15':
-    "Yangi ko'p qavatli binodagi zamonaviy studiya. Lift, qo'riqlash va to'liq jihoz bilan.",
-  'apartmentDescription.16':
-    "Shahar markazidagi biznes markazlarga yaqin, konditsioner va avtoturargoh bilan ta'minlangan lyuks kvartira.",
-  'apartmentDescription.17':
-    'Universitet yonidagi ixcham va jihozlangan kvartira. Talabalar va yosh mutaxassislar uchun qulay.',
-  'apartmentDescription.18':
-    "Tarixiy markazda, Navoiy ko'chasida joylashgan keng kvartira. Transport va do'konlar yonginasida.",
 
   'map.pageTitle': 'Xarita',
   'map.viewDetails': "Batafsil ko'rish",

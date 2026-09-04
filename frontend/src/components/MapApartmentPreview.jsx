@@ -17,7 +17,7 @@ function MapApartmentPreview({ apartment, onClose, variant = 'floating' }) {
   const { city } = useSiteLocation()
   const navigate = useNavigate()
 
-  const title = listingTitle(t, apartment)
+  const title = listingTitle(apartment)
   const district = getDistrictById(apartment.districtId)
 
   return (
