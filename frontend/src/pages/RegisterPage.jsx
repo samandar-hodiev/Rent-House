@@ -239,7 +239,7 @@ function RegisterPage() {
 
       // The backend signs the user in as part of registration, so there is no
       // second trip through the login form.
-      signIn(data.access_token, data.user)
+      signIn(data.access_token, data.user, data.refresh_token)
       navigate(destination, { replace: true })
     } catch (error) {
       setFormError(messageFor(error))

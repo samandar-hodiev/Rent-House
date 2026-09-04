@@ -48,6 +48,21 @@ export function login({ identifier, password }) {
 }
 
 /**
+ * Renews a session.
+ *
+ * Unauthenticated: the access token this replaces has usually expired by the
+ * time this is called, so the refresh token is the only credential sent.
+ */
+export function refreshSession(refreshToken) {
+  return request('/auth/refresh', { method: 'POST', body: { refresh_token: refreshToken } })
+}
+
+/** Ends the session on the server, so signing out is more than forgetting. */
+export function logout(refreshToken) {
+  return request('/auth/logout', { method: 'POST', body: { refresh_token: refreshToken } })
+}
+
+/**
  * Asks for a password-reset link.
  *
  * Always resolves. The server answers the same way whether or not the address

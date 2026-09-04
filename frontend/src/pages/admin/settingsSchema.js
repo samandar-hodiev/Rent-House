@@ -165,6 +165,7 @@ export const SETTINGS_SECTIONS = [
       { key: 'password_min_length', type: FIELD.number, min: 6, max: 72 },
       { key: 'password_require_strong', type: FIELD.toggle },
       { key: 'jwt_expiration_hours', type: FIELD.number, min: 1, max: 720 },
+      { key: 'refresh_expiration_days', type: FIELD.number, min: 1, max: 365 },
       { key: 'login_max_attempts', type: FIELD.number, min: 3, max: 20 },
       { key: 'login_lock_minutes', type: FIELD.number, min: 1, max: 1440 },
       { key: 'otp_expiry_minutes', type: FIELD.number, min: 1, max: 60 },

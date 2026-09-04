@@ -217,7 +217,9 @@ func newRouter(
 	authService := service.NewAuthService(
 		users, verifications, tokens,
 		delivery.sms, delivery.email,
-		cfg.OTP, settingsService, repository.NewLoginAttemptRepository(db),
+		cfg.OTP, settingsService,
+		repository.NewLoginAttemptRepository(db),
+		repository.NewRefreshTokenRepository(db),
 	)
 	// The first allowed origin is where the app is served from, and so where a
 	// password-reset link must point.
@@ -236,6 +238,11 @@ func newRouter(
 		auth.POST("/register/verify", authHandler.VerifyRegistrationCode)
 		auth.POST("/register/complete", authHandler.CompleteRegistration)
 		auth.POST("/login", authHandler.Login)
+		// Renewing and ending a session. Public: both carry the refresh token
+		// in the body, which is the only credential either needs — an expired
+		// access token must still be able to sign out.
+		auth.POST("/refresh", authHandler.Refresh)
+		auth.POST("/logout", authHandler.Logout)
 
 		// Protected.
 		auth.GET("/me", middleware.Auth(tokens), authHandler.Me)
@@ -341,7 +348,10 @@ func newRouter(
 	// visitor's token is refused here, and an administrator's is refused by the
 	// marketplace. Sharing one account table would mean the public registration
 	// endpoint writes rows the admin authorization has to be careful about.
-	adminService := service.NewAdminService(repository.NewAdminRepository(db), tokens, settingsService)
+	adminService := service.NewAdminService(
+		repository.NewAdminRepository(db), tokens, settingsService,
+		repository.NewRefreshTokenRepository(db),
+	)
 	// Every figure the dashboard shows is counted by PostgreSQL; this service
 	// only shapes the counts into series.
 	adminStats := service.NewAdminStatsService(repository.NewAdminStatsRepository(db), settingsService)

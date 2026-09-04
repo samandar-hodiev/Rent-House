@@ -83,7 +83,8 @@ type Settings struct {
 	MediaAllowedImageFormats      []string `setting:"media_allowed_image_formats"      json:"media_allowed_image_formats"`
 	MediaAllowedAttachmentFormats []string `setting:"media_allowed_attachment_formats" json:"media_allowed_attachment_formats"`
 
-	JWTExpirationHours    int  `setting:"jwt_expiration_hours"     json:"jwt_expiration_hours"`
+	JWTExpirationHours    int  `setting:"jwt_expiration_hours"      json:"jwt_expiration_hours"`
+	RefreshExpirationDays int  `setting:"refresh_expiration_days"   json:"refresh_expiration_days"`
 	LoginMaxAttempts      int  `setting:"login_max_attempts"       json:"login_max_attempts"`
 	LoginLockMinutes      int  `setting:"login_lock_minutes"       json:"login_lock_minutes"`
 	PasswordMinLength     int  `setting:"password_min_length"      json:"password_min_length"`

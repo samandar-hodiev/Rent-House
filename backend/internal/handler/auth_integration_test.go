@@ -157,6 +157,7 @@ func newHarness(t *testing.T) *harness {
 		// ones an owner can change.
 		service.NewSettingsService(repository.NewSettingsRepository(db)),
 		repository.NewLoginAttemptRepository(db),
+		repository.NewRefreshTokenRepository(db),
 	)
 	h := NewAuthHandler(authService, "http://localhost:5173")
 
@@ -166,6 +167,10 @@ func newHarness(t *testing.T) *harness {
 	auth.POST("/register/verify", h.VerifyRegistrationCode)
 	auth.POST("/register/complete", h.CompleteRegistration)
 	auth.POST("/login", h.Login)
+	// Mirrors cmd/server: renewing and ending a session are part of the auth
+	// surface, and a test that had to skip them would prove nothing about them.
+	auth.POST("/refresh", h.Refresh)
+	auth.POST("/logout", h.Logout)
 	auth.GET("/me", middleware.Auth(tokens), h.Me)
 
 	// Mirrors cmd/server, so a profile test cannot pass because the route was
@@ -1118,6 +1123,7 @@ func TestProviderRejectionIsReportedAsADeliveryFailure(t *testing.T) {
 		h.tokens, refusing, refusing, h.policy,
 		service.NewSettingsService(repository.NewSettingsRepository(h.db)),
 		repository.NewLoginAttemptRepository(h.db),
+		repository.NewRefreshTokenRepository(h.db),
 	)
 
 	router := gin.New()

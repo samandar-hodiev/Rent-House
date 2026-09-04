@@ -125,6 +125,7 @@ const (
 	SettingMediaAllowedAttachmentFormats = "media_allowed_attachment_formats"
 
 	SettingJWTExpirationHours    = "jwt_expiration_hours"
+	SettingRefreshExpirationDays = "refresh_expiration_days"
 	SettingLoginMaxAttempts      = "login_max_attempts"
 	SettingLoginLockMinutes      = "login_lock_minutes"
 	SettingPasswordMinLength     = "password_min_length"
@@ -264,6 +265,11 @@ var SettingDefs = []SettingDef{
 	// Security --------------------------------------------------------------
 	{Key: SettingJWTExpirationHours, Type: SettingInt, Category: CategorySecurity,
 		Default: "24", Min: 1, Max: 720},
+	{Key: SettingRefreshExpirationDays, Type: SettingInt, Category: CategorySecurity,
+		// How long somebody stays signed in without typing a password again.
+		// The access token is short and renewed from this; ending it is what
+		// "sign out" does.
+		Default: "30", Min: 1, Max: 365},
 	{Key: SettingLoginMaxAttempts, Type: SettingInt, Category: CategorySecurity,
 		Default: "5", Min: 3, Max: 20},
 	{Key: SettingLoginLockMinutes, Type: SettingInt, Category: CategorySecurity,

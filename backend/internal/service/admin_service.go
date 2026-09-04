@@ -55,6 +55,10 @@ const adminBcryptCost = 12
 type AdminService struct {
 	admins *repository.AdminRepository
 	tokens *token.Service
+	// The blocked account's open sessions, so blocking ends them rather than
+	// only stopping the next sign-in. Optional: without it a blocked account
+	// keeps its access token until it expires.
+	sessions *repository.RefreshTokenRepository
 	// The marketplace's configuration, for the rules that are the owner's to
 	// set — the password policy a new administrator's password must satisfy.
 	// Optional: a nil settings service falls back to the built-in minimum, so
@@ -64,8 +68,9 @@ type AdminService struct {
 
 func NewAdminService(
 	admins *repository.AdminRepository, tokens *token.Service, settings *SettingsService,
+	sessions *repository.RefreshTokenRepository,
 ) *AdminService {
-	return &AdminService{admins: admins, tokens: tokens, settings: settings}
+	return &AdminService{admins: admins, tokens: tokens, settings: settings, sessions: sessions}
 }
 
 // pageSize is how many rows a dashboard table shows when the client does not
@@ -394,6 +399,15 @@ func (s *AdminService) SetUserStatus(
 				return ErrAdminNotFound
 			}
 			return err
+		}
+
+		// Their open sessions end with the block. Without this, blocking
+		// stops the next sign-in and nothing else: whoever is already signed
+		// in stays signed in until their token expires.
+		if s.sessions != nil {
+			if _, err := s.sessions.RevokeAllForUser(ctx, id, time.Now().UTC()); err != nil {
+				logger.Errorf("revoke sessions of blocked user: %v", err)
+			}
 		}
 
 		// What happens to what they had published. Blocking an account stops

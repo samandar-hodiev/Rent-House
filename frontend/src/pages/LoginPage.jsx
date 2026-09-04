@@ -47,7 +47,7 @@ function LoginPage() {
         identifier: values.identifier.trim(),
         password: values.password,
       })
-      signIn(data.access_token, data.user)
+      signIn(data.access_token, data.user, data.refresh_token)
       navigate(destination, { replace: true })
     } catch (error) {
       // The backend answers the same way for an unknown account and a wrong

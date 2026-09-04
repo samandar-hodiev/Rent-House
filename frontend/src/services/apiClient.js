@@ -27,7 +27,53 @@ export const NETWORK_ERROR = 'network_error'
  * Returns `data` on success and throws an ApiError otherwise, so a caller never
  * has to check `success` by hand.
  */
-export async function request(path, { method = 'GET', body, token, signal } = {}) {
+/**
+ * How to renew an expired session, registered by the auth context.
+ *
+ * A module-level hook rather than a parameter: every screen in the app calls
+ * `request` and none of them should have to know that a token can expire. The
+ * auth context owns the tokens, so it is what supplies this.
+ */
+let renewSession = null
+
+export function setSessionRenewer(renew) {
+  renewSession = renew
+}
+
+export async function request(path, options = {}) {
+  const response = await send(path, options)
+
+  // An access token the server refused, and a session that may still be
+  // renewable. Retried exactly once: if the renewal produced a token that is
+  // also refused, the session is over and the second 401 is the honest answer.
+  const renewable =
+    response instanceof ApiError &&
+    response.status === 401 &&
+    options.token &&
+    renewSession &&
+    !path.startsWith('/auth/refresh')
+
+  if (!renewable) {
+    if (response instanceof ApiError) throw response
+    return response
+  }
+
+  const token = await renewSession()
+  if (!token) throw response
+
+  const retried = await send(path, { ...options, token })
+  if (retried instanceof ApiError) throw retried
+  return retried
+}
+
+/**
+ * One attempt.
+ *
+ * Returns the ApiError rather than throwing it, so `request` above can decide
+ * whether a failure is worth retrying without catching and rethrowing — and so
+ * an abort still propagates as the exception callers expect.
+ */
+async function send(path, { method = 'GET', body, token, signal } = {}) {
   // FormData carries its own multipart boundary in the Content-Type header,
   // which only the browser can generate. Setting the header by hand would
   // produce one without a boundary and the server would reject the upload, so
@@ -55,7 +101,7 @@ export async function request(path, { method = 'GET', body, token, signal } = {}
     // Abort is the caller cancelling on purpose — pass it through untouched so
     // effects can ignore it rather than showing an error.
     if (error?.name === 'AbortError') throw error
-    throw new ApiError({ status: 0, code: NETWORK_ERROR, message: 'Network request failed' })
+    return new ApiError({ status: 0, code: NETWORK_ERROR, message: 'Network request failed' })
   }
 
   // A 204 or an empty body is still a success.
@@ -70,7 +116,7 @@ export async function request(path, { method = 'GET', body, token, signal } = {}
   }
 
   if (!response.ok || payload?.success === false) {
-    throw new ApiError({
+    return new ApiError({
       status: response.status,
       code: payload?.error ?? 'unknown_error',
       message: payload?.message ?? `Request failed with status ${response.status}`,

@@ -231,4 +231,20 @@ type AuthResponse struct {
 	TokenType   string       `json:"token_type"`
 	// ExpiresIn is in seconds, matching the OAuth 2.0 convention clients expect.
 	ExpiresIn int64 `json:"expires_in"`
+
+	// RefreshToken renews the access token when it expires, and is what
+	// signing out revokes. Omitted when a response carries no new session —
+	// which is every response but signing in, completing a registration and
+	// renewing.
+	RefreshToken string `json:"refresh_token,omitempty"`
+}
+
+// RefreshRequest is the body of POST /api/v1/auth/refresh and
+// POST /api/v1/auth/logout.
+//
+// In the body rather than in a header: it is not a credential the client
+// presents on every request, and putting it in the Authorization header would
+// invite it being sent where the short-lived token belongs.
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required,min=16,max=512"`
 }

@@ -87,6 +87,12 @@ var (
 	// account an administrator has blocked.
 	ErrContactBlocked = errors.New("that contact belongs to a blocked account")
 
+	// ErrInvalidRefreshToken covers every reason a session cannot be renewed:
+	// unknown, expired, already used, signed out. Deliberately one error — a
+	// caller holding a token must not learn which of those it is, because the
+	// difference tells them whether the token was ever real.
+	ErrInvalidRefreshToken = errors.New("session cannot be renewed")
+
 	// ErrAccountLocked is too many failed sign-ins for one identifier. The
 	// message carries how long is left, because "try again later" without a
 	// number is not something anybody can act on.
@@ -128,6 +134,10 @@ type AuthService struct {
 	// nil means no lockout is enforced, which is how the service behaved before
 	// the setting existed.
 	attempts *repository.LoginAttemptRepository
+	// Open sessions. Optional for the same reason: without it the service
+	// issues access tokens alone, which is how it behaved before sessions
+	// could be ended.
+	sessions *repository.RefreshTokenRepository
 	// How the marketplace is configured. Read on each request rather than at
 	// start-up, so switching registration off takes effect on the next attempt
 	// instead of the next deployment. Optional: tests that predate it pass nil
@@ -147,6 +157,7 @@ func NewAuthService(
 	policy config.OTP,
 	settings *SettingsService,
 	attempts *repository.LoginAttemptRepository,
+	sessions *repository.RefreshTokenRepository,
 ) *AuthService {
 	return &AuthService{
 		users:         users,
@@ -157,6 +168,7 @@ func NewAuthService(
 		policy:        policy,
 		settings:      settings,
 		attempts:      attempts,
+		sessions:      sessions,
 		now:           time.Now,
 	}
 }
@@ -768,6 +780,14 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, password string)
 		return err
 	}
 
+	// Every session this account had open is ended. Resetting a password is
+	// usually somebody taking their account back, and leaving the sessions
+	// that were open before it alive would leave whoever they are taking it
+	// back from signed in.
+	if err := s.LogoutEverywhere(ctx, *verification.UserID); err != nil {
+		logger.Errorf("revoke sessions after password reset: %v", err)
+	}
+
 	// Spent, and spent after the password changed: a failure above must leave
 	// the link usable rather than burning it for nothing.
 	now := s.now()
@@ -897,7 +917,130 @@ func (s *AuthService) sender(method string) notify.Sender {
 	return s.emailSender
 }
 
-func (s *AuthService) authResponse(ctx context.Context, user *models.User) (*dto.AuthResponse, error) {
+// refreshTokenBytes gives a 256-bit secret. Stored under SHA-256 rather than
+// bcrypt: this is a random secret, not a password, and there is nothing to
+// guess that a slow hash would help with.
+const refreshTokenBytes = 32
+
+// newRefreshToken returns the secret to hand out and the row to store.
+func (s *AuthService) newRefreshToken(
+	ctx context.Context, userID uuid.UUID,
+) (string, *models.RefreshToken, error) {
+	buf := make([]byte, refreshTokenBytes)
+	if _, err := rand.Read(buf); err != nil {
+		return "", nil, fmt.Errorf("generate refresh token: %w", err)
+	}
+	plain := base64.RawURLEncoding.EncodeToString(buf)
+
+	days := s.site(ctx).RefreshExpirationDays
+	if days < 1 {
+		days = Defaults().RefreshExpirationDays
+	}
+
+	return plain, &models.RefreshToken{
+		UserID:    userID,
+		TokenHash: hashToken(plain),
+		ExpiresAt: s.now().UTC().AddDate(0, 0, days),
+	}, nil
+}
+
+// Refresh exchanges a refresh token for a new pair.
+//
+// The old token is revoked as the new one is created — rotation, so a token
+// that leaks is useful only until its owner next renews, and a token presented
+// twice is recognisably a replay.
+func (s *AuthService) Refresh(ctx context.Context, raw string) (*dto.AuthResponse, error) {
+	if s.sessions == nil || strings.TrimSpace(raw) == "" {
+		return nil, ErrInvalidRefreshToken
+	}
+
+	stored, err := s.sessions.FindByHash(ctx, hashToken(raw))
+	if err != nil {
+		if errors.Is(err, repository.ErrRefreshTokenNotFound) {
+			return nil, ErrInvalidRefreshToken
+		}
+		return nil, err
+	}
+
+	now := s.now().UTC()
+	if !stored.IsUsable(now) {
+		// A revoked token being presented is either a replay of one already
+		// rotated or a session somebody signed out of. Both mean the holder
+		// should not be renewing anything, and if it is a replay the real
+		// owner's session may be compromised — so every session this account
+		// has is ended rather than only this one.
+		if stored.RevokedAt != nil {
+			if _, err := s.sessions.RevokeAllForUser(ctx, stored.UserID, now); err != nil {
+				logger.Errorf("revoke sessions after replay: %v", err)
+			}
+		}
+		return nil, ErrInvalidRefreshToken
+	}
+
+	user, err := s.users.FindByID(ctx, stored.UserID)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return nil, ErrInvalidRefreshToken
+		}
+		return nil, err
+	}
+	// A session outlives neither the account nor its standing: an account
+	// blocked since the token was issued cannot renew its way back in.
+	if user.Status == models.UserStatusBlocked {
+		if _, err := s.sessions.RevokeAllForUser(ctx, user.ID, now); err != nil {
+			logger.Errorf("revoke sessions of blocked user: %v", err)
+		}
+		return nil, ErrAccountBlocked
+	}
+
+	plain, next, err := s.newRefreshToken(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.sessions.Rotate(ctx, stored.ID, next, now); err != nil {
+		if errors.Is(err, repository.ErrRefreshTokenNotFound) {
+			return nil, ErrInvalidRefreshToken
+		}
+		return nil, err
+	}
+
+	response, err := s.accessResponse(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	response.RefreshToken = plain
+	return response, nil
+}
+
+// Logout ends one session.
+//
+// Unknown or already-ended tokens are not an error: signing out twice, or from
+// a tab whose session has already expired, is not a failure the caller should
+// have to handle.
+func (s *AuthService) Logout(ctx context.Context, raw string) error {
+	if s.sessions == nil || strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	stored, err := s.sessions.FindByHash(ctx, hashToken(raw))
+	if err != nil {
+		if errors.Is(err, repository.ErrRefreshTokenNotFound) {
+			return nil
+		}
+		return err
+	}
+	return s.sessions.Revoke(ctx, stored.ID, s.now().UTC())
+}
+
+// LogoutEverywhere ends every session an account has open.
+func (s *AuthService) LogoutEverywhere(ctx context.Context, userID uuid.UUID) error {
+	if s.sessions == nil {
+		return nil
+	}
+	_, err := s.sessions.RevokeAllForUser(ctx, userID, s.now().UTC())
+	return err
+}
+
+func (s *AuthService) accessResponse(ctx context.Context, user *models.User) (*dto.AuthResponse, error) {
 	// How long a session lasts is the owner's to set. Read at the moment the
 	// token is signed, so a change applies to the next sign-in rather than to
 	// the next deployment; tokens already issued keep the life they were given,
@@ -918,6 +1061,30 @@ func (s *AuthService) authResponse(ctx context.Context, user *models.User) (*dto
 		TokenType:   "Bearer",
 		ExpiresIn:   int64(ttl.Seconds()),
 	}, nil
+}
+
+// authResponse is accessResponse plus a new session — what signing in and
+// completing a registration produce.
+func (s *AuthService) authResponse(
+	ctx context.Context, user *models.User,
+) (*dto.AuthResponse, error) {
+	response, err := s.accessResponse(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	if s.sessions == nil {
+		return response, nil
+	}
+
+	plain, session, err := s.newRefreshToken(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.sessions.Create(ctx, session); err != nil {
+		return nil, err
+	}
+	response.RefreshToken = plain
+	return response, nil
 }
 
 // newRegistrationToken returns the token to hand out and the hash to store.

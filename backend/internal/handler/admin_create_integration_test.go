@@ -72,7 +72,7 @@ func newAdminHarness(t *testing.T) *adminHarness {
 
 	settings := service.NewSettingsService(repository.NewSettingsRepository(tx))
 	adminRepo := repository.NewAdminRepository(tx)
-	admins := service.NewAdminService(adminRepo, tokens, settings)
+	admins := service.NewAdminService(adminRepo, tokens, settings, repository.NewRefreshTokenRepository(tx))
 
 	handler := NewAdminHandler(
 		admins,
@@ -127,6 +127,7 @@ func (h *adminHarness) publicRouter(t *testing.T) *gin.Engine {
 		repository.NewVerificationRepository(h.tx),
 		h.tokens, silentSender{}, silentSender{}, testPolicy(),
 		h.settings, repository.NewLoginAttemptRepository(h.tx),
+		repository.NewRefreshTokenRepository(h.tx),
 	)
 	apartmentHandler := NewApartmentHandler(
 		service.NewApartmentService(apartments, h.settings), analytics)

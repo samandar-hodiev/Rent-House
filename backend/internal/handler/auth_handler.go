@@ -350,3 +350,60 @@ func validationMessage(err error) string {
 	}
 	return "Invalid request: " + err.Error()
 }
+
+// Refresh handles POST /api/v1/auth/refresh.
+//
+// Unauthenticated by design: the access token this renews has usually expired,
+// and requiring it would make renewal impossible exactly when it is needed.
+// The refresh token in the body is the credential.
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	var req dto.RefreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+
+	result, err := h.auth.Refresh(c.Request.Context(), req.RefreshToken)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidRefreshToken):
+			// 401 rather than 400: the request was understood, the session is
+			// simply over. The client signs the user out on this.
+			response.Error(c, http.StatusUnauthorized, "invalid_refresh_token",
+				"This session has ended. Please sign in again")
+		case errors.Is(err, service.ErrAccountBlocked):
+			response.Error(c, http.StatusForbidden, "account_blocked",
+				"This account has been blocked")
+		default:
+			logger.Errorf("refresh session: %v", err)
+			response.Error(c, http.StatusInternalServerError, "internal_error",
+				"Could not renew the session")
+		}
+		return
+	}
+
+	response.OK(c, "Session renewed", result)
+}
+
+// Logout handles POST /api/v1/auth/logout.
+//
+// Ends the session on the server, which is what makes signing out more than
+// the browser forgetting a token. Answering 200 for a token that was already
+// gone is deliberate: signing out twice is not a failure.
+func (h *AuthHandler) Logout(c *gin.Context) {
+	var req dto.RefreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// Even a malformed body ends in the client clearing its own tokens, so
+		// there is nothing useful to refuse here.
+		response.OK(c, "Signed out", nil)
+		return
+	}
+
+	if err := h.auth.Logout(c.Request.Context(), req.RefreshToken); err != nil {
+		logger.Errorf("logout: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not end the session")
+		return
+	}
+	response.OK(c, "Signed out", nil)
+}

@@ -1,11 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { ApiError } from '../services/apiClient'
-import { fetchCurrentUser } from '../services/authApi'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { ApiError, setSessionRenewer } from '../services/apiClient'
+import { fetchCurrentUser, logout as logoutRequest, refreshSession } from '../services/authApi'
 
-// The access token is the whole session. It lives in localStorage so a reload
-// keeps the user signed in; nothing else about the account is persisted, and
-// the token is re-validated against the API on every page load.
+// A session is two tokens. The access token is short-lived and sent with every
+// request; the refresh token is long-lived, kept for renewing it, and is what
+// signing out revokes on the server. Both live in localStorage so a reload
+// keeps the user signed in; nothing else about the account is persisted.
 const TOKEN_KEY = 'renthouse_token'
+const REFRESH_KEY = 'renthouse_refresh'
 
 // Session states. `loading` matters: on first paint the app does not yet know
 // whether the stored token is still good, and rendering a signed-out header for
@@ -27,6 +29,15 @@ function readStoredToken() {
   }
 }
 
+function readStoredRefresh() {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage.getItem(REFRESH_KEY)
+  } catch {
+    return null
+  }
+}
+
 function persistToken(token) {
   try {
     if (token) window.localStorage.setItem(TOKEN_KEY, token)
@@ -34,6 +45,15 @@ function persistToken(token) {
   } catch {
     // Private-browsing mode can refuse writes; the session then lasts as long
     // as the tab, which is a degraded experience rather than a broken one.
+  }
+}
+
+function persistRefresh(token) {
+  try {
+    if (token) window.localStorage.setItem(REFRESH_KEY, token)
+    else window.localStorage.removeItem(REFRESH_KEY)
+  } catch {
+    // As above: the tab keeps working, the next one starts signed out.
   }
 }
 
@@ -69,19 +89,80 @@ export function AuthProvider({ children }) {
     readStoredToken() ? AUTH_STATUS.loading : AUTH_STATUS.unauthenticated,
   )
 
-  const signIn = useCallback((accessToken, apiUser) => {
+  const signIn = useCallback((accessToken, apiUser, refreshToken) => {
     persistToken(accessToken)
+    persistRefresh(refreshToken ?? null)
     setToken(accessToken)
     setUser(toUiUser(apiUser))
     setStatus(AUTH_STATUS.authenticated)
   }, [])
 
-  const signOut = useCallback(() => {
+  /** Forgets the session here. `signOut` also tells the server about it. */
+  const forget = useCallback(() => {
     persistToken(null)
+    persistRefresh(null)
     setToken(null)
     setUser(null)
     setStatus(AUTH_STATUS.unauthenticated)
   }, [])
+
+  const signOut = useCallback(async () => {
+    const refreshToken = readStoredRefresh()
+    // Cleared first, and the server told afterwards: signing out must not
+    // depend on the network. A request that fails leaves a session the server
+    // still thinks is open, which the refresh token's own expiry ends — far
+    // better than a sign-out button that does nothing when the API is down.
+    forget()
+    if (!refreshToken) return
+    try {
+      await logoutRequest(refreshToken)
+    } catch {
+      // Already reported above by clearing; nothing here to show the reader.
+    }
+  }, [forget])
+
+  /**
+   * Exchanges the refresh token for a new pair.
+   *
+   * One in flight at a time: several requests failing with 401 at once must
+   * produce one renewal, not one each — the server rotates the token, so the
+   * second would be presenting one that was just revoked and would end the
+   * session it was trying to save.
+   */
+  const refreshing = useRef(null)
+  const renew = useCallback(async () => {
+    const refreshToken = readStoredRefresh()
+    if (!refreshToken) return null
+
+    if (!refreshing.current) {
+      refreshing.current = refreshSession(refreshToken)
+        .then((data) => {
+          persistToken(data.access_token)
+          persistRefresh(data.refresh_token ?? null)
+          setToken(data.access_token)
+          if (data.user) setUser(toUiUser(data.user))
+          setStatus(AUTH_STATUS.authenticated)
+          return data.access_token
+        })
+        .catch(() => {
+          // The session is over — expired, signed out elsewhere, or revoked.
+          forget()
+          return null
+        })
+        .finally(() => {
+          refreshing.current = null
+        })
+    }
+    return refreshing.current
+  }, [forget])
+
+  // Every request in the app renews through this one function, so a token that
+  // expires mid-session is replaced rather than thrown at the reader as a
+  // sign-out. Registered here because the auth context is what owns the tokens.
+  useEffect(() => {
+    setSessionRenewer(renew)
+    return () => setSessionRenewer(null)
+  }, [renew])
 
   // Restore the session on load: a stored token proves nothing on its own — it
   // may have expired or belong to a deleted account — so it is exchanged for
@@ -108,12 +189,18 @@ export function AuthProvider({ children }) {
         // sign the user out for no reason. In those cases the token is kept and
         // the next page load tries again.
         const rejected = error instanceof ApiError && error.status === 401
-        if (rejected) {
-          persistToken(null)
-          setToken(null)
-          setUser(null)
+        if (!rejected) {
+          setStatus(AUTH_STATUS.unauthenticated)
+          return
         }
-        setStatus(AUTH_STATUS.unauthenticated)
+
+        // The access token was refused. That is what the refresh token is for:
+        // it is the usual state after a few hours away, and signing the user
+        // out here would make every short session end at the token's expiry.
+        renew().then((renewed) => {
+          if (cancelled || renewed) return
+          setStatus(AUTH_STATUS.unauthenticated)
+        })
       })
 
     return () => {
@@ -148,9 +235,10 @@ export function AuthProvider({ children }) {
       user: user ?? EMPTY_USER,
       signIn,
       signOut,
+      renew,
       applyUser,
     }),
-    [status, token, user, signIn, signOut, applyUser],
+    [status, token, user, signIn, signOut, renew, applyUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
