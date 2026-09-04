@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Container from '../components/Container'
 import FilterBar from '../components/FilterBar'
 import SortDropdown from '../components/SortDropdown'
@@ -6,19 +6,12 @@ import ApartmentGrid from '../components/ApartmentGrid'
 import { useSearch } from '../context/SearchContext'
 import { useLocale } from '../context/LocaleContext'
 import { fetchApartments } from '../services/apartmentsApi'
-import { filterApartments } from '../utils/filterApartments'
+import { toApiQuery } from '../utils/searchParams'
 
-// How many listings one request brings back. The backend caps it at 60; this
-// asks for that maximum so the client-side filters below still work on the
-// whole of what is currently published.
+// How many listings the landing page shows. The API's ceiling, because this
+// page has no pagination of its own — a search that matches more than this
+// belongs on the results page, which the search bar leads to.
 const PAGE_LIMIT = 60
-
-// The sort values the UI offers, mapped onto the API's names.
-const SORT_PARAM = {
-  newest: 'newest',
-  priceAsc: 'price_asc',
-  priceDesc: 'price_desc',
-}
 
 function HomePage() {
   const { t } = useLocale()
@@ -38,10 +31,10 @@ function HomePage() {
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
 
-  // District, keyword, price, rooms, furnished and the ordering are answered by
-  // PostgreSQL; area and floor range are still applied below, because the
-  // column filters for them are not exposed by the API yet. That split is safe
-  // only while one request covers everything published — see PAGE_LIMIT.
+  // Every filter is answered by PostgreSQL, including area, floor band and
+  // "4+ rooms" — which used to be applied in the browser over whatever one
+  // request happened to return. That made the count on this page a count of
+  // what had been fetched rather than of what matches.
   const load = useCallback(
     async (signal) => {
       setLoading(true)
@@ -49,14 +42,7 @@ function HomePage() {
       try {
         const result = await fetchApartments({
           signal,
-          district: districtId ?? '',
-          keyword,
-          min_price: filters.minPrice ?? '',
-          max_price: filters.maxPrice ?? '',
-          rooms: filters.rooms ?? undefined,
-          furnished: filters.furnished ?? undefined,
-          sort: SORT_PARAM[sort] ?? SORT_PARAM.newest,
-          limit: PAGE_LIMIT,
+          ...toApiQuery({ districtId, keyword, filters, sort, page: 1, limit: PAGE_LIMIT }),
         })
         setPage(result)
       } catch (error) {
@@ -67,7 +53,7 @@ function HomePage() {
         setLoading(false)
       }
     },
-    [districtId, keyword, filters.minPrice, filters.maxPrice, filters.rooms, filters.furnished, sort],
+    [districtId, keyword, filters, sort],
   )
 
   useEffect(() => {
@@ -76,14 +62,7 @@ function HomePage() {
     return () => controller.abort()
   }, [load])
 
-  // The remaining filters run over what came back. `filterApartments` also
-  // re-checks the ones the server applied, which costs nothing and keeps the
-  // two from disagreeing if a parameter is ever dropped.
-  const apartments = useMemo(
-    () => filterApartments(page.items, { districtId, keyword, filters }),
-    [page.items, districtId, keyword, filters],
-  )
-
+  const apartments = page.items
   const isSearchActive = Boolean(districtId) || Boolean(keyword) || activeFilterCount > 0
 
   let countText
@@ -93,11 +72,9 @@ function HomePage() {
     countText = t('listing.loading')
   } else if (apartments.length === 0) {
     countText = t('apartments.noResultsCount')
-  } else if (isSearchActive || apartments.length !== page.total) {
-    countText = t('apartments.foundCount', { count: apartments.length })
+  } else if (isSearchActive) {
+    countText = t('apartments.foundCount', { count: page.total })
   } else {
-    // Unfiltered: the server's total, which is every published listing rather
-    // than only the page held in memory.
     countText = t('apartments.defaultCount', { count: page.total })
   }
 

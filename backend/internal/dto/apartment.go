@@ -115,15 +115,26 @@ func normalizeSlugs(values []string) []string {
 //
 // Everything is optional; an empty query returns the newest active listings.
 type ApartmentListQuery struct {
-	District  string  `form:"district"`
-	Keyword   string  `form:"keyword"`
-	MinPrice  string  `form:"min_price"  binding:"omitempty,numeric"`
-	MaxPrice  string  `form:"max_price"  binding:"omitempty,numeric"`
-	Rooms     []int16 `form:"rooms"     binding:"omitempty,max=10,dive,min=1,max=20"`
-	Furnished *bool   `form:"furnished"`
-	Sort      string  `form:"sort"       binding:"omitempty,oneof=newest price_asc price_desc"`
-	Page      int     `form:"page"       binding:"omitempty,min=1"`
-	Limit     int     `form:"limit"      binding:"omitempty,min=1,max=60"`
+	District string  `form:"district"`
+	Keyword  string  `form:"keyword"`
+	MinPrice string  `form:"min_price"  binding:"omitempty,numeric"`
+	MaxPrice string  `form:"max_price"  binding:"omitempty,numeric"`
+	Rooms    []int16 `form:"rooms"     binding:"omitempty,max=10,dive,min=1,max=20"`
+	// RoomsMin is the "4+" the filter bar offers, which a set of exact values
+	// cannot express.
+	RoomsMin *int16 `form:"rooms_min" binding:"omitempty,min=1,max=20"`
+
+	MinArea *int32 `form:"min_area" binding:"omitempty,min=1,max=10000"`
+	MaxArea *int32 `form:"max_area" binding:"omitempty,min=1,max=10000"`
+
+	// Floor is a band rather than a number: the filter offers "1-5", "6-10"
+	// and "11+", and the bounds belong to the server that applies them.
+	Floor string `form:"floor" binding:"omitempty,oneof=low mid high"`
+
+	Furnished *bool  `form:"furnished"`
+	Sort      string `form:"sort"       binding:"omitempty,oneof=newest price_asc price_desc area_desc area_asc"`
+	Page      int    `form:"page"       binding:"omitempty,min=1"`
+	Limit     int    `form:"limit"      binding:"omitempty,min=1,max=60"`
 }
 
 // Normalize applies the defaults and caps the page size.

@@ -598,12 +598,16 @@ func (s *ApartmentService) filterFrom(
 	ctx context.Context, query dto.ApartmentListQuery,
 ) (repository.ApartmentFilter, error) {
 	filter := repository.ApartmentFilter{
-		Keyword:   query.Keyword,
-		Rooms:     query.Rooms,
-		Furnished: query.Furnished,
-		Sort:      query.Sort,
-		Limit:     query.Limit,
-		Offset:    query.Offset(),
+		Keyword:    query.Keyword,
+		Rooms:      query.Rooms,
+		RoomsMin:   query.RoomsMin,
+		MinArea:    query.MinArea,
+		MaxArea:    query.MaxArea,
+		FloorRange: query.Floor,
+		Furnished:  query.Furnished,
+		Sort:       query.Sort,
+		Limit:      query.Limit,
+		Offset:     query.Offset(),
 	}
 
 	if query.District != "" {

@@ -1,4 +1,13 @@
 export default {
+  "analytics.retry": "Повторить",
+  "search.title": "Результаты поиска",
+  "search.pageOf": "Страница {page} из {pages}",
+  "search.emptyTitle": "По вашему запросу ничего не найдено",
+  "search.emptyHint": "Смягчите фильтры или попробуйте другой район и другое ключевое слово.",
+  "search.errorHint": "Проверьте подключение и попробуйте снова.",
+  "pagination.label": "Страницы",
+  "pagination.previous": "Предыдущая страница",
+  "pagination.next": "Следующая страница",
   "placeholder.search.title": "Результаты поиска",
   "placeholder.search.description": "Здесь будут показаны фильтры и список объявлений.",
   "placeholder.profile.title": "Профиль",

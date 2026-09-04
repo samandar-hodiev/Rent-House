@@ -1,4 +1,13 @@
 export default {
+  "analytics.retry": "Try again",
+  "search.title": "Search results",
+  "search.pageOf": "Page {page} of {pages}",
+  "search.emptyTitle": "Nothing matches this search",
+  "search.emptyHint": "Loosen the filters, or try another district or keyword.",
+  "search.errorHint": "Check the connection and try again.",
+  "pagination.label": "Pages",
+  "pagination.previous": "Previous page",
+  "pagination.next": "Next page",
   "placeholder.search.title": "Search results",
   "placeholder.search.description": "Filters and the list of listings will appear here.",
   "placeholder.profile.title": "Profile",

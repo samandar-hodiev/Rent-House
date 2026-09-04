@@ -42,7 +42,22 @@ type ApartmentFilter struct {
 	MinPrice *decimal.Decimal
 	MaxPrice *decimal.Decimal
 	// Rooms is a set: "2 or 3 rooms" is one query, not two.
-	Rooms     []int16
+	Rooms []int16
+	// RoomsMin is the open-ended end of the same filter — the "4+" the search
+	// bar offers. Separate from Rooms because a set cannot express "or more"
+	// without listing every number up to the schema's ceiling.
+	RoomsMin *int16
+
+	// The size of the place, in square metres.
+	MinArea *int32
+	MaxArea *int32
+
+	// FloorRange is one of the bands the filter bar offers rather than a raw
+	// number: low (1-5), mid (6-10), high (11 and above). The bands live in one
+	// place — floorBounds — so the API, the filter chip and the SQL cannot
+	// disagree about where "o'rta" begins.
+	FloorRange string
+
 	Furnished *bool
 
 	// Sort is one of the values in SortOptions. Anything else falls back to
@@ -53,11 +68,22 @@ type ApartmentFilter struct {
 	Offset int
 }
 
+// The floor bands the filter bar offers.
+const (
+	FloorLow  = "low"
+	FloorMid  = "mid"
+	FloorHigh = "high"
+)
+
 // Sort orders the API accepts.
 const (
 	SortNewest    = "newest"
 	SortPriceAsc  = "price_asc"
 	SortPriceDesc = "price_desc"
+	// The filter bar has always offered these two; until now the API did not
+	// accept them, so choosing "largest first" quietly returned newest-first.
+	SortAreaDesc = "area_desc"
+	SortAreaAsc  = "area_asc"
 )
 
 // orderClauses maps an API sort name to SQL. A map lookup rather than string
@@ -66,10 +92,12 @@ var orderClauses = map[string]string{
 	SortNewest:    "apartments.created_at DESC",
 	SortPriceAsc:  "apartments.price ASC, apartments.created_at DESC",
 	SortPriceDesc: "apartments.price DESC, apartments.created_at DESC",
+	SortAreaDesc:  "apartments.area DESC, apartments.created_at DESC",
+	SortAreaAsc:   "apartments.area ASC, apartments.created_at DESC",
 }
 
 // SortOptions lists the accepted sort values, for validation messages.
-var SortOptions = []string{SortNewest, SortPriceAsc, SortPriceDesc}
+var SortOptions = []string{SortNewest, SortPriceAsc, SortPriceDesc, SortAreaDesc, SortAreaAsc}
 
 // ApartmentRepository reads and writes listings. It holds no business rules —
 // no ownership checks, no status transitions — only queries.
@@ -197,10 +225,41 @@ func (r *ApartmentRepository) applyFilter(query *gorm.DB, filter ApartmentFilter
 	if len(filter.Rooms) > 0 {
 		query = query.Where("apartments.rooms IN ?", filter.Rooms)
 	}
+	if filter.RoomsMin != nil {
+		query = query.Where("apartments.rooms >= ?", *filter.RoomsMin)
+	}
+	if filter.MinArea != nil {
+		query = query.Where("apartments.area >= ?", *filter.MinArea)
+	}
+	if filter.MaxArea != nil {
+		query = query.Where("apartments.area <= ?", *filter.MaxArea)
+	}
+	if low, high, ok := floorBounds(filter.FloorRange); ok {
+		query = query.Where("apartments.floor >= ?", low)
+		if high > 0 {
+			query = query.Where("apartments.floor <= ?", high)
+		}
+	}
 	if filter.Furnished != nil {
 		query = query.Where("apartments.furnished = ?", *filter.Furnished)
 	}
 	return query
+}
+
+// floorBounds turns a band into its numbers. A high band has no ceiling, which
+// is reported as zero rather than as a number the schema would have to keep in
+// step with.
+func floorBounds(band string) (low, high int, ok bool) {
+	switch band {
+	case FloorLow:
+		return 1, 5, true
+	case FloorMid:
+		return 6, 10, true
+	case FloorHigh:
+		return 11, 0, true
+	default:
+		return 0, 0, false
+	}
 }
 
 // Update writes the changed columns and replaces the images and amenities.

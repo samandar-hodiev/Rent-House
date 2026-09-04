@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useSearch } from '../context/SearchContext'
+import { writeSearchParams } from '../utils/searchParams'
 import { useLocale } from '../context/LocaleContext'
 import { ROUTES } from '../routes/paths'
 import DistrictSelector from './DistrictSelector'
@@ -24,10 +25,11 @@ function SearchIcon({ className = '' }) {
 
 function SearchBar() {
   const { t } = useLocale()
-  const { districtId, setDistrictId, keyword, submitKeyword } = useSearch()
+  const { districtId, setDistrictId, keyword, submitKeyword, filters, sort } = useSearch()
   const [keywordInput, setKeywordInput] = useState(keyword)
   const keywordInputId = useId()
   const location = useLocation()
+  const navigate = useNavigate()
 
   // The Map MVP searches by district + filters only; keyword/address search
   // is kept in the DOM (not removed) but visually muted and inert there.
@@ -40,7 +42,39 @@ function SearchBar() {
   const handleSubmit = (event) => {
     event.preventDefault()
     if (isKeywordSearchDisabled) return
-    submitKeyword(keywordInput)
+
+    const value = keywordInput.trim()
+    submitKeyword(value)
+
+    // Searching means going to the results. The bar sits in the header of every
+    // page, and until now submitting it from a listing or the map only changed
+    // state that page did not render — the search appeared to do nothing.
+    //
+    // The map is left alone: it is a search of its own, drawn on the map
+    // itself, and sending it to a list would be answering a different question.
+    if (location.pathname !== ROUTES.map) {
+      navigate({
+        pathname: ROUTES.search,
+        search: writeSearchParams({
+          districtId, keyword: value, filters, sort, page: 1,
+        }).toString(),
+      })
+    }
+  }
+
+  // Choosing a district is a search too, and the same rule applies: from the
+  // results page it re-runs the search, from anywhere else it goes there. The
+  // home page is the exception — it lists everything and answers a district
+  // change in place.
+  const handleDistrict = (nextDistrict) => {
+    setDistrictId(nextDistrict)
+    if (location.pathname === ROUTES.home || location.pathname === ROUTES.map) return
+    navigate({
+      pathname: ROUTES.search,
+      search: writeSearchParams({
+        districtId: nextDistrict, keyword: keywordInput.trim(), filters, sort, page: 1,
+      }).toString(),
+    })
   }
 
   return (
@@ -49,7 +83,7 @@ function SearchBar() {
       onSubmit={handleSubmit}
       className="flex min-w-0 flex-1 items-center rounded-md border border-border bg-surface focus-within:ring-2 focus-within:ring-primary/40"
     >
-      <DistrictSelector districtId={districtId} onChange={setDistrictId} />
+      <DistrictSelector districtId={districtId} onChange={handleDistrict} />
 
       <label htmlFor={keywordInputId} className="sr-only">
         {t('search.keywordLabel')}

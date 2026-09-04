@@ -1,4 +1,13 @@
 export default {
+  "analytics.retry": "Qayta urinish",
+  "search.title": "Qidiruv natijalari",
+  "search.pageOf": "{page}-sahifa, jami {pages}",
+  "search.emptyTitle": "So'rovingizga mos uy topilmadi",
+  "search.emptyHint": "Filtrlarni kengaytiring yoki boshqa tuman va kalit so'z bilan qidiring.",
+  "search.errorHint": "Ulanishni tekshirib, qayta urinib ko'ring.",
+  "pagination.label": "Sahifalar",
+  "pagination.previous": "Oldingi sahifa",
+  "pagination.next": "Keyingi sahifa",
   "placeholder.search.title": "Qidiruv natijalari",
   "placeholder.search.description": "Filtrlar va e'lonlar ro'yxati bu yerda ko'rsatiladi.",
   "placeholder.profile.title": "Profil",
