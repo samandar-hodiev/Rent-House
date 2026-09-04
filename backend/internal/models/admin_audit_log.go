@@ -19,6 +19,7 @@ const (
 	AuditListingModerated = "listing_moderated"
 	AuditSidebarChanged   = "sidebar_changed"
 	AuditSettingsChanged  = "settings_changed"
+	AuditReportHandled    = "report_handled"
 	AuditProfileUpdated   = "profile_updated"
 )
 

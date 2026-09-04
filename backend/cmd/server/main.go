@@ -272,6 +272,13 @@ func newRouter(
 		service.NewApartmentService(apartments, settingsService), analyticsService,
 	)
 
+	// Complaints about listings. One service, read from both sides: a visitor
+	// raises one, an administrator answers it, and the moderation threshold
+	// that withdraws a listing lives with the counting rather than beside it.
+	reportService := service.NewReportService(
+		repository.NewReportRepository(db), apartments, settingsService,
+	)
+
 	// One chat repository, shared: the chat service publishes messages through
 	// it and the dashboard reads its unread total from it. Two instances would
 	// be two connections to the same rows for no reason.
@@ -306,6 +313,7 @@ func newRouter(
 		// How many people looked at a listing is its owner's business, so this
 		// one is authenticated even though the listing beside it is public.
 		listings.GET("/:id/analytics", middleware.Auth(tokens), analyticsHandler.ApartmentViews)
+
 	}
 
 	// The signed-in user's own listings, in every status — this is the
@@ -360,6 +368,15 @@ func newRouter(
 	adminListings := service.NewAdminListingService(
 		repository.NewAdminListingRepository(db), apartments, settingsService,
 	)
+	// Complaints are read by the dashboard and raised from a listing page, so
+	// the handler is built once here — after the admin service it audits
+	// through — and both routes are registered from it.
+	reportHandler := handler.NewReportHandler(reportService, adminService)
+
+	// Reporting a listing. Authenticated: an anonymous complaint cannot be
+	// answered or limited, and the dashboard has to know who raised it.
+	listings.POST("/:id/reports", middleware.Auth(tokens), reportHandler.Create)
+
 	adminHandler := handler.NewAdminHandler(
 		adminService, adminStats, adminListings, settingsService,
 		files, cfg.UploadPublicPath, cfg.PublicBaseURL,
@@ -421,6 +438,14 @@ func newRouter(
 				marketplaceUsers.GET("", adminHandler.Users)
 				marketplaceUsers.GET("/:id", adminHandler.UserDetail)
 				marketplaceUsers.PATCH("/:id/status", adminHandler.SetUserStatus)
+			}
+
+			// Complaints, behind their own section like every other part of
+			// the dashboard, so the owner can withdraw it.
+			reports := authed.Group("/reports", middleware.RequireSection(adminService, "reports"))
+			{
+				reports.GET("", reportHandler.List)
+				reports.PATCH("/:id", reportHandler.SetStatus)
 			}
 
 			// The dashboard's own figures. Behind the "dashboard" section, so

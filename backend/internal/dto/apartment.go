@@ -347,3 +347,17 @@ func ParseNonNegativeDecimal(value string) (decimal.Decimal, bool) {
 	}
 	return amount, true
 }
+
+// CreateReportRequest is the body of POST /api/v1/apartments/:id/reports.
+type CreateReportRequest struct {
+	Reason string `json:"reason" binding:"required,oneof=fraud wrong_info unavailable duplicate offensive other"`
+	// Optional, and capped: a complaint is a pointer for a human to follow, not
+	// a document.
+	Comment string `json:"comment" binding:"omitempty,max=1000"`
+}
+
+// UpdateReportRequest is the body of PATCH /api/v1/admin/reports/:id.
+type UpdateReportRequest struct {
+	Status     string `json:"status" binding:"required,oneof=open reviewing resolved dismissed"`
+	Resolution string `json:"resolution" binding:"omitempty,max=1000"`
+}

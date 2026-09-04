@@ -63,6 +63,11 @@ const BADGE_TINTS = {
   resolved: 'bg-primary-light text-primary-hover dark:text-primary',
   rejected: 'bg-error/10 text-error',
   reported: 'bg-warning/15 text-warning',
+  // A complaint's states. `open` is a thing waiting to be read, which is the
+  // same kind of thing as a listing waiting for moderation.
+  open: 'bg-warning/15 text-warning',
+  reviewing: 'bg-warning/15 text-warning',
+  dismissed: 'bg-surface-secondary text-text-muted',
   archived: 'bg-surface-secondary text-text-muted',
   success: 'bg-primary-light text-primary-hover dark:text-primary',
   failed: 'bg-error/10 text-error',

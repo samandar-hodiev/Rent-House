@@ -146,6 +146,7 @@ export const SETTINGS_SECTIONS = [
     id: 'moderation',
     fields: [
       { key: 'listing_edit_moderation_required', type: FIELD.toggle },
+      { key: 'report_threshold', type: FIELD.number, min: 0, max: 50 },
       { key: 'block_reason_required', type: FIELD.toggle },
       {
         key: 'block_listings_action',

@@ -99,6 +99,7 @@ const (
 	SettingListingDraftsAllowed          = "listing_drafts_allowed"
 	SettingListingEditModerationRequired = "listing_edit_moderation_required"
 
+	SettingReportThreshold     = "report_threshold"
 	SettingBlockReasonRequired = "block_reason_required"
 	SettingBlockListingsAction = "block_listings_action"
 
@@ -209,6 +210,12 @@ var SettingDefs = []SettingDef{
 	// Moderation ------------------------------------------------------------
 	{Key: SettingListingEditModerationRequired, Type: SettingBool, Category: CategoryModeration,
 		Default: "true"},
+	{Key: SettingReportThreshold, Type: SettingInt, Category: CategoryModeration,
+		// How many people have to complain before a listing is taken off the
+		// public site and put back in the moderation queue. Zero switches it
+		// off: complaints are still recorded and still read, they simply do
+		// not withdraw a listing on their own.
+		Default: "0", Min: 0, Max: 50},
 	{Key: SettingBlockReasonRequired, Type: SettingBool, Category: CategoryModeration,
 		Default: "true"},
 	{Key: SettingBlockListingsAction, Type: SettingString, Category: CategoryModeration,

@@ -58,6 +58,7 @@ type Settings struct {
 	ListingDraftsAllowed          bool `setting:"listing_drafts_allowed"           json:"listing_drafts_allowed"`
 	ListingEditModerationRequired bool `setting:"listing_edit_moderation_required" json:"listing_edit_moderation_required"`
 
+	ReportThreshold     int    `setting:"report_threshold"      json:"report_threshold"`
 	BlockReasonRequired bool   `setting:"block_reason_required" json:"block_reason_required"`
 	BlockListingsAction string `setting:"block_listings_action" json:"block_listings_action"`
 

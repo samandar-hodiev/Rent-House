@@ -167,6 +167,21 @@ export async function fetchApartment(id, { token, signal } = {}) {
   return toApartment(await request(`/apartments/${id}`, { token, signal }))
 }
 
+/**
+ * Reports a listing.
+ *
+ * Signed in, always: an anonymous complaint cannot be answered, cannot be
+ * limited to one per listing, and the dashboard has to know who raised it.
+ */
+export function reportListing(id, { reason, comment, token, signal } = {}) {
+  return request(`/apartments/${id}/reports`, {
+    method: 'POST',
+    body: { reason, comment },
+    token,
+    signal,
+  })
+}
+
 /** The signed-in user's own listings, drafts included. */
 export async function fetchMyApartments({ token, signal, ...params } = {}) {
   const query = new URLSearchParams(omitEmpty(params)).toString()

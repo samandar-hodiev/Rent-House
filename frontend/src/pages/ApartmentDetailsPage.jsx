@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
+  Flag,
   ArrowUpDown,
   BedDouble,
   Building2,
@@ -37,6 +38,7 @@ import { useLocale } from '../context/LocaleContext'
 import { useSiteLocation } from '../hooks/useSiteLocation'
 import { useAuth } from '../context/AuthContext'
 import { useWishlist } from '../context/WishlistContext'
+import ReportListingDialog from '../components/ReportListingDialog'
 import { useRequireAuth } from '../hooks/useRequireAuth'
 import { getDistrictById, districtNameKey } from '../data/districts'
 import { fetchApartment, fetchApartments } from '../services/apartmentsApi'
@@ -104,6 +106,11 @@ function ApartmentDetailsPage() {
   // saving and messaging require signing in, and both return here afterwards.
   const handleSaveClick = requireAuth(() => toggleWishlist(apartment?.id))
   const handleChatClick = requireAuth(() => setIsChatOpen(true))
+
+  // Reporting is an account's action too, for the same reason as the other
+  // two: a complaint nobody can be asked about is not worth recording.
+  const [isReportOpen, setIsReportOpen] = useState(false)
+  const handleReportClick = requireAuth(() => setIsReportOpen(true))
 
   // Calling needs a number to call. When the owner has not added one, a `tel:`
   // link would open an empty dialer or do nothing at all, so the button says
@@ -186,6 +193,9 @@ function ApartmentDetailsPage() {
   // conversation between an owner and their own listing, so a Call and a
   // Message button here could only ever fail; what belongs in their place is
   // the one action an owner actually wants, which is editing it.
+  // Also decides whether the report action is offered: reporting your own
+  // listing is refused by the server, and an action that always fails should
+  // not be on screen.
   const isOwnListing = Boolean(user?.id && apartment.owner?.id === user.id)
 
   const facts = [
@@ -264,6 +274,17 @@ function ApartmentDetailsPage() {
               >
                 <Share2 aria-hidden="true" size={16} />
               </button>
+              {isOwnListing ? null : (
+                <button
+                  type="button"
+                  onClick={handleReportClick}
+                  aria-label={t('report.title')}
+                  title={t('report.title')}
+                  className="flex size-9 items-center justify-center rounded-full border border-border bg-surface text-text-muted transition-colors hover:bg-error/10 hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <Flag aria-hidden="true" size={16} />
+                </button>
+              )}
             </div>
           </div>
           {shareCopied ? (
@@ -448,6 +469,13 @@ function ApartmentDetailsPage() {
             setNoPhoneOpen(false)
             handleChatClick()
           }}
+        />
+      ) : null}
+
+      {isReportOpen ? (
+        <ReportListingDialog
+          apartmentId={apartment.id}
+          onClose={() => setIsReportOpen(false)}
         />
       ) : null}
 

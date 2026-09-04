@@ -111,6 +111,57 @@ export async function saveSidebarSections(sections, { token, signal } = {}) {
 }
 
 /**
+ * Complaints about listings.
+ *
+ * Filtering, searching and paging are the server's work, like every other
+ * table here: it returns the page plus the totals a paginator needs.
+ */
+export async function fetchReports({ status, search, page = 1, limit, token, signal } = {}) {
+  const query = new URLSearchParams()
+  if (status) query.set('status', status)
+  if (search) query.set('search', search)
+  query.set('page', String(page))
+  if (limit) query.set('limit', String(limit))
+
+  const data = await request(`/admin/reports?${query}`, { token, signal })
+  return {
+    reports: (data?.reports ?? []).map(toReport),
+    counts: data?.counts ?? {},
+    total: data?.total ?? 0,
+    page: data?.page ?? 1,
+    limit: data?.limit ?? 20,
+  }
+}
+
+/** Moves one complaint along, recording who decided and what they wrote. */
+export async function setReportStatus(id, { status, resolution = '', token, signal } = {}) {
+  return toReport(await request(`/admin/reports/${id}`, {
+    method: 'PATCH',
+    body: { status, resolution },
+    token,
+    signal,
+  }))
+}
+
+function toReport(row) {
+  return {
+    id: row.id,
+    apartmentId: row.apartment_id,
+    apartmentTitle: row.apartment_title ?? '',
+    apartmentStatus: row.apartment_status ?? '',
+    reason: row.reason,
+    comment: row.comment ?? '',
+    status: row.status,
+    resolution: row.resolution ?? '',
+    reporterName: row.reporter_name ?? '',
+    resolvedByName: row.resolved_by_name ?? '',
+    openCount: row.open_count ?? 0,
+    createdAt: row.created_at,
+    resolvedAt: row.resolved_at ?? null,
+  }
+}
+
+/**
  * Back to the values the server declares as its defaults.
  *
  * A delete rather than a write: the defaults live in the registry, so removing
