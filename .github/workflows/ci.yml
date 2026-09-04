@@ -1,0 +1,124 @@
+# What must hold before a change is merged.
+#
+# Two jobs, because the two halves fail for different reasons and a red tick
+# should say which. Both run on every push and every pull request: the point of
+# this file is that nobody has to remember to run the suite.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+
+    services:
+      # A throwaway PostgreSQL for the integration tests. Disposable, which is
+      # what lets RENTHOUSE_TEST_DESTRUCTIVE below be set at all.
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: renthouse_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # The suite needs the DSN explicitly rather than inferring one: skipping
+      # silently would report success while testing nothing.
+      TEST_DATABASE_DSN: postgres://postgres:postgres@localhost:5432/renthouse_test?sslmode=disable
+      # This database exists for the run and is thrown away with it, so the
+      # listing tests that empty the apartments table may do so here.
+      RENTHOUSE_TEST_DESTRUCTIVE: "1"
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      # gofmt is not a matter of taste here: the repository is formatted, and a
+      # diff means somebody's editor is not.
+      - name: Formatting
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt'd:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Prepare the test database
+        # Migrations, then the reference data every listing needs: a listing
+        # names its district by slug, and on a database with no districts every
+        # test that publishes one is refused with a 400 that says nothing about
+        # the code.
+        run: |
+          go run ./cmd/migrate up
+          go run ./cmd/seed
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: renthouse_test
+          DB_SSLMODE: disable
+          JWT_SECRET: ci-secret-not-used-outside-this-run
+
+      - name: Unit tests
+        run: go test ./...
+
+      - name: Integration tests
+        run: go test -tags=integration ./...
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `ci` rather than `install`: it installs exactly the lockfile and fails
+      # if the two have drifted, which is the whole point of having one.
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
