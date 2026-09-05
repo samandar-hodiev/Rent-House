@@ -499,6 +499,7 @@ export default {
   'auth.errorDeliveryFailed': "Tasdiqlash kodini yuborib bo'lmadi. Birozdan keyin qayta urinib ko'ring.",
   'auth.checkingSession': 'Tekshirilmoqda...',
   'auth.errorUnexpected': 'Kutilmagan xatolik. Keyinroq urinib ko\'ring.',
+  'auth.errorRateLimited': "Juda ko'p urinish qilindi. Birozdan so'ng qayta urinib ko'ring.",
 
   // District display names, keyed by the district id from data/districts.js
   // (ids and filter values are language-independent and never change).
@@ -684,6 +685,7 @@ export default {
   'listing.errorFloorTooHigh': "Qavat bino qavatlaridan yuqori bo'lishi mumkin emas.",
   'listing.errorNotOwner': "Bu e'lon boshqa foydalanuvchiga tegishli.",
   'listing.errorSessionExpired': "Sessiya tugagan. Qaytadan kiring.",
+  'listing.errorRateLimited': "Juda ko'p urinish qilindi. Birozdan so'ng qayta urinib ko'ring.",
   'listing.delete': "O'chirish",
   'listing.deleteConfirm': "E'lonni o'chirishni tasdiqlaysizmi?",
   'listing.deleting': "O'chirilmoqda...",

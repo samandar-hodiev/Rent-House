@@ -139,6 +139,8 @@ function ListingForm({ id, isEditMode, existing }) {
       case 'token_expired':
       case 'invalid_token':
         return t('listing.errorSessionExpired')
+      case 'rate_limited':
+        return t('listing.errorRateLimited')
       default:
         return t('listing.errorUnexpected')
     }

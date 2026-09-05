@@ -246,11 +246,19 @@ func newRouter(
 	{
 		// Public: a caller with no account cannot be asked for a token.
 		// Registration is three steps, so ownership of the contact is proven
-		// before an account exists.
-		auth.POST("/register/request", authHandler.RequestRegistrationCode)
+		// before an account exists. Rate-limited by IP: nothing here needs an
+		// account, so there is no account-lockout to fall back on.
+		auth.POST("/register/request",
+			middleware.RateLimit(cfg.RateLimit.RegisterMax, cfg.RateLimit.RegisterWindow),
+			authHandler.RequestRegistrationCode)
 		auth.POST("/register/verify", authHandler.VerifyRegistrationCode)
 		auth.POST("/register/complete", authHandler.CompleteRegistration)
-		auth.POST("/login", authHandler.Login)
+		// Login already locks one identifier after too many failures; the IP
+		// limit alongside it catches the case that lockout cannot — one caller
+		// sweeping through many identifiers, none of which alone trips a lock.
+		auth.POST("/login",
+			middleware.RateLimit(cfg.RateLimit.LoginMax, cfg.RateLimit.LoginWindow),
+			authHandler.Login)
 		// Renewing and ending a session. Public: both carry the refresh token
 		// in the body, which is the only credential either needs — an expired
 		// access token must still be able to sign out.
@@ -261,8 +269,11 @@ func newRouter(
 		auth.GET("/me", middleware.Auth(tokens), authHandler.Me)
 
 		// Password reset, by email. Public: somebody who has forgotten their
-		// password has no token to present.
-		auth.POST("/password/forgot", authHandler.ForgotPassword)
+		// password has no token to present. Rate-limited so this cannot become
+		// a way to mail-bomb an inbox or probe which addresses are registered.
+		auth.POST("/password/forgot",
+			middleware.RateLimit(cfg.RateLimit.PasswordResetMax, cfg.RateLimit.PasswordReset),
+			authHandler.ForgotPassword)
 		auth.GET("/password/reset", authHandler.ValidateResetToken)
 		auth.POST("/password/reset", authHandler.ResetPassword)
 	}
@@ -316,8 +327,12 @@ func newRouter(
 		listings.GET("/:id", middleware.OptionalAuth(tokens), apartmentHandler.Get)
 
 		// Owner-only. The identity comes from the token; the service checks
-		// that the listing is actually theirs before writing anything.
-		listings.POST("", middleware.Auth(tokens), apartmentHandler.Create)
+		// that the listing is actually theirs before writing anything. Also
+		// rate-limited by IP: a valid session is still a script's, once stolen
+		// or automated, and moderation should not have to absorb a flood.
+		listings.POST("", middleware.Auth(tokens),
+			middleware.RateLimit(cfg.RateLimit.ListingMax, cfg.RateLimit.ListingWindow),
+			apartmentHandler.Create)
 		listings.PUT("/:id", middleware.Auth(tokens), apartmentHandler.Update)
 		listings.DELETE("/:id", middleware.Auth(tokens), apartmentHandler.Delete)
 		// The listing's lifecycle, separate from editing its content: a status

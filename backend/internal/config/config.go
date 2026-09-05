@@ -29,6 +29,18 @@ const (
 	// enough to type a name and a password, short enough that a stolen token is
 	// nearly worthless.
 	defaultRegistrationTokenExpiry = 15 * time.Minute
+
+	// Defaults for the IP-based limits below. Account lockout already throttles
+	// one identifier at a time; these guard the endpoints a script can hit with
+	// no account at all, or by cycling through many.
+	defaultRateLimitRegisterMax      = 5
+	defaultRateLimitRegisterWindow   = 15 * time.Minute
+	defaultRateLimitPasswordResetMax = 5
+	defaultRateLimitPasswordReset    = 15 * time.Minute
+	defaultRateLimitLoginMax         = 30
+	defaultRateLimitLoginWindow      = 5 * time.Minute
+	defaultRateLimitListingMax       = 20
+	defaultRateLimitListingWindow    = time.Hour
 )
 
 // Config holds every setting the server needs to start.
@@ -49,6 +61,44 @@ type Config struct {
 	JWT           JWT
 	OTP           OTP
 	Notify        Notify
+	RateLimit     RateLimit
+}
+
+// RateLimit holds the IP-based request caps for endpoints reachable without
+// an account, or reachable by cycling through many.
+type RateLimit struct {
+	RegisterMax      int
+	RegisterWindow   time.Duration
+	PasswordResetMax int
+	PasswordReset    time.Duration
+	LoginMax         int
+	LoginWindow      time.Duration
+	ListingMax       int
+	ListingWindow    time.Duration
+}
+
+// validate confirms every pair describes an actual limit — a max of zero or
+// less would either block every caller or, divided by a non-positive window,
+// mean nothing at all.
+func (r RateLimit) validate() error {
+	for _, pair := range []struct {
+		name   string
+		max    int
+		window time.Duration
+	}{
+		{"RATE_LIMIT_REGISTER", r.RegisterMax, r.RegisterWindow},
+		{"RATE_LIMIT_PASSWORD_RESET", r.PasswordResetMax, r.PasswordReset},
+		{"RATE_LIMIT_LOGIN", r.LoginMax, r.LoginWindow},
+		{"RATE_LIMIT_LISTING", r.ListingMax, r.ListingWindow},
+	} {
+		if pair.max <= 0 {
+			return fmt.Errorf("%s_MAX must be at least 1", pair.name)
+		}
+		if pair.window <= 0 {
+			return fmt.Errorf("%s_WINDOW must be a positive duration, for example 15m", pair.name)
+		}
+	}
+	return nil
 }
 
 // Notify selects how verification codes are delivered.
@@ -173,6 +223,12 @@ func Load() (*Config, error) {
 		RegistrationTokenExpiry: tokenExpiry,
 	}
 
+	rateLimit, err := loadRateLimit()
+	if err != nil {
+		return nil, err
+	}
+	cfg.RateLimit = rateLimit
+
 	// 587 is the submission port with STARTTLS, which is what Gmail, Brevo and
 	// SendGrid all document first.
 	smtpPort, err := parseInt(os.Getenv("SMTP_PORT"), 587, "SMTP_PORT")
@@ -217,6 +273,59 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
+// loadRateLimit reads the IP-based request caps, each an independent
+// max/window pair so one endpoint can be tuned without touching the others.
+func loadRateLimit() (RateLimit, error) {
+	registerMax, err := parseInt(os.Getenv("RATE_LIMIT_REGISTER_MAX"), defaultRateLimitRegisterMax, "RATE_LIMIT_REGISTER_MAX")
+	if err != nil {
+		return RateLimit{}, err
+	}
+	registerWindow, err := parseDuration(
+		os.Getenv("RATE_LIMIT_REGISTER_WINDOW"), defaultRateLimitRegisterWindow, "RATE_LIMIT_REGISTER_WINDOW")
+	if err != nil {
+		return RateLimit{}, err
+	}
+	passwordResetMax, err := parseInt(
+		os.Getenv("RATE_LIMIT_PASSWORD_RESET_MAX"), defaultRateLimitPasswordResetMax, "RATE_LIMIT_PASSWORD_RESET_MAX")
+	if err != nil {
+		return RateLimit{}, err
+	}
+	passwordResetWindow, err := parseDuration(
+		os.Getenv("RATE_LIMIT_PASSWORD_RESET_WINDOW"), defaultRateLimitPasswordReset, "RATE_LIMIT_PASSWORD_RESET_WINDOW")
+	if err != nil {
+		return RateLimit{}, err
+	}
+	loginMax, err := parseInt(os.Getenv("RATE_LIMIT_LOGIN_MAX"), defaultRateLimitLoginMax, "RATE_LIMIT_LOGIN_MAX")
+	if err != nil {
+		return RateLimit{}, err
+	}
+	loginWindow, err := parseDuration(
+		os.Getenv("RATE_LIMIT_LOGIN_WINDOW"), defaultRateLimitLoginWindow, "RATE_LIMIT_LOGIN_WINDOW")
+	if err != nil {
+		return RateLimit{}, err
+	}
+	listingMax, err := parseInt(os.Getenv("RATE_LIMIT_LISTING_MAX"), defaultRateLimitListingMax, "RATE_LIMIT_LISTING_MAX")
+	if err != nil {
+		return RateLimit{}, err
+	}
+	listingWindow, err := parseDuration(
+		os.Getenv("RATE_LIMIT_LISTING_WINDOW"), defaultRateLimitListingWindow, "RATE_LIMIT_LISTING_WINDOW")
+	if err != nil {
+		return RateLimit{}, err
+	}
+
+	return RateLimit{
+		RegisterMax:      registerMax,
+		RegisterWindow:   registerWindow,
+		PasswordResetMax: passwordResetMax,
+		PasswordReset:    passwordResetWindow,
+		LoginMax:         loginMax,
+		LoginWindow:      loginWindow,
+		ListingMax:       listingMax,
+		ListingWindow:    listingWindow,
+	}, nil
+}
+
 // validate reports every missing required value at once, so a misconfigured
 // deployment does not have to be fixed one restart at a time.
 func (c *Config) validate() error {
@@ -250,6 +359,9 @@ func (c *Config) validate() error {
 	}
 	if c.OTP.RegistrationTokenExpiry <= 0 {
 		return errors.New("REGISTRATION_TOKEN_EXPIRATION must be a positive duration, for example 15m")
+	}
+	if err := c.RateLimit.validate(); err != nil {
+		return err
 	}
 	return c.validateNotify()
 }

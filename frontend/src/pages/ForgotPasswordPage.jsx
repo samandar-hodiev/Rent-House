@@ -6,6 +6,7 @@ import AuthButton from '../components/auth/AuthButton'
 import AuthInput from '../components/auth/AuthInput'
 import { Link } from 'react-router-dom'
 import { useLocale } from '../context/LocaleContext'
+import { ApiError } from '../services/apiClient'
 import { requestPasswordReset } from '../services/authApi'
 import { ROUTES } from '../routes/paths'
 
@@ -48,10 +49,15 @@ function ForgotPasswordPage() {
     try {
       await requestPasswordReset(trimmed.toLowerCase())
       setSent(true)
-    } catch {
-      // Only a request that never reached the server lands here: the endpoint
-      // answers 200 whether or not the address is known.
-      setFormError(t('auth.errorUnexpected'))
+    } catch (err) {
+      // The endpoint answers 200 whether or not the address is known, so only
+      // a request that never got that far — no connection, or this address
+      // sending too many of these — lands here.
+      if (err instanceof ApiError && err.code === 'rate_limited') {
+        setFormError(t('auth.errorRateLimited'))
+      } else {
+        setFormError(t('auth.errorUnexpected'))
+      }
     } finally {
       setIsSubmitting(false)
     }

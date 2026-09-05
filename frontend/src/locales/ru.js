@@ -499,6 +499,7 @@ export default {
   'auth.errorDeliveryFailed': 'Не удалось отправить код подтверждения. Попробуйте чуть позже.',
   'auth.checkingSession': 'Проверяем...',
   'auth.errorUnexpected': 'Непредвиденная ошибка. Попробуйте позже.',
+  'auth.errorRateLimited': 'Слишком много попыток. Повторите попытку немного позже.',
 
   // District display names, keyed by the district id from data/districts.js
   // (ids and filter values are language-independent and never change).
@@ -684,6 +685,7 @@ export default {
   'listing.errorFloorTooHigh': 'Этаж не может быть выше этажности дома.',
   'listing.errorNotOwner': 'Это объявление принадлежит другому пользователю.',
   'listing.errorSessionExpired': 'Сессия истекла. Войдите снова.',
+  'listing.errorRateLimited': 'Слишком много попыток. Повторите попытку немного позже.',
   'listing.delete': 'Удалить',
   'listing.deleteConfirm': 'Удалить объявление?',
   'listing.deleting': 'Удаление...',

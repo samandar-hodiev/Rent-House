@@ -114,6 +114,8 @@ function RegisterPage() {
           return t('auth.errorTooManyAttempts')
         case 'verification_not_found':
           return t('auth.errorVerificationLost')
+        case 'rate_limited':
+          return t('auth.errorRateLimited')
         case 'invalid_registration_token':
           return t('auth.errorSessionExpired')
         case 'validation_failed':

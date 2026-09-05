@@ -10,6 +10,7 @@ func TestValidateReportsEveryMissingVariable(t *testing.T) {
 		AllowedOrigins: []string{"http://localhost:5173"},
 		JWT:            JWT{ExpiresIn: time.Hour},
 		OTP:            validOTP(),
+		RateLimit:      validRateLimit(),
 	}
 
 	err := cfg.validate()
@@ -29,6 +30,7 @@ func TestValidateAcceptsCompleteConfig(t *testing.T) {
 		Database:       Database{User: "postgres", Name: "renthouse"},
 		JWT:            JWT{Secret: "secret", ExpiresIn: time.Hour},
 		OTP:            validOTP(),
+		RateLimit:      validRateLimit(),
 	}
 
 	if err := cfg.validate(); err != nil {
@@ -88,6 +90,7 @@ func TestValidateRejectsNonPositiveExpiry(t *testing.T) {
 		Database:       Database{User: "postgres", Name: "renthouse"},
 		JWT:            JWT{Secret: "secret", ExpiresIn: 0},
 		OTP:            validOTP(),
+		RateLimit:      validRateLimit(),
 	}
 	if err := cfg.validate(); err == nil {
 		t.Fatal("expected an error when the token lifetime is not positive")
@@ -105,6 +108,54 @@ func validOTP() OTP {
 	}
 }
 
+// validRateLimit returns a policy that passes validation, so a test can focus
+// on the field it is actually exercising.
+func validRateLimit() RateLimit {
+	return RateLimit{
+		RegisterMax:      5,
+		RegisterWindow:   15 * time.Minute,
+		PasswordResetMax: 5,
+		PasswordReset:    15 * time.Minute,
+		LoginMax:         30,
+		LoginWindow:      5 * time.Minute,
+		ListingMax:       20,
+		ListingWindow:    time.Hour,
+	}
+}
+
+func TestValidateRejectsABadRateLimitPolicy(t *testing.T) {
+	base := func() *Config {
+		return &Config{
+			AllowedOrigins: []string{"http://localhost:5173"},
+			Database:       Database{User: "postgres", Name: "renthouse"},
+			JWT:            JWT{Secret: "secret", ExpiresIn: time.Hour},
+			OTP:            validOTP(),
+			RateLimit:      validRateLimit(),
+		}
+	}
+
+	cases := map[string]func(*Config){
+		"zero register max":     func(c *Config) { c.RateLimit.RegisterMax = 0 },
+		"zero register window":  func(c *Config) { c.RateLimit.RegisterWindow = 0 },
+		"negative password max": func(c *Config) { c.RateLimit.PasswordResetMax = -1 },
+		"zero password window":  func(c *Config) { c.RateLimit.PasswordReset = 0 },
+		"zero login max":        func(c *Config) { c.RateLimit.LoginMax = 0 },
+		"negative login window": func(c *Config) { c.RateLimit.LoginWindow = -time.Second },
+		"zero listing max":      func(c *Config) { c.RateLimit.ListingMax = 0 },
+		"zero listing window":   func(c *Config) { c.RateLimit.ListingWindow = 0 },
+	}
+
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			cfg := base()
+			mutate(cfg)
+			if err := cfg.validate(); err == nil {
+				t.Fatal("expected the invalid rate limit policy to be rejected")
+			}
+		})
+	}
+}
+
 func TestValidateRejectsABadOTPPolicy(t *testing.T) {
 	base := func() *Config {
 		return &Config{
@@ -112,6 +163,7 @@ func TestValidateRejectsABadOTPPolicy(t *testing.T) {
 			Database:       Database{User: "postgres", Name: "renthouse"},
 			JWT:            JWT{Secret: "secret", ExpiresIn: time.Hour},
 			OTP:            validOTP(),
+			RateLimit:      validRateLimit(),
 		}
 	}
 

@@ -56,6 +56,8 @@ function LoginPage() {
         setFormError(t('auth.errorNetwork'))
       } else if (error instanceof ApiError && error.code === 'invalid_credentials') {
         setFormError(t('auth.errorCredentials'))
+      } else if (error instanceof ApiError && error.code === 'rate_limited') {
+        setFormError(t('auth.errorRateLimited'))
       } else {
         setFormError(t('auth.errorUnexpected'))
       }

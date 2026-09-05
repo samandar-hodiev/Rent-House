@@ -499,6 +499,7 @@ export default {
   'auth.errorDeliveryFailed': 'Could not send the verification code. Please try again shortly.',
   'auth.checkingSession': 'Checking your session...',
   'auth.errorUnexpected': 'Something went wrong. Please try again later.',
+  'auth.errorRateLimited': 'Too many attempts. Please try again in a little while.',
 
   // District display names, keyed by the district id from data/districts.js
   // (ids and filter values are language-independent and never change).
@@ -683,6 +684,7 @@ export default {
   'listing.errorFloorTooHigh': 'The floor cannot be above the building height.',
   'listing.errorNotOwner': 'This listing belongs to another user.',
   'listing.errorSessionExpired': 'Your session expired. Please sign in again.',
+  'listing.errorRateLimited': 'Too many attempts. Please try again in a little while.',
   'listing.delete': 'Delete',
   'listing.deleteConfirm': 'Delete this listing?',
   'listing.deleting': 'Deleting...',
