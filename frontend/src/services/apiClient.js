@@ -30,18 +30,29 @@ export const NETWORK_ERROR = 'network_error'
 /**
  * How to renew an expired session, registered by the auth context.
  *
- * A module-level hook rather than a parameter: every screen in the app calls
- * `request` and none of them should have to know that a token can expire. The
- * auth context owns the tokens, so it is what supplies this.
+ * Two module-level hooks rather than a parameter: every screen in the app
+ * calls `request` and none of them should have to know that a token can
+ * expire. The marketplace and the dashboard are separate systems with
+ * separate tokens, so they get separate slots — a single shared one would mean
+ * whichever context mounted (or unmounted) last decides how every 401 in the
+ * app gets renewed, including the other system's.
  */
-let renewSession = null
+const renewers = { user: null, admin: null }
 
-export function setSessionRenewer(renew) {
-  renewSession = renew
+export function setSessionRenewer(renew, scope = 'user') {
+  renewers[scope] = renew
+}
+
+// Which slot a path's session belongs to. `/admin/...` is the dashboard;
+// everything else is the marketplace.
+function scopeFor(path) {
+  return path.startsWith('/admin/') ? 'admin' : 'user'
 }
 
 export async function request(path, options = {}) {
   const response = await send(path, options)
+
+  const renew = renewers[scopeFor(path)]
 
   // An access token the server refused, and a session that may still be
   // renewable. Retried exactly once: if the renewal produced a token that is
@@ -50,15 +61,15 @@ export async function request(path, options = {}) {
     response instanceof ApiError &&
     response.status === 401 &&
     options.token &&
-    renewSession &&
-    !path.startsWith('/auth/refresh')
+    renew &&
+    !path.endsWith('/auth/refresh')
 
   if (!renewable) {
     if (response instanceof ApiError) throw response
     return response
   }
 
-  const token = await renewSession()
+  const token = await renew()
   if (!token) throw response
 
   const retried = await send(path, { ...options, token })

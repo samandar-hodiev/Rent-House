@@ -1,12 +1,19 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { ApiError } from '../services/apiClient'
-import { fetchCurrentAdmin, login as loginRequest, logout as logoutRequest } from '../services/adminApi'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { ApiError, setSessionRenewer } from '../services/apiClient'
+import {
+  fetchCurrentAdmin,
+  login as loginRequest,
+  logout as logoutRequest,
+  refreshSession,
+  toAdmin,
+} from '../services/adminApi'
 
-// Its own key, deliberately: an administrator's token and a visitor's are for
+// Its own keys, deliberately: an administrator's tokens and a visitor's are for
 // different systems and must not be interchangeable. The backend refuses either
 // at the other's endpoints, and storing them apart means the client never
 // presents the wrong one in the first place.
 const TOKEN_KEY = 'renthouse_admin_token'
+const REFRESH_KEY = 'renthouse_admin_refresh'
 
 // `loading` matters: on first paint the app does not yet know whether the
 // stored token is still good, and rendering the sign-in form for a moment on
@@ -37,6 +44,24 @@ function persistToken(token) {
   }
 }
 
+function readRefresh() {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage.getItem(REFRESH_KEY)
+  } catch {
+    return null
+  }
+}
+
+function persistRefresh(token) {
+  try {
+    if (token) window.localStorage.setItem(REFRESH_KEY, token)
+    else window.localStorage.removeItem(REFRESH_KEY)
+  } catch {
+    // As above: the tab keeps working, the next one starts signed out.
+  }
+}
+
 /**
  * The signed-in administrator.
  *
@@ -54,10 +79,53 @@ export function AdminAuthProvider({ children }) {
 
   const clear = useCallback(() => {
     persistToken(null)
+    persistRefresh(null)
     setToken(null)
     setAdmin(null)
     setStatus(ADMIN_AUTH_STATUS.unauthenticated)
   }, [])
+
+  /**
+   * Exchanges the refresh token for a new pair — see AuthContext.renew, which
+   * this mirrors. One in flight at a time for the same reason: several
+   * requests failing with 401 at once must produce one renewal, since the
+   * server rotates the token and a second renewal would present one the first
+   * already spent.
+   */
+  const refreshing = useRef(null)
+  const renew = useCallback(async () => {
+    const refreshToken = readRefresh()
+    if (!refreshToken) return null
+
+    if (!refreshing.current) {
+      refreshing.current = refreshSession(refreshToken)
+        .then((data) => {
+          persistToken(data.access_token)
+          persistRefresh(data.refresh_token ?? null)
+          setToken(data.access_token)
+          if (data.admin) setAdmin(toAdmin(data.admin))
+          setStatus(ADMIN_AUTH_STATUS.authenticated)
+          return data.access_token
+        })
+        .catch(() => {
+          clear()
+          return null
+        })
+        .finally(() => {
+          refreshing.current = null
+        })
+    }
+    return refreshing.current
+  }, [clear])
+
+  // Every admin request renews through this, so a token that expires mid-
+  // session is replaced rather than thrown at the reader as a sign-out. Its
+  // own slot in the client: see setSessionRenewer for why the marketplace's
+  // renewer must not be the one called here.
+  useEffect(() => {
+    setSessionRenewer(renew, 'admin')
+    return () => setSessionRenewer(null, 'admin')
+  }, [renew])
 
   // Whether the stored token is still good, asked of the server rather than
   // assumed. Anything the server refuses ends the session; a network failure
@@ -79,24 +147,38 @@ export function AdminAuthProvider({ children }) {
       })
       .catch((error) => {
         if (cancelled || error?.name === 'AbortError') return
-        // A refusal is an answer: the token is spent, expired, or the account
-        // is gone. A network error is not, so the session is left alone.
-        if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
-          clear()
+
+        // Only a 401 proves the access token itself is bad — and that is what
+        // the refresh token is for, the same way the marketplace's session
+        // renews after a few hours away rather than signing the reader out.
+        const rejected = error instanceof ApiError && error.status === 401
+        if (!rejected) {
+          // Any other refusal (403, 404 — the account is gone or blocked) is
+          // an answer a renewed token would get again, so the session ends.
+          if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+            clear()
+            return
+          }
+          setStatus(ADMIN_AUTH_STATUS.unauthenticated)
           return
         }
-        setStatus(ADMIN_AUTH_STATUS.unauthenticated)
+
+        renew().then((renewed) => {
+          if (cancelled || renewed) return
+          setStatus(ADMIN_AUTH_STATUS.unauthenticated)
+        })
       })
 
     return () => {
       cancelled = true
       controller.abort()
     }
-  }, [token, clear])
+  }, [token, clear, renew])
 
   const signIn = useCallback(async ({ email, password }) => {
     const session = await loginRequest({ email, password })
     persistToken(session.token)
+    persistRefresh(session.refreshToken)
     setToken(session.token)
     setAdmin(session.admin)
     setStatus(ADMIN_AUTH_STATUS.authenticated)
@@ -104,19 +186,18 @@ export function AdminAuthProvider({ children }) {
   }, [])
 
   const signOut = useCallback(async () => {
-    // Told to the server first, so a denylist added later has something to act
-    // on — but the local session ends either way, which is what the person
-    // asked for.
-    if (token) {
-      try {
-        await logoutRequest({ token })
-      } catch {
-        // Already invalid on the server, or unreachable. Neither is a reason
-        // to stay signed in here.
-      }
-    }
+    const refreshToken = readRefresh()
+    // Cleared first, and the server told afterwards: signing out must not
+    // depend on the network — see AuthContext.signOut, which this mirrors.
     clear()
-  }, [token, clear])
+    if (!refreshToken) return
+    try {
+      await logoutRequest({ refreshToken })
+    } catch {
+      // Already invalid on the server, or unreachable. Neither is a reason to
+      // stay signed in here.
+    }
+  }, [clear])
 
   /**
    * Replaces the account the app is showing, after the person edits it.

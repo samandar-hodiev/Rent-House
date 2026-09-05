@@ -75,7 +75,10 @@ func newAdminHarness(t *testing.T) *adminHarness {
 	notifications := service.NewNotificationService(
 		repository.NewNotificationRepository(tx), settings)
 	adminRepo := repository.NewAdminRepository(tx)
-	admins := service.NewAdminService(adminRepo, tokens, settings, repository.NewRefreshTokenRepository(tx))
+	admins := service.NewAdminService(
+		adminRepo, tokens, settings,
+		repository.NewRefreshTokenRepository(tx), repository.NewAdminRefreshTokenRepository(tx),
+	)
 
 	handler := NewAdminHandler(
 		admins,

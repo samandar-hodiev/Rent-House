@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"sort"
@@ -37,11 +39,24 @@ var (
 	// ErrBlockReasonRequired is returned when an account is blocked without
 	// saying why.
 	ErrBlockReasonRequired = errors.New("a block reason is required")
+
+	// ErrAdminInvalidRefreshToken covers every reason a dashboard session
+	// cannot be renewed: unknown, expired, revoked. One error for all three so
+	// a caller cannot use the difference to learn which token existed.
+	ErrAdminInvalidRefreshToken = errors.New("admin session cannot be renewed")
 )
 
-// adminSessionTTL is how long a dashboard session lasts. Shorter than the
-// marketplace's, because an administrator's token opens more.
+// adminSessionTTL is how long a dashboard access token lasts before it must be
+// renewed. Shorter than the marketplace's, because an administrator's token
+// opens more.
 const adminSessionTTL = 8 * time.Hour
+
+// adminRefreshTokenTTL is how long a dashboard session may be renewed without
+// signing in again. Shorter than the marketplace's 30-day default for the same
+// reason the access token is shorter: this account can moderate and configure
+// the whole marketplace, so a stolen refresh token should not stay useful for
+// a month.
+const adminRefreshTokenTTL = 7 * 24 * time.Hour
 
 // adminBcryptCost matches the marketplace's, and is well above the library
 // default.
@@ -58,7 +73,14 @@ type AdminService struct {
 	// The blocked account's open sessions, so blocking ends them rather than
 	// only stopping the next sign-in. Optional: without it a blocked account
 	// keeps its access token until it expires.
-	sessions *repository.RefreshTokenRepository
+	userSessions *repository.RefreshTokenRepository
+	// The dashboard's own sessions — a different table from the one above,
+	// because a visitor's session and an administrator's are already separate
+	// systems with separate accounts, and a shared table would let a bug in
+	// either flow renew or revoke a session that belongs to the other.
+	// Optional, for the same reason userSessions is: the admin bootstrap
+	// command signs nobody in, so it has no sessions to manage.
+	adminSessions *repository.AdminRefreshTokenRepository
 	// The marketplace's configuration, for the rules that are the owner's to
 	// set — the password policy a new administrator's password must satisfy.
 	// Optional: a nil settings service falls back to the built-in minimum, so
@@ -68,9 +90,12 @@ type AdminService struct {
 
 func NewAdminService(
 	admins *repository.AdminRepository, tokens *token.Service, settings *SettingsService,
-	sessions *repository.RefreshTokenRepository,
+	userSessions *repository.RefreshTokenRepository, adminSessions *repository.AdminRefreshTokenRepository,
 ) *AdminService {
-	return &AdminService{admins: admins, tokens: tokens, settings: settings, sessions: sessions}
+	return &AdminService{
+		admins: admins, tokens: tokens, settings: settings,
+		userSessions: userSessions, adminSessions: adminSessions,
+	}
 }
 
 // pageSize is how many rows a dashboard table shows when the client does not
@@ -97,11 +122,14 @@ func (s *AdminService) passwordPolicy(ctx context.Context) PasswordPolicy {
 	}
 }
 
-// Session is what a successful sign-in produces.
+// Session is what a successful sign-in — or a renewal — produces.
 type Session struct {
 	Admin     *models.Admin
 	Token     string
 	ExpiresAt time.Time
+	// RefreshToken is empty when adminSessions is nil: a session then works
+	// exactly as before, a stateless token good until it expires on its own.
+	RefreshToken string
 }
 
 // Login verifies an email and password and starts a session.
@@ -147,7 +175,121 @@ func (s *AdminService) Login(ctx context.Context, email, password string) (*Sess
 		admin.LastLoginAt = &now
 	}
 
-	return &Session{Admin: admin, Token: signed, ExpiresAt: expiresAt}, nil
+	session := &Session{Admin: admin, Token: signed, ExpiresAt: expiresAt}
+	if s.adminSessions != nil {
+		plain, row, err := s.newAdminRefreshToken(admin.ID)
+		if err != nil {
+			return nil, fmt.Errorf("admin login: %w", err)
+		}
+		if err := s.adminSessions.Create(ctx, row); err != nil {
+			return nil, fmt.Errorf("admin login: %w", err)
+		}
+		session.RefreshToken = plain
+	}
+
+	return session, nil
+}
+
+// newAdminRefreshToken returns the secret to hand out and the row to store.
+// Mirrors AuthService.newRefreshToken — a fixed lifetime rather than a
+// setting, since it is not the owner's to tune from the dashboard it protects.
+func (s *AdminService) newAdminRefreshToken(adminID uuid.UUID) (string, *models.AdminRefreshToken, error) {
+	buf := make([]byte, refreshTokenBytes)
+	if _, err := rand.Read(buf); err != nil {
+		return "", nil, fmt.Errorf("generate admin refresh token: %w", err)
+	}
+	plain := base64.RawURLEncoding.EncodeToString(buf)
+
+	return plain, &models.AdminRefreshToken{
+		AdminID:   adminID,
+		TokenHash: hashToken(plain),
+		ExpiresAt: time.Now().UTC().Add(adminRefreshTokenTTL),
+	}, nil
+}
+
+// Refresh exchanges a dashboard refresh token for a new pair, rotating it in
+// the same act — see AuthService.Refresh, which this mirrors.
+func (s *AdminService) Refresh(ctx context.Context, raw string) (*Session, error) {
+	if s.adminSessions == nil || strings.TrimSpace(raw) == "" {
+		return nil, ErrAdminInvalidRefreshToken
+	}
+
+	stored, err := s.adminSessions.FindByHash(ctx, hashToken(raw))
+	if err != nil {
+		if errors.Is(err, repository.ErrAdminRefreshTokenNotFound) {
+			return nil, ErrAdminInvalidRefreshToken
+		}
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	if !stored.IsUsable(now) {
+		// A revoked token being presented again is a replay of one already
+		// rotated, or a session somebody signed out of. Either way every
+		// session this admin has is ended, exactly as a replayed marketplace
+		// token ends every session a user has.
+		if stored.RevokedAt != nil {
+			if _, err := s.adminSessions.RevokeAllForAdmin(ctx, stored.AdminID, now); err != nil {
+				logger.Errorf("revoke admin sessions after replay: %v", err)
+			}
+		}
+		return nil, ErrAdminInvalidRefreshToken
+	}
+
+	admin, err := s.admins.FindByID(ctx, stored.AdminID)
+	if err != nil {
+		if errors.Is(err, repository.ErrAdminNotFound) {
+			return nil, ErrAdminInvalidRefreshToken
+		}
+		return nil, fmt.Errorf("admin refresh: %w", err)
+	}
+	// A session outlives neither the account nor its standing: an owner who
+	// suspends an administrator expects that to end sessions already open, not
+	// only the next sign-in.
+	if !admin.CanSignIn() {
+		if _, err := s.adminSessions.RevokeAllForAdmin(ctx, admin.ID, now); err != nil {
+			logger.Errorf("revoke sessions of suspended admin: %v", err)
+		}
+		if admin.Status == models.AdminStatusSuspended {
+			return nil, ErrAdminSuspended
+		}
+		return nil, ErrAdminInactive
+	}
+
+	plain, next, err := s.newAdminRefreshToken(admin.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.adminSessions.Rotate(ctx, stored.ID, next, now); err != nil {
+		if errors.Is(err, repository.ErrAdminRefreshTokenNotFound) {
+			return nil, ErrAdminInvalidRefreshToken
+		}
+		return nil, err
+	}
+
+	signed, expiresAt, err := s.tokens.GenerateScoped(admin.ID, token.ScopeAdmin, adminSessionTTL)
+	if err != nil {
+		return nil, fmt.Errorf("admin refresh: %w", err)
+	}
+
+	return &Session{Admin: admin, Token: signed, ExpiresAt: expiresAt, RefreshToken: plain}, nil
+}
+
+// Logout ends one dashboard session. An unknown or already-ended token is not
+// an error — signing out twice is not a failure the caller should have to
+// handle.
+func (s *AdminService) Logout(ctx context.Context, raw string) error {
+	if s.adminSessions == nil || strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	stored, err := s.adminSessions.FindByHash(ctx, hashToken(raw))
+	if err != nil {
+		if errors.Is(err, repository.ErrAdminRefreshTokenNotFound) {
+			return nil
+		}
+		return err
+	}
+	return s.adminSessions.Revoke(ctx, stored.ID, time.Now().UTC())
 }
 
 // Authenticate loads the account a verified token names, and refuses one whose
@@ -266,7 +408,20 @@ func (s *AdminService) SetStatus(
 		return ErrOwnerImmutable
 	}
 
-	return s.admins.UpdateStatus(ctx, id, status)
+	if err := s.admins.UpdateStatus(ctx, id, status); err != nil {
+		return err
+	}
+
+	// Every request already re-checks status against the database, so access
+	// stops immediately regardless of this — but a refresh token left live
+	// would otherwise sit in the table for days, useless but present. Best
+	// effort: the status change itself already succeeded.
+	if status != models.AdminStatusActive && s.adminSessions != nil {
+		if _, err := s.adminSessions.RevokeAllForAdmin(ctx, id, time.Now().UTC()); err != nil {
+			logger.Errorf("revoke sessions of %s admin: %v", status, err)
+		}
+	}
+	return nil
 }
 
 // Delete removes an administrator.
@@ -293,6 +448,8 @@ func (s *AdminService) Delete(ctx context.Context, actor *models.Admin, id uuid.
 		return ErrOwnerImmutable
 	}
 
+	// Their sessions need no separate revoking: admin_refresh_tokens references
+	// admins ON DELETE CASCADE, so the row going away takes its sessions with it.
 	return s.admins.Delete(ctx, id)
 }
 
@@ -404,8 +561,8 @@ func (s *AdminService) SetUserStatus(
 		// Their open sessions end with the block. Without this, blocking
 		// stops the next sign-in and nothing else: whoever is already signed
 		// in stays signed in until their token expires.
-		if s.sessions != nil {
-			if _, err := s.sessions.RevokeAllForUser(ctx, id, time.Now().UTC()); err != nil {
+		if s.userSessions != nil {
+			if _, err := s.userSessions.RevokeAllForUser(ctx, id, time.Now().UTC()); err != nil {
 				logger.Errorf("revoke sessions of blocked user: %v", err)
 			}
 		}

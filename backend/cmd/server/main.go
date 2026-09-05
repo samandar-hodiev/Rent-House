@@ -394,7 +394,7 @@ func newRouter(
 	// endpoint writes rows the admin authorization has to be careful about.
 	adminService := service.NewAdminService(
 		repository.NewAdminRepository(db), tokens, settingsService,
-		repository.NewRefreshTokenRepository(db),
+		repository.NewRefreshTokenRepository(db), repository.NewAdminRefreshTokenRepository(db),
 	)
 	// Every figure the dashboard shows is counted by PostgreSQL; this service
 	// only shapes the counts into series.
@@ -425,11 +425,17 @@ func newRouter(
 		// registration endpoint — the owner creates every other account, and
 		// the owner itself is created by `cmd/admin`.
 		admin.POST("/auth/login", adminHandler.Login)
+		// Renewing and ending a session, mirroring the marketplace's own:
+		// public, because both carry the refresh token in the body, which is
+		// the only credential either needs — an access token that has already
+		// expired must still be exchangeable for a new one, and its holder
+		// must still be able to sign out.
+		admin.POST("/auth/refresh", adminHandler.Refresh)
+		admin.POST("/auth/logout", adminHandler.Logout)
 
 		authed := admin.Group("", middleware.AdminAuth(tokens, adminService))
 		{
 			authed.GET("/auth/me", adminHandler.Me)
-			authed.POST("/auth/logout", adminHandler.Logout)
 
 			// The administrator's own account: their name and their picture,
 			// and nothing else. The role and the status are not editable here

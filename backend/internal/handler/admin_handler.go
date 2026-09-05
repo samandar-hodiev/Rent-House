@@ -157,10 +157,51 @@ func (h *AdminHandler) Login(c *gin.Context) {
 		models.AuditSignIn, session.Admin.Email, c.ClientIP(), models.AuditSuccess)
 
 	response.OK(c, "Signed in", dto.AdminSessionResponse{
-		Admin:       dto.NewAdminResponse(session.Admin),
-		AccessToken: session.Token,
-		TokenType:   "Bearer",
-		ExpiresIn:   int64(time.Until(session.ExpiresAt).Seconds()),
+		Admin:        dto.NewAdminResponse(session.Admin),
+		AccessToken:  session.Token,
+		TokenType:    "Bearer",
+		ExpiresIn:    int64(time.Until(session.ExpiresAt).Seconds()),
+		RefreshToken: session.RefreshToken,
+	})
+}
+
+// Refresh handles POST /api/v1/admin/auth/refresh.
+//
+// Public, like the marketplace's: a dashboard access token that has expired is
+// exactly the case this exists for, so it cannot itself be required to call it.
+func (h *AdminHandler) Refresh(c *gin.Context) {
+	var req dto.RefreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+
+	session, err := h.admins.Refresh(c.Request.Context(), req.RefreshToken)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrAdminInvalidRefreshToken):
+			response.Error(c, http.StatusUnauthorized, "invalid_refresh_token",
+				"This session has ended. Please sign in again")
+		case errors.Is(err, service.ErrAdminSuspended):
+			response.Error(c, http.StatusForbidden, "account_suspended",
+				"This account is suspended")
+		case errors.Is(err, service.ErrAdminInactive):
+			response.Error(c, http.StatusForbidden, "account_inactive",
+				"This account is not active")
+		default:
+			logger.Errorf("admin refresh: %v", err)
+			response.Error(c, http.StatusInternalServerError, "internal_error",
+				"Could not renew the session")
+		}
+		return
+	}
+
+	response.OK(c, "Session renewed", dto.AdminSessionResponse{
+		Admin:        dto.NewAdminResponse(session.Admin),
+		AccessToken:  session.Token,
+		TokenType:    "Bearer",
+		ExpiresIn:    int64(time.Until(session.ExpiresAt).Seconds()),
+		RefreshToken: session.RefreshToken,
 	})
 }
 
@@ -179,11 +220,24 @@ func (h *AdminHandler) Me(c *gin.Context) {
 
 // Logout handles POST /api/v1/admin/auth/logout.
 //
-// The token is a signed, stateless JWT, so there is nothing on the server to
-// tear down: the client discards it and the session is over. The endpoint
-// exists so the client has one call to make, and so a token denylist can be
-// added here later without the frontend changing.
+// Ends the session on the server: the access token stays a stateless JWT that
+// remains valid until it expires on its own, but the refresh token behind it
+// is revoked, so the session cannot be renewed past that point. A body that
+// fails to bind is treated the same as no refresh token at all — the client
+// discards its tokens either way, so there is nothing useful to refuse here.
 func (h *AdminHandler) Logout(c *gin.Context) {
+	var req dto.RefreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.OK(c, "Signed out", nil)
+		return
+	}
+
+	if err := h.admins.Logout(c.Request.Context(), req.RefreshToken); err != nil {
+		logger.Errorf("admin logout: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not end the session")
+		return
+	}
 	response.OK(c, "Signed out", nil)
 }
 

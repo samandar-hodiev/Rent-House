@@ -39,14 +39,20 @@ export function toManagedUser(data) {
   }
 }
 
-/** Signs in. Returns the account and the token that identifies it. */
+/** Signs in. Returns the account, the access token, and the refresh token
+ * that renews it. */
 export async function login({ email, password, signal } = {}) {
   const data = await request('/admin/auth/login', {
     method: 'POST',
     body: { email, password },
     signal,
   })
-  return { admin: toAdmin(data.admin), token: data.access_token, expiresIn: data.expires_in }
+  return {
+    admin: toAdmin(data.admin),
+    token: data.access_token,
+    expiresIn: data.expires_in,
+    refreshToken: data.refresh_token ?? null,
+  }
 }
 
 /** Who the stored token belongs to, re-checked against the server. */
@@ -54,8 +60,20 @@ export async function fetchCurrentAdmin({ token, signal } = {}) {
   return toAdmin(await request('/admin/auth/me', { token, signal }))
 }
 
-export async function logout({ token, signal } = {}) {
-  return request('/admin/auth/logout', { method: 'POST', token, signal })
+/** Exchanges a refresh token for a new access/refresh pair. */
+export function refreshSession(refreshToken) {
+  return request('/admin/auth/refresh', { method: 'POST', body: { refresh_token: refreshToken } })
+}
+
+/** Ends the session on the server: without a refresh token there is only the
+ * local session to forget, which the caller does regardless of this call. */
+export async function logout({ refreshToken, signal } = {}) {
+  if (!refreshToken) return undefined
+  return request('/admin/auth/logout', {
+    method: 'POST',
+    body: { refresh_token: refreshToken },
+    signal,
+  })
 }
 
 /** Every administrator. Owner only — the API answers 403 to anyone else. */

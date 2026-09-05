@@ -309,6 +309,67 @@ func TestRefreshTokenRotationIsSingleUse(t *testing.T) {
 	}
 }
 
+// --- admin refresh tokens ----------------------------------------------------
+
+// The dashboard's session table, mirroring the marketplace's own above — same
+// rotation guarantee, checked against admins rather than users.
+func TestAdminRefreshTokenRotationIsSingleUse(t *testing.T) {
+	db := tx(t)
+	repo := repository.NewAdminRefreshTokenRepository(db)
+	ctx := context.Background()
+	admin := anyAdmin(t, db)
+	now := time.Now().UTC()
+
+	first := &models.AdminRefreshToken{
+		AdminID: admin.ID, TokenHash: strings.Repeat("a", 64),
+		ExpiresAt: now.Add(24 * time.Hour),
+	}
+	if err := repo.Create(ctx, first); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	second := &models.AdminRefreshToken{
+		AdminID: admin.ID, TokenHash: strings.Repeat("b", 64),
+		ExpiresAt: now.Add(24 * time.Hour),
+	}
+	if err := repo.Rotate(ctx, first.ID, second, now); err != nil {
+		t.Fatalf("rotate: %v", err)
+	}
+
+	stored, err := repo.FindByHash(ctx, first.TokenHash)
+	if err != nil {
+		t.Fatalf("find: %v", err)
+	}
+	if stored.RevokedAt == nil {
+		t.Fatal("the rotated token is still live")
+	}
+	if stored.ReplacedBy == nil || *stored.ReplacedBy != second.ID {
+		t.Fatal("the rotated token does not name its successor")
+	}
+	if stored.IsUsable(now) {
+		t.Fatal("a revoked token reports itself usable")
+	}
+
+	third := &models.AdminRefreshToken{
+		AdminID: admin.ID, TokenHash: strings.Repeat("c", 64),
+		ExpiresAt: now.Add(24 * time.Hour),
+	}
+	if err := repo.Rotate(ctx, first.ID, third, now); err == nil {
+		t.Fatal("a token was rotated twice")
+	}
+
+	if _, err := repo.RevokeAllForAdmin(ctx, admin.ID, now); err != nil {
+		t.Fatalf("revoke all: %v", err)
+	}
+	live, err := repo.FindByHash(ctx, second.TokenHash)
+	if err != nil {
+		t.Fatalf("find successor: %v", err)
+	}
+	if live.RevokedAt == nil {
+		t.Fatal("revoking every session left one live")
+	}
+}
+
 // --- reports ----------------------------------------------------------------
 
 // The duplicate guard is its own test: a rejected insert leaves PostgreSQL's

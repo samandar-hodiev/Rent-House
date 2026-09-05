@@ -160,8 +160,8 @@ export function AuthProvider({ children }) {
   // expires mid-session is replaced rather than thrown at the reader as a
   // sign-out. Registered here because the auth context is what owns the tokens.
   useEffect(() => {
-    setSessionRenewer(renew)
-    return () => setSessionRenewer(null)
+    setSessionRenewer(renew, 'user')
+    return () => setSessionRenewer(null, 'user')
   }, [renew])
 
   // Restore the session on load: a stored token proves nothing on its own — it

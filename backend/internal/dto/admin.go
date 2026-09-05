@@ -184,13 +184,17 @@ type AdminUserListResponse struct {
 	TotalPages int                 `json:"total_pages"`
 }
 
-// AdminSessionResponse is returned by a successful sign-in.
+// AdminSessionResponse is returned by a successful sign-in or renewal.
 type AdminSessionResponse struct {
 	Admin       AdminResponse `json:"admin"`
 	AccessToken string        `json:"access_token"`
 	TokenType   string        `json:"token_type"`
 	// ExpiresIn is in seconds, matching the OAuth 2.0 convention clients expect.
 	ExpiresIn int64 `json:"expires_in"`
+	// RefreshToken is omitted when the server was built without a session
+	// repository — see AdminService.Session — in which case a dashboard token
+	// simply lasts until it expires, as it always has.
+	RefreshToken string `json:"refresh_token,omitempty"`
 }
 
 // AdminListingResponse is one row of the listings table.
