@@ -192,7 +192,12 @@ func newRouter(
 	if err := router.SetTrustedProxies(cfg.TrustedProxies); err != nil {
 		return nil, fmt.Errorf("trusted proxies: %w", err)
 	}
-	router.Use(gin.Logger(), gin.Recovery(), middleware.CORS(cfg.AllowedOrigins))
+	router.Use(
+		gin.Logger(), gin.Recovery(),
+		middleware.SecurityHeaders(),
+		middleware.LimitRequestBody(middleware.MaxRequestBodyBytes),
+		middleware.CORS(cfg.AllowedOrigins),
+	)
 
 	// Liveness probe: intentionally does not touch the database, so it answers
 	// "the process is up" rather than "every dependency is up".

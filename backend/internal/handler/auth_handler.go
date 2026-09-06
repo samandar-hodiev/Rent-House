@@ -385,6 +385,14 @@ func validationMessage(err error) string {
 	if err == nil {
 		return "Invalid request"
 	}
+	// A request whose body was cut off by middleware.LimitRequestBody reaches
+	// every caller of this function the same way a malformed one does — a
+	// bind that failed — but "http: request body too large" is Go's own
+	// wording for its own reader, not something to hand a client verbatim.
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		return "Request body is too large"
+	}
 	return "Invalid request: " + err.Error()
 }
 
