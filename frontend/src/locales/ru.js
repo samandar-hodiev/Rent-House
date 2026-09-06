@@ -486,6 +486,7 @@ export default {
   'auth.phoneVerified': '{contact} подтверждён',
   'auth.viaPhone': 'По телефону',
   'auth.viaEmail': 'По email',
+  'auth.methodTemporarilyUnavailable': 'Пока недоступно — скоро появится',
   'auth.sendSmsCode': 'Отправить SMS-код',
   'auth.sendCode': 'Отправить код',
   'auth.sending': 'Отправляем...',

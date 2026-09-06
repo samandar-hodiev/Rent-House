@@ -485,6 +485,7 @@ export default {
   'auth.phoneVerified': '{contact} verified',
   'auth.viaPhone': 'By phone',
   'auth.viaEmail': 'By email',
+  'auth.methodTemporarilyUnavailable': 'Not available yet — coming soon',
   'auth.sendSmsCode': 'Send SMS code',
   'auth.sendCode': 'Send code',
   'auth.sending': 'Sending...',

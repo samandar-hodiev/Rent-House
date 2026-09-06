@@ -23,6 +23,14 @@ import { ROUTES } from '../routes/paths'
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const OTP_LENGTH = 6
 
+// Temporary: phone registration has nothing behind it yet to actually send
+// the SMS — SMS_PROVIDER is "dev" (codes only reach the server log), not a
+// real provider like Eskiz. Rather than let someone "register by phone" and
+// never receive a code, the option is disabled here until a real SMS
+// provider is connected. Flip this back to true then — nothing else about
+// the flow needs to change, the phone path underneath is otherwise complete.
+const PHONE_REGISTRATION_ENABLED = false
+
 const STEP = { contact: 'contact', code: 'code', profile: 'profile' }
 
 // Accepts the shapes people actually type and returns the canonical form the
@@ -58,7 +66,7 @@ function RegisterPage() {
   const destination = readRedirect(search) ?? ROUTES.dashboard
 
   const [step, setStep] = useState(STEP.contact)
-  const [method, setMethod] = useState('phone')
+  const [method, setMethod] = useState(PHONE_REGISTRATION_ENABLED ? 'phone' : 'email')
   const [contact, setContact] = useState('')
   const [verificationId, setVerificationId] = useState(null)
   // "sent" when a provider accepted the message, "logged" when the server only
@@ -430,6 +438,7 @@ function RegisterPage() {
 
         <MethodChoice
           value={method}
+          disabled={PHONE_REGISTRATION_ENABLED ? [] : ['phone']}
           onChange={(next) => {
             setMethod(next)
             setContact('')

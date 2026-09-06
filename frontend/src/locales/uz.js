@@ -485,6 +485,7 @@ export default {
   'auth.phoneVerified': '{contact} tasdiqlandi',
   'auth.viaPhone': 'Telefon orqali',
   'auth.viaEmail': 'Email orqali',
+  'auth.methodTemporarilyUnavailable': "Hozircha mavjud emas — tez orada ochiladi",
   'auth.sendSmsCode': 'SMS kod yuborish',
   'auth.sendCode': 'Kod yuborish',
   'auth.sending': 'Yuborilmoqda...',
