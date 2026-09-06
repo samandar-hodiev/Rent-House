@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Flag, Loader2 } from 'lucide-react'
 import EmptyState from '../components/EmptyState'
@@ -36,7 +36,7 @@ function DashboardReportsPage() {
   // "still finding out".
   const [status, setStatus] = useState('loading')
 
-  useEffect(() => {
+  const load = useCallback(() => {
     const controller = new AbortController()
     setStatus('loading')
     fetchMyReports({ token, signal: controller.signal, limit: 100 })
@@ -48,8 +48,13 @@ function DashboardReportsPage() {
         if (error?.name === 'AbortError') return
         setStatus('error')
       })
-    return () => controller.abort()
+    return controller
   }, [token])
+
+  useEffect(() => {
+    const controller = load()
+    return () => controller.abort()
+  }, [load])
 
   if (status === 'loading') {
     return (
@@ -70,6 +75,15 @@ function DashboardReportsPage() {
         <p role="alert" className="text-sm text-error">
           {t('dashboard.reportsLoadFailed')}
         </p>
+        <div>
+          <button
+            type="button"
+            onClick={load}
+            className="rounded-md border border-border px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {t('listing.retry')}
+          </button>
+        </div>
       </section>
     )
   }
