@@ -1,0 +1,113 @@
+# Runs the whole stack: PostgreSQL, the API, and the built frontend behind
+# nginx. `make up` is the short way to reach this; see the Makefile.
+#
+# Before the first run: copy .env.example to .env, and backend/.env.example
+# to backend/.env, filling both in — `make env` does the copying for you if
+# either file does not exist yet.
+#
+# The database credentials live only in the root .env, not in backend/.env:
+# they have to match on both sides — the Postgres container below, and
+# whatever migrate/seed/backend connect with — and every service here gets
+# them from the same place instead of each trusting its own copy.
+#
+# Migrations and the reference-data seed are deliberately not run by the
+# server itself (see cmd/migrate's own doc comment) — they are separate,
+# idempotent one-shot services here instead, each exiting once its job is
+# done, and each safe to run again on the next `up`.
+x-backend-db: &backend-db
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_USER: ${DB_USER:-postgres}
+  DB_PASSWORD: ${DB_PASSWORD:-postgres}
+  DB_NAME: ${DB_NAME:-renthouse}
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-renthouse}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    environment:
+      <<: *backend-db
+    entrypoint: ["/app/migrate"]
+    command: ["up"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  seed:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    environment:
+      <<: *backend-db
+    entrypoint: ["/app/seed"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    environment:
+      <<: *backend-db
+      PORT: "8080"
+      # The browser only ever calls nginx (see frontend/nginx.conf), but this
+      # still matters for anyone hitting the published port directly.
+      ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-3000}
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Relative and same-origin: nginx proxies /api/ to the backend
+        # container, so the browser never needs to know its address.
+        VITE_API_URL: /api/v1
+        VITE_YANDEX_MAPS_API_KEY: ${VITE_YANDEX_MAPS_API_KEY:-}
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      # Waits for the backend to actually answer, not only to have started —
+      # nginx proxies to it immediately, and a request arriving before the API
+      # is listening would otherwise get a 502 during every startup.
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  uploads_data:
