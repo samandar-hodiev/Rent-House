@@ -147,6 +147,39 @@ func (s *ReportService) applyThreshold(ctx context.Context, apartment *models.Ap
 	logger.Infof("listing %s withdrawn after %d reports", apartment.ID, open)
 }
 
+// MyReportPage is one page of a reporter's own history.
+type MyReportPage struct {
+	Reports []repository.MyReportRow
+	Total   int64
+	Page    int
+	Limit   int
+}
+
+// ListMine returns the complaints one account has raised — what they reported,
+// about which listing, and what came of it.
+func (s *ReportService) ListMine(
+	ctx context.Context, reporterID uuid.UUID, page, limit int,
+) (*MyReportPage, error) {
+	if page < 1 {
+		page = 1
+	}
+	switch {
+	case limit < 1:
+		limit = Defaults().PaginationDefaultSize
+		if s.settings != nil {
+			limit = s.settings.MustGet(ctx).PaginationDefaultSize
+		}
+	case limit > 100:
+		limit = 100
+	}
+
+	rows, total, err := s.reports.ListForReporter(ctx, reporterID, page, limit)
+	if err != nil {
+		return nil, err
+	}
+	return &MyReportPage{Reports: rows, Total: total, Page: page, Limit: limit}, nil
+}
+
 // ReportPage is one page of the dashboard's list.
 type ReportPage struct {
 	Reports []repository.ReportRow

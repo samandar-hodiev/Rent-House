@@ -24,6 +24,7 @@ import DashboardPage from './pages/DashboardPage'
 import DashboardListingsPage from './pages/DashboardListingsPage'
 import DashboardChatsPage from './pages/DashboardChatsPage'
 import DashboardEditProfilePage from './pages/DashboardEditProfilePage'
+import DashboardReportsPage from './pages/DashboardReportsPage'
 import CreateListingPage from './pages/CreateListingPage'
 import NotFoundPage from './pages/NotFoundPage'
 import { ToastProvider } from './context/ToastContext'
@@ -248,6 +249,7 @@ function App() {
                               element={<Navigate to={`${ROUTES.dashboardChats}?view=blocked`} replace />}
                             />
                             <Route path="edit-profile" element={<DashboardEditProfilePage />} />
+                            <Route path="reports" element={<DashboardReportsPage />} />
                           </Route>
                           <Route path={ROUTES.createListing} element={<CreateListingPage />} />
                           {/* Same form component in edit mode — see CreateListingPage. */}

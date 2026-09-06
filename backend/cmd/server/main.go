@@ -416,6 +416,8 @@ func newRouter(
 	// Reporting a listing. Authenticated: an anonymous complaint cannot be
 	// answered or limited, and the dashboard has to know who raised it.
 	listings.POST("/:id/reports", middleware.Auth(tokens), reportHandler.Create)
+	// What this account has reported, and what came of it.
+	me.GET("/reports", reportHandler.ListMine)
 
 	adminHandler := handler.NewAdminHandler(
 		adminService, adminStats, adminListings, settingsService,

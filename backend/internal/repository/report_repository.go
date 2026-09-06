@@ -141,6 +141,52 @@ func (r *ReportRepository) List(
 	return rows, total, nil
 }
 
+// MyReportRow is one line of a reporter's own history: the complaint, plus
+// enough of the listing to identify it without a second request.
+type MyReportRow struct {
+	models.ListingReport
+
+	ApartmentTitle  string `gorm:"column:apartment_title"`
+	ApartmentStatus string `gorm:"column:apartment_status"`
+}
+
+// ListForReporter returns one page of the complaints one account has raised,
+// newest first.
+func (r *ReportRepository) ListForReporter(
+	ctx context.Context, reporterID uuid.UUID, page, limit int,
+) ([]MyReportRow, int64, error) {
+	base := r.db.WithContext(ctx).
+		Table("listing_reports AS r").
+		Joins("JOIN apartments AS a ON a.id = r.apartment_id").
+		Where("r.reporter_id = ?", reporterID)
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("count reports: %w", err)
+	}
+	if total == 0 {
+		return []MyReportRow{}, 0, nil
+	}
+
+	if limit <= 0 {
+		limit = 20
+	}
+	if page <= 0 {
+		page = 1
+	}
+
+	rows := []MyReportRow{}
+	err := base.
+		Select("r.*, a.title AS apartment_title, a.status AS apartment_status").
+		Order("r.created_at DESC").
+		Limit(limit).Offset((page - 1) * limit).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, 0, fmt.Errorf("list reports for reporter: %w", err)
+	}
+	return rows, total, nil
+}
+
 // CountByStatus is the tally the dashboard shows above the table.
 func (r *ReportRepository) CountByStatus(ctx context.Context) (map[string]int64, error) {
 	type row struct {

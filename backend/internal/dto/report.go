@@ -47,6 +47,30 @@ type AdminReportResponse struct {
 	OpenCount int64 `json:"open_count"`
 }
 
+// MyReportResponse is one line of a reporter's own history: their complaint,
+// plus the listing it was about. No reporter name (it is their own account)
+// and no reviewer's name — who on the dashboard handled it is not this
+// account's business, only what was decided.
+type MyReportResponse struct {
+	ReportResponse
+
+	ApartmentTitle  string `json:"apartment_title"`
+	ApartmentStatus string `json:"apartment_status"`
+}
+
+func NewMyReportRows(rows []repository.MyReportRow) []MyReportResponse {
+	out := make([]MyReportResponse, 0, len(rows))
+	for i := range rows {
+		row := rows[i]
+		out = append(out, MyReportResponse{
+			ReportResponse:  NewReportResponse(&row.ListingReport),
+			ApartmentTitle:  row.ApartmentTitle,
+			ApartmentStatus: row.ApartmentStatus,
+		})
+	}
+	return out
+}
+
 func NewReportRows(rows []repository.ReportRow) []AdminReportResponse {
 	out := make([]AdminReportResponse, 0, len(rows))
 	for i := range rows {

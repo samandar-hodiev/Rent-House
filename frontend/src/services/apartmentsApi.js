@@ -183,6 +183,30 @@ export function reportListing(id, { reason, comment, token, signal } = {}) {
 }
 
 /**
+ * What this account has reported, and what came of it — the reporter's own
+ * view of a complaint's outcome, which otherwise only an administrator sees.
+ */
+export async function fetchMyReports({ token, signal, ...params } = {}) {
+  const query = new URLSearchParams(omitEmpty(params)).toString()
+  const data = await request(`/me/reports${query ? `?${query}` : ''}`, { token, signal })
+  return {
+    reports: (data?.reports ?? []).map((row) => ({
+      id: row.id,
+      apartmentId: row.apartment_id,
+      apartmentTitle: row.apartment_title,
+      apartmentStatus: row.apartment_status,
+      reason: row.reason,
+      comment: row.comment,
+      status: row.status,
+      resolution: row.resolution ?? '',
+      createdAt: row.created_at,
+      resolvedAt: row.resolved_at ?? null,
+    })),
+    total: data?.total ?? 0,
+  }
+}
+
+/**
  * What this account should know about — a decision on one of their listings,
  * most often. The recipient is the token's user, so there is no id to pass.
  */

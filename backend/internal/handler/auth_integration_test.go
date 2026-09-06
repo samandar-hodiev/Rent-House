@@ -114,12 +114,14 @@ func (c *codeCatcher) codeFor(t *testing.T, destination string) string {
 }
 
 type harness struct {
-	router *gin.Engine
-	db     *gorm.DB
-	tokens *token.Service
-	codes  *codeCatcher
-	auth   *service.AuthService
-	policy config.OTP
+	router     *gin.Engine
+	db         *gorm.DB
+	tokens     *token.Service
+	codes      *codeCatcher
+	auth       *service.AuthService
+	policy     config.OTP
+	apartments *repository.ApartmentRepository
+	reports    *service.ReportService
 }
 
 func testPolicy() config.OTP {
@@ -149,6 +151,8 @@ func newHarness(t *testing.T) *harness {
 	codes := newCodeCatcher()
 	policy := testPolicy()
 	apartments := repository.NewApartmentRepository(db)
+	settings := service.NewSettingsService(repository.NewSettingsRepository(db))
+	notifications := service.NewNotificationService(repository.NewNotificationRepository(db), settings)
 	authService := service.NewAuthService(
 		repository.NewUserRepository(db),
 		repository.NewVerificationRepository(db),
@@ -156,13 +160,16 @@ func newHarness(t *testing.T) *harness {
 		// The real settings service and the real attempt counter: these tests
 		// exercise the rules the marketplace actually runs under, including the
 		// ones an owner can change.
-		service.NewSettingsService(repository.NewSettingsRepository(db)),
+		settings,
 		repository.NewLoginAttemptRepository(db),
 		repository.NewRefreshTokenRepository(db),
-		service.NewNotificationService(repository.NewNotificationRepository(db), nil),
+		notifications,
 		apartments,
 	)
 	h := NewAuthHandler(authService, "http://localhost:5173")
+	reportsService := service.NewReportService(
+		repository.NewReportRepository(db), apartments, settings, notifications)
+	reportHandler := NewReportHandler(reportsService, nil)
 
 	router := gin.New()
 	auth := router.Group("/api/v1/auth")
@@ -181,6 +188,12 @@ func newHarness(t *testing.T) *harness {
 	router.PATCH("/api/v1/me", middleware.Auth(tokens), h.UpdateProfile)
 	router.DELETE("/api/v1/me", middleware.Auth(tokens), h.DeleteAccount)
 
+	// Reporting a listing, and reading back what this account has reported —
+	// mirrors cmd/server, so a test of either cannot pass because the route
+	// was missing rather than because the rule held.
+	router.POST("/api/v1/apartments/:id/reports", middleware.Auth(tokens), reportHandler.Create)
+	router.GET("/api/v1/me/reports", middleware.Auth(tokens), reportHandler.ListMine)
+
 	// Password reset, mirroring cmd/server.
 	auth.POST("/password/forgot", h.ForgotPassword)
 	auth.GET("/password/reset", h.ValidateResetToken)
@@ -191,7 +204,10 @@ func newHarness(t *testing.T) *harness {
 			_ = sqlDB.Close()
 		}
 	})
-	return &harness{router: router, db: db, tokens: tokens, codes: codes, auth: authService, policy: policy}
+	return &harness{
+		router: router, db: db, tokens: tokens, codes: codes, auth: authService, policy: policy,
+		apartments: apartments, reports: reportsService,
+	}
 }
 
 // cleanupContact removes the account and verification rows a test created.

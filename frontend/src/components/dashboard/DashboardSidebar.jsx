@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  Flag,
   Heart,
   LayoutDashboard,
   LogOut,
@@ -79,6 +80,12 @@ export function DashboardNavList({ onNavigate }) {
         icon={<MessageSquare aria-hidden="true" size={ICON_SIZE} />}
         label={t('dashboard.chats')}
         badge={unreadConversations > 0 ? unreadConversations : null}
+        onNavigate={onNavigate}
+      />
+      <DashboardNavItem
+        to={ROUTES.dashboardReports}
+        icon={<Flag aria-hidden="true" size={ICON_SIZE} />}
+        label={t('dashboard.reports')}
         onNavigate={onNavigate}
       />
       {/* The blocked list lives in chat's own sidebar now, under "Chat

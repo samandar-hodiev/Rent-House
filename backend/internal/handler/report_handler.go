@@ -77,6 +77,35 @@ func (h *ReportHandler) Create(c *gin.Context) {
 	response.Success(c, http.StatusCreated, "Report received", dto.NewReportResponse(report))
 }
 
+// ListMine handles GET /api/v1/me/reports.
+//
+// What this account has reported, and what came of it — the only view of a
+// complaint's outcome that exists for anybody but an administrator.
+func (h *ReportHandler) ListMine(c *gin.Context) {
+	reporterID, ok := middleware.UserIDFrom(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
+		return
+	}
+	page, _ := strconv.Atoi(c.Query("page"))
+	limit, _ := strconv.Atoi(c.Query("limit"))
+
+	result, err := h.reports.ListMine(c.Request.Context(), reporterID, page, limit)
+	if err != nil {
+		logger.Errorf("list my reports: %v", err)
+		response.Error(c, http.StatusInternalServerError, "internal_error",
+			"Could not load your reports")
+		return
+	}
+
+	response.OK(c, "Your reports", gin.H{
+		"reports": dto.NewMyReportRows(result.Reports),
+		"total":   result.Total,
+		"page":    result.Page,
+		"limit":   result.Limit,
+	})
+}
+
 // List handles GET /api/v1/admin/reports.
 func (h *ReportHandler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.Query("page"))

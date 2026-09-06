@@ -15,6 +15,7 @@ export const ROUTES = {
   dashboardSaved: '/dashboard/saved',
   dashboardChats: '/dashboard/chats',
   dashboardBlocked: '/dashboard/blocked',
+  dashboardReports: '/dashboard/reports',
   dashboardEditProfile: '/dashboard/edit-profile',
   createListing: '/create-listing',
   editListing: '/edit-listing/:id',
