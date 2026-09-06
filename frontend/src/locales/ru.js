@@ -177,6 +177,17 @@ export default {
   'dashboard.phoneTaken': 'Этот номер уже привязан к другому аккаунту.',
   'dashboard.phoneInvalid': 'Введите корректный номер, например +998 90 123 45 67.',
   'dashboard.contactRequired': 'В аккаунте должен остаться хотя бы один способ связи.',
+  'dashboard.dangerZoneTitle': 'Опасная зона',
+  'dashboard.deleteAccountHint':
+    'После удаления аккаунта вы не сможете в него войти. Ваши объявления будут закрыты, но история переписки и данные других пользователей сохранятся. Это действие необратимо.',
+  'dashboard.deleteAccountButton': 'Удалить аккаунт',
+  'dashboard.deleteAccountConfirmTitle': 'Подтвердите удаление аккаунта',
+  'dashboard.deleteAccountConfirmHint':
+    'Это действие необратимо. Введите пароль, чтобы продолжить.',
+  'dashboard.deleteAccountConfirmButton': 'Да, удалить аккаунт',
+  'dashboard.deleteAccountDone': 'Ваш аккаунт удалён.',
+  'dashboard.deleteAccountWrongPassword': 'Неверный пароль.',
+  'dashboard.deleteAccountFailed': 'Не удалось удалить аккаунт. Попробуйте ещё раз.',
   'dashboard.themeLight': 'Светлая',
   'dashboard.themeDark': 'Тёмная',
   'dashboard.themeSystem': 'Как в системе',

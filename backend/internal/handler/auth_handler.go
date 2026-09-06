@@ -178,6 +178,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			// know why they still cannot get in.
 			response.Error(c, http.StatusForbidden, "account_blocked",
 				"This account has been blocked")
+		case errors.Is(err, service.ErrAccountDeleted):
+			response.Error(c, http.StatusForbidden, "account_deleted",
+				"This account has been deleted")
 		default:
 			logger.Errorf("login: %v", err)
 			response.Error(c, http.StatusInternalServerError, "internal_error", "Could not complete login")
@@ -315,6 +318,40 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	response.OK(c, "Profile updated", user)
 }
 
+// DeleteAccount handles DELETE /api/v1/me and runs behind the auth middleware.
+//
+// Irreversible, so it asks the password again rather than trusting the
+// bearer token alone — see dto.DeleteAccountRequest.
+func (h *AuthHandler) DeleteAccount(c *gin.Context) {
+	userID, ok := middleware.UserIDFrom(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "missing_token", "Authentication required")
+		return
+	}
+
+	var req dto.DeleteAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", validationMessage(err))
+		return
+	}
+
+	if err := h.auth.DeleteAccount(c.Request.Context(), userID, req.Password); err != nil {
+		switch {
+		case errors.Is(err, service.ErrUserNotFound):
+			response.Error(c, http.StatusUnauthorized, "invalid_token", "Invalid token")
+		case errors.Is(err, service.ErrInvalidPassword):
+			response.Error(c, http.StatusUnauthorized, "invalid_password", "Password is incorrect")
+		default:
+			logger.Errorf("delete account: %v", err)
+			response.Error(c, http.StatusInternalServerError, "internal_error",
+				"Could not delete the account")
+		}
+		return
+	}
+
+	response.OK(c, "Account deleted", nil)
+}
+
 // Me handles GET /api/v1/auth/me and runs behind the auth middleware.
 func (h *AuthHandler) Me(c *gin.Context) {
 	// The identity comes from the verified token, never from the request body
@@ -374,6 +411,9 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		case errors.Is(err, service.ErrAccountBlocked):
 			response.Error(c, http.StatusForbidden, "account_blocked",
 				"This account has been blocked")
+		case errors.Is(err, service.ErrAccountDeleted):
+			response.Error(c, http.StatusForbidden, "account_deleted",
+				"This account has been deleted")
 		default:
 			logger.Errorf("refresh session: %v", err)
 			response.Error(c, http.StatusInternalServerError, "internal_error",

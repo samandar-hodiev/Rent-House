@@ -134,6 +134,7 @@ func (h *adminHarness) publicRouter(t *testing.T) *gin.Engine {
 		h.tokens, silentSender{}, silentSender{}, testPolicy(),
 		h.settings, repository.NewLoginAttemptRepository(h.tx),
 		repository.NewRefreshTokenRepository(h.tx), h.notifications,
+		apartments,
 	)
 	apartmentHandler := NewApartmentHandler(
 		service.NewApartmentService(apartments, h.settings, h.notifications), analytics)

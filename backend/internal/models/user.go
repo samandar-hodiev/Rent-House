@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 // Language options offered by the frontend.
 const (
 	LanguageUz = "uz"
@@ -9,12 +11,14 @@ const (
 
 // Whether an account may be used.
 //
-// Set by an administrator, and not by the person themselves. Distinct from a
-// user_blocks row, which is one member refusing to hear from another: this one
-// refuses the sign-in.
+// "blocked" is set by an administrator, never the person themselves — distinct
+// from a user_blocks row, which is one member refusing to hear from another.
+// "deleted" is the opposite direction: the person themselves ending their own
+// use of the marketplace. Both refuse sign-in; see User.CanSignIn.
 const (
 	UserStatusActive  = "active"
 	UserStatusBlocked = "blocked"
+	UserStatusDeleted = "deleted"
 )
 
 // Theme options offered by the frontend.
@@ -48,10 +52,13 @@ type User struct {
 	PasswordHash string `gorm:"column:password_hash;type:varchar(255);not null" json:"-"`
 
 	AvatarURL *string `gorm:"column:avatar_url;type:text" json:"avatar_url,omitempty"`
-	// "active" or "blocked". A blocked account cannot sign in; see AuthService.
+	// "active", "blocked" or "deleted" — see the constants above.
 	Status   string `gorm:"column:status;type:varchar(20);not null;default:active" json:"status"`
 	Language string `gorm:"column:language;type:varchar(2);not null;default:uz" json:"language"`
 	Theme    string `gorm:"column:theme;type:varchar(5);not null;default:light" json:"theme"`
+	// Set once, when the account deletes itself. Nil otherwise — including for
+	// a blocked account, which is a different thing done by a different party.
+	DeletedAt *time.Time `gorm:"column:deleted_at" json:"-"`
 
 	Timestamps
 
@@ -61,3 +68,7 @@ type User struct {
 }
 
 func (User) TableName() string { return "users" }
+
+// CanSignIn reports whether the account is in a state that allows a session —
+// mirrors Admin.CanSignIn.
+func (u *User) CanSignIn() bool { return u.Status == UserStatusActive }

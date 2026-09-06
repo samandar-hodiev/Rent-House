@@ -111,6 +111,18 @@ var (
 	// the client can tell the user to retry rather than showing "something went
 	// wrong" — and so it is never mistaken for the browser being offline.
 	ErrDeliveryFailed = errors.New("verification code could not be delivered")
+
+	// ErrAccountDeleted is a session or sign-in attempt reaching an account
+	// that deleted itself. Distinct from ErrAccountBlocked: the same refusal,
+	// but "your account was blocked" would be false for somebody who left on
+	// their own.
+	ErrAccountDeleted = errors.New("account has been deleted")
+
+	// ErrInvalidPassword is deleting your own account with the wrong password.
+	// Re-entering it is the one check that stands between a stolen access
+	// token and an irreversible action — a token proves who is asking, not
+	// that they still control the account.
+	ErrInvalidPassword = errors.New("password is incorrect")
 )
 
 // bcryptCost is above bcrypt.DefaultCost (10). Each increment doubles the work
@@ -145,6 +157,11 @@ type AuthService struct {
 	// instead of the next deployment. Optional: tests that predate it pass nil
 	// and get the configured defaults.
 	settings *SettingsService
+	// Closed on deletion, so a marketplace that no longer has this person does
+	// not keep showing their listings with them as the contact. Optional, for
+	// the same reason sessions is: a caller that does not supply one gets
+	// account deletion without that side effect, rather than a panic.
+	apartments *repository.ApartmentRepository
 
 	// now is injectable so tests can move time without sleeping.
 	now func() time.Time
@@ -161,6 +178,7 @@ func NewAuthService(
 	attempts *repository.LoginAttemptRepository,
 	sessions *repository.RefreshTokenRepository,
 	notifications *NotificationService,
+	apartments *repository.ApartmentRepository,
 ) *AuthService {
 	return &AuthService{
 		users:         users,
@@ -173,6 +191,7 @@ func NewAuthService(
 		attempts:      attempts,
 		sessions:      sessions,
 		notifications: notifications,
+		apartments:    apartments,
 		now:           time.Now,
 	}
 }
@@ -557,7 +576,14 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest) (*dto.Aut
 	// address but not its password that the account is blocked would confirm
 	// the address exists. This is what an administrator's "Bloklash" does —
 	// without it the status would be a label rather than a consequence.
-	if user.Status == models.UserStatusBlocked {
+	//
+	// A deleted account reaching this far at all would mean its old contact
+	// somehow still resolved to it after the tombstone email replaced it —
+	// defense in depth, not the path a deleted account is expected to take.
+	if !user.CanSignIn() {
+		if user.Status == models.UserStatusDeleted {
+			return nil, ErrAccountDeleted
+		}
 		return nil, ErrAccountBlocked
 	}
 
@@ -998,10 +1024,16 @@ func (s *AuthService) Refresh(ctx context.Context, raw string) (*dto.AuthRespons
 		return nil, err
 	}
 	// A session outlives neither the account nor its standing: an account
-	// blocked since the token was issued cannot renew its way back in.
-	if user.Status == models.UserStatusBlocked {
+	// blocked, or deleted by itself, since the token was issued cannot renew
+	// its way back in. DeleteAccount already revokes every session as part of
+	// deleting one, so reaching this is the same defense-in-depth as the
+	// status check in Login above, not the path deletion normally takes.
+	if !user.CanSignIn() {
 		if _, err := s.sessions.RevokeAllForUser(ctx, user.ID, now); err != nil {
-			logger.Errorf("revoke sessions of blocked user: %v", err)
+			logger.Errorf("revoke sessions of %s user: %v", user.Status, err)
+		}
+		if user.Status == models.UserStatusDeleted {
+			return nil, ErrAccountDeleted
 		}
 		return nil, ErrAccountBlocked
 	}
@@ -1051,6 +1083,94 @@ func (s *AuthService) LogoutEverywhere(ctx context.Context, userID uuid.UUID) er
 	}
 	_, err := s.sessions.RevokeAllForUser(ctx, userID, s.now().UTC())
 	return err
+}
+
+// DeleteAccount permanently ends this person's use of the marketplace.
+//
+// The password is re-checked rather than trusting the access token alone: a
+// token proves who is asking, not that they still control the account, and
+// this is the one action here that cannot be undone.
+//
+// The row is anonymized in place rather than removed. owner_id cascades on
+// delete, so removing the row outright would take every listing this person
+// published, and every conversation anyone ever had about one, with it.
+// Scrubbing the name and contact, replacing the password with one nobody
+// holds, and refusing sign-in reaches the same end — this account can no
+// longer be found, reached, or signed into — without disturbing what other
+// people hold onto.
+func (s *AuthService) DeleteAccount(ctx context.Context, userID uuid.UUID, password string) error {
+	user, err := s.users.FindByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return ErrUserNotFound
+		}
+		return err
+	}
+
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
+		return ErrInvalidPassword
+	}
+
+	scrambled, err := randomUnusablePasswordHash()
+	if err != nil {
+		return fmt.Errorf("delete account: %w", err)
+	}
+
+	now := s.now().UTC()
+	fields := map[string]any{
+		"first_name": deletedUserFirstName,
+		"last_name":  "",
+		// Unique by construction — the id belongs to no other row — so this
+		// never collides with uq_users_email, and satisfies the CHECK that
+		// requires at least a phone or an email even once phone is cleared.
+		"email":         fmt.Sprintf("deleted-%s@deleted.renthouse.local", userID),
+		"phone":         nil,
+		"avatar_url":    nil,
+		"password_hash": scrambled,
+		"status":        models.UserStatusDeleted,
+		"deleted_at":    now,
+	}
+	if err := s.users.UpdateProfile(ctx, userID, fields); err != nil {
+		return fmt.Errorf("delete account: %w", err)
+	}
+
+	// Both are best-effort: the account is already gone as far as anyone
+	// signing in is concerned, which is the property that actually matters.
+	if s.sessions != nil {
+		if _, err := s.sessions.RevokeAllForUser(ctx, userID, now); err != nil {
+			logger.Errorf("revoke sessions on account deletion: %v", err)
+		}
+	}
+	if s.apartments != nil {
+		if _, err := s.apartments.CloseAllForOwner(ctx, userID); err != nil {
+			logger.Errorf("close listings on account deletion: %v", err)
+		}
+	}
+	return nil
+}
+
+// deletedUserFirstName is what an anonymized account's owner name reads as
+// wherever it is still shown — an apartment card, a chat thread. Uzbek,
+// matching every other user-facing fallback string in this file (see
+// Maintenance's default message): the marketplace's default language, shown
+// regardless of the reader's own, because it is stored data rather than a
+// translation key.
+const deletedUserFirstName = "O'chirilgan foydalanuvchi"
+
+// randomUnusablePasswordHash produces a bcrypt hash of a secret nobody holds,
+// for an account whose real password must stop working. Hashing a random
+// value rather than clearing the column: a NULL or empty password_hash risks
+// matching a comparison bug in a way a well-formed, unknown hash cannot.
+func randomUnusablePasswordHash() (string, error) {
+	buf := make([]byte, refreshTokenBytes)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("generate password: %w", err)
+	}
+	hash, err := bcrypt.GenerateFromPassword(buf, bcryptCost)
+	if err != nil {
+		return "", fmt.Errorf("hash password: %w", err)
+	}
+	return string(hash), nil
 }
 
 func (s *AuthService) accessResponse(ctx context.Context, user *models.User) (*dto.AuthResponse, error) {

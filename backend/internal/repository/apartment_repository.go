@@ -414,6 +414,27 @@ func (r *ApartmentRepository) CloseExpired(ctx context.Context, cutoff time.Time
 	return result.RowsAffected, nil
 }
 
+// CloseAllForOwner closes every listing this owner currently has in public
+// view — active or pending — because the owner is gone. Mirrors CloseExpired;
+// see there for why published_at is cleared alongside the status.
+//
+// Drafts are left alone: they were never visible, and there is nothing about
+// the owner's departure that a draft's own status needs to record.
+func (r *ApartmentRepository) CloseAllForOwner(ctx context.Context, ownerID uuid.UUID) (int64, error) {
+	result := r.db.WithContext(ctx).
+		Model(&models.Apartment{}).
+		Where("owner_id = ? AND status IN ?", ownerID,
+			[]string{models.ApartmentStatusActive, models.ApartmentStatusPending}).
+		Updates(map[string]any{
+			"status":       models.ApartmentStatusClosed,
+			"published_at": nil,
+		})
+	if result.Error != nil {
+		return 0, fmt.Errorf("close listings of owner: %w", result.Error)
+	}
+	return result.RowsAffected, nil
+}
+
 // applyPublishedAt keeps published_at in step with status, which the schema
 // requires them to be (see ck_apartments_published_at).
 //

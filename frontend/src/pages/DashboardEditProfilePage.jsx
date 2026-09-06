@@ -1,14 +1,18 @@
 import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Eye, Loader2, Upload } from 'lucide-react'
 import FormField from '../components/FormField'
 import UserAvatar from '../components/dashboard/UserAvatar'
 import ImageLightbox from '../components/ImageLightbox'
+import DeleteAccountDialog from '../components/DeleteAccountDialog'
 import { useAuth } from '../context/AuthContext'
 import { useLocale } from '../context/LocaleContext'
-import { updateProfile } from '../services/authApi'
+import { useToast } from '../context/ToastContext'
+import { deleteAccount, updateProfile } from '../services/authApi'
 import { uploadApartmentImage } from '../services/apartmentsApi'
 import { resolveUploadUrl } from '../utils/uploadUrl'
 import { ApiError } from '../services/apiClient'
+import { ROUTES } from '../routes/paths'
 
 // The server refuses anything larger, so the same limit is stated here — the
 // person finds out before a megabyte-long upload rather than after it.
@@ -23,8 +27,14 @@ const MAX_AVATAR_BYTES = 5 * 1024 * 1024
  */
 function DashboardEditProfilePage() {
   const { t } = useLocale()
-  const { user, token, applyUser } = useAuth()
+  const { user, token, applyUser, signOut } = useAuth()
+  const { showToast } = useToast()
+  const navigate = useNavigate()
   const fileInputRef = useRef(null)
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
 
   const [values, setValues] = useState({
     firstName: user.firstName ?? '',
@@ -130,6 +140,27 @@ function DashboardEditProfilePage() {
       )
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDeleteAccount = async (password) => {
+    setDeleteBusy(true)
+    setDeleteError(null)
+    try {
+      await deleteAccount(password, { token })
+      // The server already ended every session this account had; leaving here
+      // is the same shape as signing out, so the same function does it.
+      await signOut()
+      navigate(ROUTES.home, { replace: true })
+      showToast(t('dashboard.deleteAccountDone'))
+    } catch (caught) {
+      setDeleteError(
+        caught instanceof ApiError && caught.code === 'invalid_password'
+          ? t('dashboard.deleteAccountWrongPassword')
+          : t('dashboard.deleteAccountFailed'),
+      )
+    } finally {
+      setDeleteBusy(false)
     }
   }
 
@@ -273,12 +304,40 @@ function DashboardEditProfilePage() {
         </form>
       </section>
 
+      {/* Set apart from the form above rather than placed inside it: nothing
+          here is saved with the same button, and the border marks that this
+          section behaves differently before a reader tries the button and
+          finds out the hard way. */}
+      <section className="rounded-xl border border-error/30 bg-surface p-5 sm:p-6">
+        <h2 className="text-sm font-semibold text-error">{t('dashboard.dangerZoneTitle')}</h2>
+        <p className="mt-2 text-sm text-text-secondary">{t('dashboard.deleteAccountHint')}</p>
+        <button
+          type="button"
+          onClick={() => setDeleteDialogOpen(true)}
+          className="mt-4 rounded-md border border-error/40 bg-error/10 px-4 py-2.5 text-sm font-medium text-error transition-colors hover:bg-error/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          {t('dashboard.deleteAccountButton')}
+        </button>
+      </section>
+
       {/* The same lightbox chat uses for an enlarged picture, so there is one
           image viewer in the application rather than two that look alike. */}
       {lightbox && avatarUrl ? (
         <ImageLightbox
           image={{ src: avatarUrl, name: displayName }}
           onClose={() => setLightbox(false)}
+        />
+      ) : null}
+
+      {deleteDialogOpen ? (
+        <DeleteAccountDialog
+          busy={deleteBusy}
+          error={deleteError}
+          onCancel={() => {
+            setDeleteDialogOpen(false)
+            setDeleteError(null)
+          }}
+          onConfirm={handleDeleteAccount}
         />
       ) : null}
     </div>

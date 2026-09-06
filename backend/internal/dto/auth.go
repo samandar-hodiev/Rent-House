@@ -239,6 +239,15 @@ type AuthResponse struct {
 	RefreshToken string `json:"refresh_token,omitempty"`
 }
 
+// DeleteAccountRequest is the body of DELETE /api/v1/me.
+//
+// The password, not the access token alone: a token proves who is asking, not
+// that they still control the account, and this is the one action here that
+// cannot be undone.
+type DeleteAccountRequest struct {
+	Password string `json:"password" binding:"required,min=1,max=72"`
+}
+
 // RefreshRequest is the body of POST /api/v1/auth/refresh and
 // POST /api/v1/auth/logout.
 //

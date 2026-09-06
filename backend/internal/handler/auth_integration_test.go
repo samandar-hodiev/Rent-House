@@ -148,6 +148,7 @@ func newHarness(t *testing.T) *harness {
 
 	codes := newCodeCatcher()
 	policy := testPolicy()
+	apartments := repository.NewApartmentRepository(db)
 	authService := service.NewAuthService(
 		repository.NewUserRepository(db),
 		repository.NewVerificationRepository(db),
@@ -159,6 +160,7 @@ func newHarness(t *testing.T) *harness {
 		repository.NewLoginAttemptRepository(db),
 		repository.NewRefreshTokenRepository(db),
 		service.NewNotificationService(repository.NewNotificationRepository(db), nil),
+		apartments,
 	)
 	h := NewAuthHandler(authService, "http://localhost:5173")
 
@@ -177,6 +179,7 @@ func newHarness(t *testing.T) *harness {
 	// Mirrors cmd/server, so a profile test cannot pass because the route was
 	// missing rather than because the rule held.
 	router.PATCH("/api/v1/me", middleware.Auth(tokens), h.UpdateProfile)
+	router.DELETE("/api/v1/me", middleware.Auth(tokens), h.DeleteAccount)
 
 	// Password reset, mirroring cmd/server.
 	auth.POST("/password/forgot", h.ForgotPassword)
@@ -1126,6 +1129,7 @@ func TestProviderRejectionIsReportedAsADeliveryFailure(t *testing.T) {
 		repository.NewLoginAttemptRepository(h.db),
 		repository.NewRefreshTokenRepository(h.db),
 		service.NewNotificationService(repository.NewNotificationRepository(h.db), nil),
+		repository.NewApartmentRepository(h.db),
 	)
 
 	router := gin.New()

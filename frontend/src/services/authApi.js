@@ -107,3 +107,14 @@ export function fetchCurrentUser(token) {
 export function updateProfile(patch, { token } = {}) {
   return request('/me', { method: 'PATCH', body: patch, token })
 }
+
+/**
+ * Ends the account for good.
+ *
+ * Asks for the password again, not just the token: this is the one action in
+ * the app that cannot be undone, and a token proves who is asking, not that
+ * they still control the account.
+ */
+export function deleteAccount(password, { token } = {}) {
+  return request('/me', { method: 'DELETE', body: { password }, token })
+}

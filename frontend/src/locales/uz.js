@@ -177,6 +177,17 @@ export default {
   'dashboard.phoneTaken': 'Bu raqam boshqa hisobga biriktirilgan.',
   'dashboard.phoneInvalid': "To'g'ri telefon raqam kiriting, masalan +998 90 123 45 67.",
   'dashboard.contactRequired': "Hisobda kamida bitta bog'lanish usuli qolishi kerak.",
+  'dashboard.dangerZoneTitle': 'Xavfli hudud',
+  'dashboard.deleteAccountHint':
+    "Hisobingizni o'chirsangiz, unga qayta kira olmaysiz. E'lonlaringiz yopiladi, lekin suhbat tarixi va boshqa foydalanuvchilarning ma'lumotlari saqlanib qoladi. Bu amalni ortga qaytarib bo'lmaydi.",
+  'dashboard.deleteAccountButton': "Hisobni o'chirish",
+  'dashboard.deleteAccountConfirmTitle': "Hisobni o'chirishni tasdiqlang",
+  'dashboard.deleteAccountConfirmHint':
+    "Bu amal ortga qaytarilmaydi. Davom etish uchun parolingizni kiriting.",
+  'dashboard.deleteAccountConfirmButton': "Ha, hisobni o'chirish",
+  'dashboard.deleteAccountDone': "Hisobingiz o'chirildi.",
+  'dashboard.deleteAccountWrongPassword': "Parol noto'g'ri.",
+  'dashboard.deleteAccountFailed': "Hisobni o'chirib bo'lmadi. Qayta urinib ko'ring.",
   'dashboard.themeLight': "Yorug'",
   'dashboard.themeDark': 'Tun',
   'dashboard.themeSystem': "Tizim bo'yicha",

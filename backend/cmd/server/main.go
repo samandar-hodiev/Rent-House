@@ -233,6 +233,7 @@ func newRouter(
 		repository.NewLoginAttemptRepository(db),
 		repository.NewRefreshTokenRepository(db),
 		notificationService,
+		repository.NewApartmentRepository(db),
 	)
 	// The first allowed origin is where the app is served from, and so where a
 	// password-reset link must point.
@@ -352,6 +353,8 @@ func newRouter(
 		// The signed-in account's own profile. PATCH rather than PUT: a form
 		// that leaves a field untouched must not erase it.
 		me.PATCH("", authHandler.UpdateProfile)
+		// Ending it for good.
+		me.DELETE("", authHandler.DeleteAccount)
 
 		me.GET("/apartments", apartmentHandler.ListMine)
 		me.GET("/apartments/stats", apartmentHandler.Stats)
