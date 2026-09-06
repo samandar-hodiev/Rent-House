@@ -5,10 +5,13 @@
 # to backend/.env, filling both in — `make env` does the copying for you if
 # either file does not exist yet.
 #
-# The database credentials live only in the root .env, not in backend/.env:
-# they have to match on both sides — the Postgres container below, and
-# whatever migrate/seed/backend connect with — and every service here gets
-# them from the same place instead of each trusting its own copy.
+# The database credentials, and ALLOWED_ORIGINS, live only in the root .env,
+# not in backend/.env: the database credentials have to match on both sides —
+# the Postgres container below, and whatever migrate/seed/backend connect
+# with — and ALLOWED_ORIGINS has to match wherever this compose file actually
+# publishes the frontend, not wherever backend/.env's own copy happens to say
+# (that one is for running the server bare, outside Docker). Every service
+# here gets both from the same place instead of each trusting its own copy.
 #
 # Migrations and the reference-data seed are deliberately not run by the
 # server itself (see cmd/migrate's own doc comment) — they are separate,
@@ -30,8 +33,14 @@ services:
       POSTGRES_DB: ${DB_NAME:-renthouse}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # Not published to the host: nothing outside this network needs to reach
+    # it directly, and a database port open to whatever the host is exposed
+    # to is the easiest of these settings to forget about. For a one-off
+    # look inside it, `docker compose exec postgres psql -U <DB_USER> -d
+    # <DB_NAME>` needs no published port at all. Uncomment if a local GUI
+    # client genuinely needs one:
+    # ports:
+    #   - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 5s
@@ -72,9 +81,11 @@ services:
     environment:
       <<: *backend-db
       PORT: "8080"
-      # The browser only ever calls nginx (see frontend/nginx.conf), but this
-      # still matters for anyone hitting the published port directly.
-      ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-3000}
+      # From the root .env, not backend/.env — see the comment there. The
+      # browser only ever calls nginx (see frontend/nginx.conf), but this
+      # still matters for anyone hitting the published port directly, and for
+      # deploying to a real domain instead of localhost.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
     volumes:
       - uploads_data:/app/uploads
     ports:

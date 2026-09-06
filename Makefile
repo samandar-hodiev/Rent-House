@@ -4,9 +4,26 @@
 
 # Copies each .env.example to .env the first time only — an existing .env is
 # never overwritten, so re-running this never undoes local configuration.
+#
+# The two secrets that must never be "postgres" or "change-me" in anything
+# but a throwaway local database — DB_PASSWORD and JWT_SECRET — are replaced
+# with a random value at the moment the file is created, so the documented
+# path (`make env && make up`) never actually produces a weak one. Copying
+# the .env.example files by hand instead still leaves their placeholders,
+# which is what those placeholders' own comments are there to warn about.
 env:
-	@test -f .env || cp .env.example .env
-	@test -f backend/.env || cp backend/.env.example backend/.env
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		password=$$(openssl rand -base64 24 | tr -d '=\n'); \
+		sed -i.bak "s#^DB_PASSWORD=.*#DB_PASSWORD=$$password#" .env && rm -f .env.bak; \
+		echo "generated a random DB_PASSWORD in .env"; \
+	fi
+	@if [ ! -f backend/.env ]; then \
+		cp backend/.env.example backend/.env; \
+		secret=$$(openssl rand -base64 32 | tr -d '=\n'); \
+		sed -i.bak "s#^JWT_SECRET=.*#JWT_SECRET=$$secret#" backend/.env && rm -f backend/.env.bak; \
+		echo "generated a random JWT_SECRET in backend/.env"; \
+	fi
 	@echo ".env and backend/.env ready"
 
 ## Brings up the whole stack: PostgreSQL, migrations, the reference-data
