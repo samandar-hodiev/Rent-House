@@ -119,7 +119,7 @@ No business logic in handlers.
 
 PostgreSQL, with migrations. Entities (create only when the matching feature
 is implemented, not all up front): User, District, Apartment, ApartmentImage,
-Wishlist, WishlistItem, Amenity, ApartmentAmenity, Report, RefreshToken.
+Favorite, Amenity, ApartmentAmenity, Report, RefreshToken.
 Apartment references District by FK — no duplicated district strings.
 
 ## API
@@ -134,14 +134,14 @@ POST   /api/v1/auth/logout
 GET    /api/v1/apartments
 GET    /api/v1/apartments/:id
 POST   /api/v1/apartments
-PATCH  /api/v1/apartments/:id
+PUT    /api/v1/apartments/:id
 DELETE /api/v1/apartments/:id
 
 GET    /api/v1/districts
 
-GET    /api/v1/wishlist
-POST   /api/v1/wishlist/:apartmentId
-DELETE /api/v1/wishlist/:apartmentId
+GET    /api/v1/me/favorites
+POST   /api/v1/me/favorites/:apartmentId
+DELETE /api/v1/me/favorites/:apartmentId
 ```
 
 Search: `GET /api/v1/apartments?district=&keyword=&min_price=&max_price=&rooms=&area=&floor=&furnished=&page=&limit=&sort=`.
