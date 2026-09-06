@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, Building2, Eye, Heart, Loader2, MessageSquare, Phone } from 'lucide-react'
 import EmptyState from '../../components/EmptyState'
@@ -59,24 +59,29 @@ function AdminListingDetailPage() {
   const [busy, setBusy] = useState(false)
   const [moderationError, setModerationError] = useState(null)
 
-  useEffect(() => {
+  // 'not-found' (the listing genuinely does not exist — a retry would only
+  // 404 again) is kept apart from 'error' (a network hiccup or a server
+  // fault — a retry can plausibly succeed), so the page can tell the two
+  // apart instead of showing "listing not found" for a dropped connection.
+  const load = useCallback(() => {
     const controller = new AbortController()
-    let cancelled = false
+    setState('loading')
     fetchListing(id, { token, signal: controller.signal })
       .then((data) => {
-        if (cancelled) return
         setListing(data)
         setState('ready')
       })
       .catch((error) => {
-        if (cancelled || error?.name === 'AbortError') return
-        setState('error')
+        if (error?.name === 'AbortError') return
+        setState(error?.status === 404 ? 'not-found' : 'error')
       })
-    return () => {
-      cancelled = true
-      controller.abort()
-    }
+    return controller
   }, [id, token])
+
+  useEffect(() => {
+    const controller = load()
+    return () => controller.abort()
+  }, [load])
 
   if (state === 'loading') {
     return (
@@ -85,12 +90,23 @@ function AdminListingDetailPage() {
       </div>
     )
   }
-  if (state === 'error' || !listing) {
+  if (state === 'not-found' || (state === 'ready' && !listing)) {
     return (
       <EmptyState
         icon={<Building2 aria-hidden="true" size={28} />}
         title={t('listings.notFound')}
         description={t('listings.notFoundHint')}
+      />
+    )
+  }
+  if (state === 'error') {
+    return (
+      <EmptyState
+        icon={<Building2 aria-hidden="true" size={28} />}
+        title={t('listings.loadFailed')}
+        description={t('login.errorNetwork')}
+        actionLabel={t('listings.retry')}
+        onAction={load}
       />
     )
   }
