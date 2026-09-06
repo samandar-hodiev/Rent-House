@@ -671,7 +671,7 @@ func (s *AdminService) User(ctx context.Context, id uuid.UUID) (*UserDetail, err
 // Sidebar sections that only ever belong to the owner, whatever the
 // configuration says. Reported by Permissions so the roles page describes the
 // rules the server actually enforces rather than a table somebody wrote once.
-var ownerOnlySections = []string{"sidebarControl", "adminManagement"}
+var ownerOnlySections = []string{"sidebarControl", "adminManagement", "settings"}
 
 // RolePermission is one line of the roles table.
 type RolePermission struct {

@@ -41,12 +41,17 @@ export const ADMIN_NAV = [
   { id: 'reports', key: 'nav.reports', icon: Flag, to: ADMIN_ROUTES.reports },
   { id: 'analytics', key: 'nav.analytics', icon: BarChart3, to: ADMIN_ROUTES.analytics },
   { id: 'notifications', key: 'nav.notifications', icon: Bell, to: ADMIN_ROUTES.notifications },
+  // Managing administrators is the owner's alone (see RequireOwner() on
+  // /admin/admins and /admin/settings in cmd/server/main.go) — not a section
+  // the owner can hand to a super admin, so it carries no switch to fake one.
   {
     id: 'adminManagement', key: 'nav.adminManagement', icon: Shield,
     children: [
       { key: 'nav.admins', to: ADMIN_ROUTES.admins },
       { key: 'nav.roles', to: ADMIN_ROUTES.roles },
     ],
+    ownerOnly: true,
+    alwaysVisible: true,
   },
   // The switch board itself: the owner's, and never switchable. Hiding it would
   // hide the only way to bring anything back.
@@ -59,7 +64,13 @@ export const ADMIN_NAV = [
     alwaysVisible: true,
   },
   { id: 'auditLogs', key: 'nav.auditLogs', icon: ClipboardList, to: ADMIN_ROUTES.auditLogs },
-  { id: 'settings', key: 'nav.settings', icon: Settings, to: ADMIN_ROUTES.settings },
+  // Same as adminManagement above: /admin/settings is RequireOwner()'d
+  // unconditionally, so there is nothing for a switch here to control.
+  {
+    id: 'settings', key: 'nav.settings', icon: Settings, to: ADMIN_ROUTES.settings,
+    ownerOnly: true,
+    alwaysVisible: true,
+  },
 ]
 
 /**
