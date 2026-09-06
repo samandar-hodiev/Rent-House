@@ -5,6 +5,7 @@ import { ADMIN_AUTH_STATUS, useAdminAuth } from '../../context/AdminAuthContext'
 import { ApiError, NETWORK_ERROR } from '../../services/apiClient'
 import { ADMIN_ROUTES } from '../../routes/adminPaths'
 import { useAdmin } from '../../context/AdminSettingsContext'
+import { useSiteSettings } from '../../context/SiteSettingsContext'
 
 const INPUT =
   'h-11 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
@@ -21,6 +22,8 @@ const INPUT =
 function AdminLoginPage() {
   const { t } = useAdmin()
   const { status, signIn } = useAdminAuth()
+  const { settings } = useSiteSettings()
+  const brand = settings.site_brand_name || settings.site_name
   const location = useLocation()
 
   const [email, setEmail] = useState('')
@@ -70,7 +73,7 @@ function AdminLoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-2 text-center">
           <span className="flex items-center gap-2">
-            <span className="text-lg font-semibold text-text-primary">RentHouse</span>
+            <span className="text-lg font-semibold text-text-primary">{brand}</span>
             <span className="flex items-center gap-1 rounded-full bg-primary-light px-2 py-0.5 text-[11px] font-semibold text-primary-hover dark:text-primary">
               <ShieldCheck aria-hidden="true" size={11} className="shrink-0" />
               {t('login.badge')}

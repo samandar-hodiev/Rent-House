@@ -8,6 +8,7 @@ import { AdminNavList, AdminSidebarFooter } from './AdminSidebar'
 import { ADMIN_ROLE, AdminSettingsProvider, useAdmin } from '../../context/AdminSettingsContext'
 import { AdminAuthProvider, useAdminAuth } from '../../context/AdminAuthContext'
 import { AdminLogoutProvider, useAdminLogout } from '../../context/AdminLogoutContext'
+import { useSiteSettings } from '../../context/SiteSettingsContext'
 import { ADMIN_ROUTES } from '../../routes/adminPaths'
 
 // The signed-in administrator. Fake, like everything else in this module —
@@ -115,6 +116,11 @@ function AdminProfileMenu() {
  */
 function AdminShell() {
   const { t, theme, role, roleLabel } = useAdmin()
+  // The same setting the public site's header reads — this is the one
+  // marketplace's name, not a separate admin brand, so the owner sets it once
+  // and it applies wherever the name appears.
+  const { settings } = useSiteSettings()
+  const brand = settings.site_brand_name || settings.site_name
   const RoleIcon = roleIcon(role)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const location = useLocation()
@@ -138,7 +144,7 @@ function AdminShell() {
       <aside className="hidden w-60 shrink-0 border-r border-border bg-surface lg:block 2xl:w-64">
         <div className="sticky top-0 flex h-screen flex-col">
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
-            <span className="text-sm font-semibold text-text-primary">RentHouse</span>
+            <span className="truncate text-sm font-semibold text-text-primary">{brand}</span>
             {/* The role, next to the wordmark: which dashboard you are in and
                 who you are in it, in one mark. The shield is the same one the
                 role menu uses, so the two read as the same thing. */}
@@ -169,7 +175,7 @@ function AdminShell() {
           </button>
 
           <Link to={ADMIN_ROUTES.dashboard} className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-sm font-semibold text-text-primary">RentHouse</span>
+            <span className="truncate text-sm font-semibold text-text-primary">{brand}</span>
             <span className="hidden items-center gap-1 rounded-full bg-primary-light px-2 py-0.5 text-[11px] font-semibold text-primary-hover dark:text-primary sm:flex lg:hidden">
               <RoleIcon aria-hidden="true" size={11} className="shrink-0" />
               {roleLabel}
@@ -195,7 +201,7 @@ function AdminShell() {
             className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-border bg-surface"
           >
             <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
-              <span className="text-sm font-semibold text-text-primary">RentHouse Admin</span>
+              <span className="truncate text-sm font-semibold text-text-primary">{brand} Admin</span>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
