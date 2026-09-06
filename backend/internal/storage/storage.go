@@ -12,12 +12,14 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"mime"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -116,6 +118,20 @@ func (s *LocalStorage) SaveKind(
 		return Saved{}, ErrUnsupportedType
 	}
 
+	// The Content-Type header above is whatever the client claims — a script
+	// or an HTML file renamed to "photo.jpg" and sent as image/jpeg would pass
+	// it unchecked. The first bytes of the body do not lie the same way, so
+	// they are sniffed and, for the formats Go can identify with confidence,
+	// held to match the extension the header bought this upload.
+	peeked, err := peek(r)
+	if err != nil {
+		return Saved{}, fmt.Errorf("storage: read file: %w", err)
+	}
+	if !sniffedTypeMatches(extension, http.DetectContentType(peeked)) {
+		return Saved{}, ErrUnsupportedType
+	}
+	r = io.MultiReader(bytes.NewReader(peeked), r)
+
 	name, err := randomName(extension)
 	if err != nil {
 		return Saved{}, err
@@ -196,6 +212,50 @@ func (s *LocalStorage) Delete(_ context.Context, url string) error {
 		return fmt.Errorf("storage: delete file: %w", err)
 	}
 	return nil
+}
+
+// sniffSize is how many leading bytes are read for content sniffing.
+// http.DetectContentType never looks past this many bytes itself, so reading
+// more would only cost memory for no better answer.
+const sniffSize = 512
+
+// peek reads up to sniffSize bytes without losing them for the write that
+// follows — a short file (or an empty one, refused later for being empty) is
+// not an error here, only a genuine read failure is.
+func peek(r io.Reader) ([]byte, error) {
+	buffer := make([]byte, sniffSize)
+	n, err := io.ReadFull(r, buffer)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return nil, err
+	}
+	return buffer[:n], nil
+}
+
+// sniffedTypeMatches reports whether a file's actual bytes are consistent
+// with the extension its declared Content-Type resolved to.
+//
+// Only the four image formats are checked against: Go's sniffer identifies
+// them precisely, but has no signature for the legacy OLE-based .doc/.xls, for
+// Safari's audio/mp4 voice notes, or for .docx/.xlsx (a zip archive at the
+// byte level like any other) — all of them read back as
+// application/octet-stream or application/zip, which would make a byte check
+// reject files nothing is wrong with. What this catches is what the header
+// cannot: a script or HTML file renamed to "photo.jpg" and sent as
+// image/jpeg, which sniffs to a type Go recognizes with confidence and that
+// confidently disagrees.
+func sniffedTypeMatches(extension, sniffed string) bool {
+	switch extension {
+	case ".jpg", ".jpeg":
+		return sniffed == "image/jpeg"
+	case ".png":
+		return sniffed == "image/png"
+	case ".gif":
+		return sniffed == "image/gif"
+	case ".webp":
+		return sniffed == "image/webp"
+	default:
+		return true
+	}
 }
 
 // normalizeContentType drops any parameters, so "image/jpeg; charset=binary"
