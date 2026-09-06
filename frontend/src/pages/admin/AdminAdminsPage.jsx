@@ -401,7 +401,9 @@ function AdminAdminsPage() {
         list.map((row) => (row.id === target.id ? { ...row, status: next } : row)),
       )
     } catch {
-      // The row keeps the status the server still holds.
+      // The row keeps the status the server still holds; the toast is the
+      // only sign anything was tried at all.
+      showToast(t('admins.actionFailed'))
     }
     setBusyId(null)
   }
@@ -412,7 +414,10 @@ function AdminAdminsPage() {
       await deleteAdmin(target.id, { token })
       setAdmins((list) => list.filter((row) => row.id !== target.id))
     } catch {
-      // Left in place: the server refused, so it is still there.
+      // Left in place: the server refused, so it is still there. The toast
+      // is what tells the admin that "nothing happened" was a refusal, not
+      // silence.
+      showToast(t('admins.actionFailed'))
     }
     setBusyId(null)
     setRemoving(null)
@@ -487,7 +492,7 @@ function AdminAdminsPage() {
                       <span className="text-xs text-text-muted">—</span>
                     ) : (
                       <span className="flex items-center gap-1.5">
-                        <MockButton onClick={() => toggleStatus(row)}>
+                        <MockButton onClick={() => toggleStatus(row)} disabled={busyId === row.id}>
                           {t(row.status === 'active' ? 'action.suspend' : 'action.unblock')}
                         </MockButton>
                         <button

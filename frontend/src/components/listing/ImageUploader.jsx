@@ -69,23 +69,38 @@ function ImageUploader({ images, coverImageId, onChange, onCoverChange, error })
     }
   }
 
+  // Oversized is not retryable — the same file is still the same size — so it
+  // stays a distinct reason from a failed network request, which is. `file`
+  // is kept on the tile only so this has something to resend; it never
+  // leaves the component and is not part of what gets saved.
+  const retry = (image) => {
+    if (!image.file) return
+    patchImage(image.id, { uploading: true, failed: false })
+    upload(image, image.file)
+  }
+
   const addFiles = (fileList) => {
     const picked = [...fileList]
       .filter((file) => file.type.startsWith('image/'))
       .slice(0, remaining)
     if (picked.length === 0) return
 
-    const added = picked.map((file, index) => ({
-      id: `${Date.now()}-${index}-${file.name}`,
-      name: file.name,
-      url: URL.createObjectURL(file),
-      // A file past the marketplace's size is marked as failed here rather
-      // than sent and refused: the tile says so immediately, and the server
-      // is spared an upload it would reject.
-      uploading: file.size <= maxImageBytes,
-      uploadedUrl: null,
-      failed: file.size > maxImageBytes,
-    }))
+    const added = picked.map((file, index) => {
+      const oversized = file.size > maxImageBytes
+      return {
+        id: `${Date.now()}-${index}-${file.name}`,
+        name: file.name,
+        url: URL.createObjectURL(file),
+        file,
+        // A file past the marketplace's size is marked as failed here rather
+        // than sent and refused: the tile says so immediately, and the server
+        // is spared an upload it would reject.
+        uploading: !oversized,
+        uploadedUrl: null,
+        failed: oversized,
+        oversized,
+      }
+    })
 
     onChange((current) => [...current, ...added])
     // The first photo added becomes the cover, matching what the card shows.
@@ -201,9 +216,23 @@ function ImageUploader({ images, coverImageId, onChange, onCoverChange, error })
                   ) : null}
 
                   {image.failed ? (
-                    <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-error px-2 py-1 text-[11px] font-medium text-white">
-                      <TriangleAlert aria-hidden="true" size={12} className="shrink-0" />
-                      {t('listing.imageUploadFailed')}
+                    <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-error px-2 py-1 text-[11px] font-medium text-white">
+                      <span className="flex min-w-0 items-center gap-1">
+                        <TriangleAlert aria-hidden="true" size={12} className="shrink-0" />
+                        <span className="truncate">{t('listing.imageUploadFailed')}</span>
+                      </span>
+                      {/* Oversized has nothing to retry — the file is still
+                          the same size — so only a genuine upload failure
+                          (a network blip, say) offers this. */}
+                      {!image.oversized ? (
+                        <button
+                          type="button"
+                          onClick={() => retry(image)}
+                          className="shrink-0 underline underline-offset-2 hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                        >
+                          {t('listing.imageRetry')}
+                        </button>
+                      ) : null}
                     </span>
                   ) : null}
 

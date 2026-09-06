@@ -130,7 +130,16 @@ export function validateListing(listing) {
     return value !== '' && Number.isFinite(number) && number >= min && number <= max
   }
 
+  // Length alone is not enough: a tile still uploading, or one that failed,
+  // has no uploadedUrl yet, and toApartmentPayload silently drops exactly
+  // those — publishing here would submit a listing with fewer photos than
+  // the form shows, sometimes none, with no warning at the moment it happens.
   if (listing.images.length === 0) errors.images = 'listing.errorImages'
+  else if (listing.images.some((image) => image.uploading)) {
+    errors.images = 'listing.errorImagesUploading'
+  } else if (listing.images.some((image) => image.failed)) {
+    errors.images = 'listing.errorImagesFailed'
+  }
 
   // These bounds mirror the API's binding rules exactly. When the two drift the
   // form accepts something the server then rejects, and the owner is told
