@@ -166,7 +166,13 @@ function AdminDashboardPage() {
 
         <AdminCard title={t('chart.topDistricts')}>
           <div className="flex min-h-0 flex-1 flex-col p-4">
-            <BarList items={districts} scroll />
+            {districts.length === 0 ? (
+              <p className="flex flex-1 items-center justify-center text-sm text-text-muted">
+                {t('analytics.noData')}
+              </p>
+            ) : (
+              <BarList items={districts} scroll />
+            )}
           </div>
         </AdminCard>
       </div>
