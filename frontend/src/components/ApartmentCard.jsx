@@ -69,20 +69,15 @@ function ApartmentCard({ apartment, title: titleOverride, interactive = true }) 
     navigate(`/map?apartment=${apartment.id}`)
   }
 
-  const Wrapper = interactive ? 'a' : 'div'
-  const wrapperProps = interactive
-    ? {
-        href: apartmentDetailsPath(apartment.id),
-        target: '_blank',
-        rel: 'noopener noreferrer',
-        'aria-label': t('apartmentCard.detailsAriaLabel', { title }),
-      }
-    : {}
-
   return (
-    <Wrapper
-      {...wrapperProps}
-      className={`group flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+    // A `<button>` cannot legally sit inside an `<a>` — the wishlist and map
+    // links below both need to be independently clickable, so the whole card
+    // is a plain `<div>` and only the title is a real link. Its `after:` pseudo
+    // element is stretched to the edges of this `relative` container (the
+    // classic "stretched link" pattern), which is what makes clicking anywhere
+    // on the card open the listing without wrapping everything in an anchor.
+    <div
+      className={`group relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm transition-shadow hover:shadow-md ${
         interactive ? 'cursor-pointer' : ''
       }`}
     >
@@ -96,7 +91,7 @@ function ApartmentCard({ apartment, title: titleOverride, interactive = true }) 
           aria-label={
             isWishlisted ? t('apartmentCard.wishlistRemove') : t('apartmentCard.wishlistAdd')
           }
-          className={`absolute right-3 top-3 flex size-8.5 items-center justify-center rounded-full shadow-[0_2px_10px_rgba(15,23,42,0.10)] ring-1 backdrop-blur-md transition-all duration-150 hover:scale-105 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+          className={`relative z-10 absolute right-3 top-3 flex size-8.5 items-center justify-center rounded-full shadow-[0_2px_10px_rgba(15,23,42,0.10)] ring-1 backdrop-blur-md transition-all duration-150 hover:scale-105 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
             isWishlisted
               ? 'bg-primary-light/80 text-primary ring-primary/30'
               : 'bg-white/70 text-slate-600 ring-white/60 hover:bg-white/90'
@@ -114,7 +109,21 @@ function ApartmentCard({ apartment, title: titleOverride, interactive = true }) 
 
         {/* Two lines are reserved whether or not the title needs them, so the
             rows below it line up across a row of cards. */}
-        <h3 className="line-clamp-2 min-h-12 text-base font-medium text-text-primary">{title}</h3>
+        <h3 className="line-clamp-2 min-h-12 text-base font-medium text-text-primary">
+          {interactive ? (
+            <a
+              href={apartmentDetailsPath(apartment.id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={t('apartmentCard.detailsAriaLabel', { title })}
+              className="static after:absolute after:inset-0 after:content-[''] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {title}
+            </a>
+          ) : (
+            title
+          )}
+        </h3>
 
         <p className="flex items-center gap-1 text-sm text-text-secondary">
           <MapPin aria-hidden="true" size={14} className="shrink-0" />
@@ -143,7 +152,7 @@ function ApartmentCard({ apartment, title: titleOverride, interactive = true }) 
           <button
             type="button"
             onClick={handleMapClick}
-            className="flex items-center gap-1 whitespace-nowrap font-medium text-primary hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="relative z-10 flex items-center gap-1 whitespace-nowrap font-medium text-primary hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Map aria-hidden="true" size={13} className="shrink-0" />
             {t('apartmentCard.mapView')}
@@ -151,7 +160,7 @@ function ApartmentCard({ apartment, title: titleOverride, interactive = true }) 
           ) : null}
         </div>
       </div>
-    </Wrapper>
+    </div>
   )
 }
 
