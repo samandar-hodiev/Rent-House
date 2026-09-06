@@ -4,6 +4,7 @@ import { useLocale } from '../context/LocaleContext'
 import { useDismiss } from '../hooks/useDismiss'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { getDistrictById, districtNameKey } from '../data/districts'
+import { APARTMENT_TYPES } from '../data/listingForm'
 import { formatUzsAmount } from '../utils/formatPrice'
 import FilterPanel from './FilterPanel'
 
@@ -172,6 +173,18 @@ function FilterBar({
         : t('filters.chip.furnishedNo'),
       onRemove: () => setFilters({ furnished: null }),
     })
+  }
+
+  if (filters.apartmentType) {
+    const labelKey = APARTMENT_TYPES.find((option) => option.id === filters.apartmentType)
+      ?.labelKey
+    if (labelKey) {
+      chips.push({
+        key: 'apartmentType',
+        label: `${t('listing.apartmentType')}: ${t(labelKey)}`,
+        onRemove: () => setFilters({ apartmentType: null }),
+      })
+    }
   }
 
   const chipNodes = (

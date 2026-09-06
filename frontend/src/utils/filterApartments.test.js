@@ -7,12 +7,13 @@ import { filterApartments } from './filterApartments'
 const listing = (overrides = {}) => ({
   id: 'a', districtId: 'chilonzor', searchText: 'chilonzor bunyodkor metro',
   price: 4000000, rooms: 2, area: 60, floor: 4, furnished: true,
+  apartmentType: 'apartment',
   ...overrides,
 })
 
 const NOTHING = {
   minPrice: null, maxPrice: null, rooms: null,
-  minArea: null, maxArea: null, floorRange: null, furnished: null,
+  minArea: null, maxArea: null, floorRange: null, furnished: null, apartmentType: null,
 }
 
 const run = (items, { districtId = null, keyword = '', filters = {} } = {}) =>
@@ -61,6 +62,15 @@ describe('filtering listings', () => {
     const items = [listing({ id: 'yes', furnished: true }), listing({ id: 'no', furnished: false })]
     expect(run(items, { filters: { furnished: false } }).map((i) => i.id)).toEqual(['no'])
     expect(run(items, { filters: { furnished: null } })).toHaveLength(2)
+  })
+
+  it('matches apartment type exactly', () => {
+    const items = [
+      listing({ id: 'apt', apartmentType: 'apartment' }),
+      listing({ id: 'house', apartmentType: 'house' }),
+    ]
+    expect(run(items, { filters: { apartmentType: 'house' } }).map((i) => i.id)).toEqual(['house'])
+    expect(run(items, { filters: { apartmentType: null } })).toHaveLength(2)
   })
 
   it('drops a listing with nothing to search rather than throwing', () => {

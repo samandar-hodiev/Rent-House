@@ -39,6 +39,10 @@ export function filterApartments(apartments, { districtId, keyword, filters }) {
       return false
     }
 
+    if (filters.apartmentType && apartment.apartmentType !== filters.apartmentType) {
+      return false
+    }
+
     return true
   })
 }

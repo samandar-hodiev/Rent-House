@@ -39,12 +39,23 @@ const (
 	UtilitiesSeparate = "SEPARATE"
 )
 
+// What kind of place this is — a whole flat, a house with its own yard, or a
+// single room. Not the same thing as Rooms (how many bedrooms): a 1-room
+// ApartmentTypeApartment and a 1-room ApartmentTypeHouse are both real and
+// both searchable separately.
+const (
+	ApartmentTypeApartment = "apartment"
+	ApartmentTypeHouse     = "house"
+	ApartmentTypeRoom      = "room"
+)
+
 // Accepted values, mirrored by CHECK constraints in the migration so a bad
 // value cannot reach the table even through a direct SQL insert.
 var (
 	Currencies        = []string{CurrencyUZS, CurrencyUSD}
 	RentalPeriods     = []string{RentalPeriodMonthly, RentalPeriodDaily}
 	UtilitiesOptions  = []string{UtilitiesIncluded, UtilitiesSeparate}
+	ApartmentTypes    = []string{ApartmentTypeApartment, ApartmentTypeHouse, ApartmentTypeRoom}
 	ApartmentStatuses = []string{
 		ApartmentStatusDraft,
 		ApartmentStatusPending,
@@ -79,6 +90,8 @@ type Apartment struct {
 	Floor       int16 `gorm:"column:floor;not null" json:"floor"`
 	TotalFloors int16 `gorm:"column:total_floors;not null" json:"total_floors"`
 	Furnished   bool  `gorm:"column:furnished;not null;default:false" json:"furnished"`
+	// "apartment", "house" or "room" — see the constants above.
+	ApartmentType string `gorm:"column:apartment_type;type:varchar(20);not null;default:apartment" json:"apartment_type"`
 
 	Status string `gorm:"column:status;type:varchar(10);not null;default:draft;index:idx_apartments_status" json:"status"`
 

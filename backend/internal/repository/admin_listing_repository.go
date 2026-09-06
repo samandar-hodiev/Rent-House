@@ -120,14 +120,15 @@ func (r *AdminListingRepository) List(
 // AdminListingDetail is everything the detail card shows.
 type AdminListingDetail struct {
 	AdminListingRow
-	Address     string  `gorm:"column:address"`
-	Description string  `gorm:"column:description"`
-	TotalFloors int     `gorm:"column:total_floors"`
-	Furnished   bool    `gorm:"column:furnished"`
-	OwnerID     string  `gorm:"column:owner_id"`
-	OwnerEmail  *string `gorm:"column:owner_email"`
-	OwnerPhone  *string `gorm:"column:owner_phone"`
-	OwnerAvatar *string `gorm:"column:owner_avatar"`
+	Address       string  `gorm:"column:address"`
+	Description   string  `gorm:"column:description"`
+	TotalFloors   int     `gorm:"column:total_floors"`
+	Furnished     bool    `gorm:"column:furnished"`
+	ApartmentType string  `gorm:"column:apartment_type"`
+	OwnerID       string  `gorm:"column:owner_id"`
+	OwnerEmail    *string `gorm:"column:owner_email"`
+	OwnerPhone    *string `gorm:"column:owner_phone"`
+	OwnerAvatar   *string `gorm:"column:owner_avatar"`
 }
 
 // Detail loads one listing with its owner.
@@ -141,7 +142,7 @@ func (r *AdminListingRepository) Detail(
 		Joins("LEFT JOIN districts AS d ON d.id = a.district_id").
 		Where("a.id = ?", id).
 		Select(`a.id, a.title, a.price, a.currency, a.status, a.rooms, a.area, a.floor,
-			a.total_floors, a.furnished, a.views_count, a.created_at, a.address,
+			a.total_floors, a.furnished, a.apartment_type, a.views_count, a.created_at, a.address,
 			COALESCE(a.description, '') AS description,
 			COALESCE(d.name, '') AS district,
 			a.owner_id,

@@ -8,6 +8,7 @@ const EMPTY_FILTERS = {
   maxArea: null,
   floorRange: null,
   furnished: null,
+  apartmentType: null,
 }
 
 const SearchContext = createContext(null)

@@ -306,6 +306,7 @@ func (s *ApartmentService) Update(
 		"floor":          apartment.Floor,
 		"total_floors":   apartment.TotalFloors,
 		"furnished":      apartment.Furnished,
+		"apartment_type": apartment.ApartmentType,
 		"district_id":    apartment.DistrictID,
 		"neighborhood":   apartment.Neighborhood,
 		"address":        apartment.Address,
@@ -533,20 +534,21 @@ func (s *ApartmentService) build(
 	}
 
 	apartment := &models.Apartment{
-		DistrictID:   district.ID,
-		Title:        req.Title,
-		Description:  req.Description,
-		Price:        price,
-		Currency:     req.Currency,
-		RentalPeriod: req.RentalPeriod,
-		Rooms:        req.Rooms,
-		Area:         req.Area,
-		Floor:        req.Floor,
-		TotalFloors:  req.TotalFloors,
-		Furnished:    req.Furnished,
-		Address:      req.Address,
-		Latitude:     req.Latitude,
-		Longitude:    req.Longitude,
+		DistrictID:    district.ID,
+		Title:         req.Title,
+		Description:   req.Description,
+		Price:         price,
+		Currency:      req.Currency,
+		RentalPeriod:  req.RentalPeriod,
+		Rooms:         req.Rooms,
+		Area:          req.Area,
+		Floor:         req.Floor,
+		TotalFloors:   req.TotalFloors,
+		Furnished:     req.Furnished,
+		ApartmentType: req.ApartmentType,
+		Address:       req.Address,
+		Latitude:      req.Latitude,
+		Longitude:     req.Longitude,
 		// Optional in the form, mandatory in the row: the column has a default
 		// that an insert picks up but an explicit update would overwrite with
 		// an empty string the CHECK rejects.
@@ -614,16 +616,17 @@ func (s *ApartmentService) filterFrom(
 	ctx context.Context, query dto.ApartmentListQuery,
 ) (repository.ApartmentFilter, error) {
 	filter := repository.ApartmentFilter{
-		Keyword:    query.Keyword,
-		Rooms:      query.Rooms,
-		RoomsMin:   query.RoomsMin,
-		MinArea:    query.MinArea,
-		MaxArea:    query.MaxArea,
-		FloorRange: query.Floor,
-		Furnished:  query.Furnished,
-		Sort:       query.Sort,
-		Limit:      query.Limit,
-		Offset:     query.Offset(),
+		Keyword:       query.Keyword,
+		Rooms:         query.Rooms,
+		RoomsMin:      query.RoomsMin,
+		MinArea:       query.MinArea,
+		MaxArea:       query.MaxArea,
+		FloorRange:    query.Floor,
+		Furnished:     query.Furnished,
+		ApartmentType: query.ApartmentType,
+		Sort:          query.Sort,
+		Limit:         query.Limit,
+		Offset:        query.Offset(),
 	}
 
 	if query.District != "" {

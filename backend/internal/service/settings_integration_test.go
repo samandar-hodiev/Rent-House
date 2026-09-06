@@ -51,20 +51,21 @@ func settingsTx(t *testing.T) *gorm.DB {
 // change the one field it cares about.
 func writeRequest(districtSlug string, publish bool, images int) dto.ApartmentWriteRequest {
 	req := dto.ApartmentWriteRequest{
-		Title:        "Settings test listing",
-		Description:  "A listing created by the settings integration test.",
-		Price:        "4500000",
-		Currency:     "UZS",
-		RentalPeriod: "monthly",
-		Rooms:        2,
-		Area:         55,
-		Floor:        3,
-		TotalFloors:  9,
-		DistrictSlug: districtSlug,
-		Address:      "Test address 1",
-		Latitude:     41.311081,
-		Longitude:    69.240562,
-		Publish:      publish,
+		Title:         "Settings test listing",
+		Description:   "A listing created by the settings integration test.",
+		Price:         "4500000",
+		Currency:      "UZS",
+		RentalPeriod:  "monthly",
+		Rooms:         2,
+		Area:          55,
+		Floor:         3,
+		TotalFloors:   9,
+		ApartmentType: "apartment",
+		DistrictSlug:  districtSlug,
+		Address:       "Test address 1",
+		Latitude:      41.311081,
+		Longitude:     69.240562,
+		Publish:       publish,
 	}
 	for i := 0; i < images; i++ {
 		req.Images = append(req.Images, dto.ApartmentImageInput{

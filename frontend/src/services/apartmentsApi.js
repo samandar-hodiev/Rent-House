@@ -41,6 +41,7 @@ export function toApartment(item) {
     floor: item.floor,
     totalFloors: item.total_floors,
     furnished: item.furnished,
+    apartmentType: item.apartment_type,
 
     status: item.status,
 
@@ -116,6 +117,7 @@ export function toApartmentPayload(values, { publish }) {
     // The form stores this as an id ('FURNISHED' / 'UNFURNISHED'); the column
     // is a boolean.
     furnished: values.furnished === 'FURNISHED',
+    apartment_type: values.apartmentType,
 
     district_slug: location.district,
     address: location.address.trim(),

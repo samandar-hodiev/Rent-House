@@ -36,9 +36,11 @@ export const EMPTY_FILTERS = {
   maxArea: null,
   floorRange: null,
   furnished: null,
+  apartmentType: null,
 }
 
 const FLOOR_BANDS = ['low', 'mid', 'high']
+const APARTMENT_TYPE_VALUES = new Set(['apartment', 'house', 'room'])
 
 function toNumber(value) {
   if (value === null || value === '') return null
@@ -50,6 +52,7 @@ function toNumber(value) {
 export function readSearchParams(params) {
   const furnished = params.get('furnished')
   const floor = params.get('floor')
+  const apartmentType = params.get('apartment_type')
   const sortParam = params.get('sort')
 
   return {
@@ -65,6 +68,7 @@ export function readSearchParams(params) {
       maxArea: toNumber(params.get('max_area')),
       floorRange: FLOOR_BANDS.includes(floor) ? floor : null,
       furnished: furnished === 'true' ? true : furnished === 'false' ? false : null,
+      apartmentType: APARTMENT_TYPE_VALUES.has(apartmentType) ? apartmentType : null,
     },
   }
 }
@@ -94,6 +98,7 @@ export function writeSearchParams({ districtId, keyword, filters, sort, page }) 
   if (filters?.furnished !== null && filters?.furnished !== undefined) {
     set('furnished', filters.furnished)
   }
+  set('apartment_type', filters?.apartmentType)
   if (sort && sort !== DEFAULT_SORT) set('sort', SORT_PARAM[sort] ?? sort)
   if (page && page > 1) set('page', page)
 
@@ -127,6 +132,7 @@ export function toApiQuery({ districtId, keyword, filters, sort, page, limit }) 
     else query.rooms = filters.rooms
   }
   if (filters.furnished !== null) query.furnished = filters.furnished
+  if (filters.apartmentType !== null) query.apartment_type = filters.apartmentType
 
   return query
 }

@@ -1,5 +1,6 @@
 import { useLocale } from '../context/LocaleContext'
 import { DISTRICTS, districtNameKey } from '../data/districts'
+import { APARTMENT_TYPES } from '../data/listingForm'
 
 const ROOM_OPTIONS = [1, 2, 3, 4]
 const FLOOR_OPTIONS = [
@@ -178,6 +179,29 @@ function FilterPanel({
           </div>
         </fieldset>
       ) : null}
+
+      <fieldset className="mb-4">
+        <legend className="mb-2 text-sm font-medium text-text-primary">
+          {t('listing.apartmentType')}
+        </legend>
+        <div className="flex flex-wrap gap-2">
+          {APARTMENT_TYPES.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() =>
+                onChange({
+                  apartmentType: filters.apartmentType === option.id ? null : option.id,
+                })
+              }
+              aria-pressed={filters.apartmentType === option.id}
+              className={optionButtonClass(filters.apartmentType === option.id)}
+            >
+              {t(option.labelKey)}
+            </button>
+          ))}
+        </div>
+      </fieldset>
 
       <fieldset className="mb-5">
         <legend className="mb-2 text-sm font-medium text-text-primary">

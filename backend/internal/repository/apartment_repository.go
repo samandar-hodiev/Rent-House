@@ -59,6 +59,8 @@ type ApartmentFilter struct {
 	FloorRange string
 
 	Furnished *bool
+	// Empty matches every type. One of models.ApartmentTypes otherwise.
+	ApartmentType string
 
 	// Sort is one of the values in SortOptions. Anything else falls back to
 	// newest-first rather than being interpolated into the SQL.
@@ -242,6 +244,9 @@ func (r *ApartmentRepository) applyFilter(query *gorm.DB, filter ApartmentFilter
 	}
 	if filter.Furnished != nil {
 		query = query.Where("apartments.furnished = ?", *filter.Furnished)
+	}
+	if filter.ApartmentType != "" {
+		query = query.Where("apartments.apartment_type = ?", filter.ApartmentType)
 	}
 	return query
 }

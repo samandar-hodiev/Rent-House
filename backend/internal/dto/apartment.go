@@ -49,6 +49,8 @@ type ApartmentWriteRequest struct {
 	Floor       int16 `json:"floor"        binding:"required,min=1,max=200"`
 	TotalFloors int16 `json:"total_floors" binding:"required,min=1,max=200"`
 	Furnished   bool  `json:"furnished"`
+	// A whole flat, a house, or a single room — see models.ApartmentTypes.
+	ApartmentType string `json:"apartment_type" binding:"required,oneof=apartment house room"`
 
 	// The slug the frontend already uses ("chilonzor"), resolved to the
 	// district's id by the service. The client never sees a district uuid.
@@ -131,10 +133,11 @@ type ApartmentListQuery struct {
 	// and "11+", and the bounds belong to the server that applies them.
 	Floor string `form:"floor" binding:"omitempty,oneof=low mid high"`
 
-	Furnished *bool  `form:"furnished"`
-	Sort      string `form:"sort"       binding:"omitempty,oneof=newest price_asc price_desc area_desc area_asc"`
-	Page      int    `form:"page"       binding:"omitempty,min=1"`
-	Limit     int    `form:"limit"      binding:"omitempty,min=1,max=60"`
+	Furnished     *bool  `form:"furnished"`
+	ApartmentType string `form:"apartment_type" binding:"omitempty,oneof=apartment house room"`
+	Sort          string `form:"sort"       binding:"omitempty,oneof=newest price_asc price_desc area_desc area_asc"`
+	Page          int    `form:"page"       binding:"omitempty,min=1"`
+	Limit         int    `form:"limit"      binding:"omitempty,min=1,max=60"`
 }
 
 // Normalize applies the defaults and caps the page size.
@@ -210,6 +213,8 @@ type ApartmentResponse struct {
 	Floor       int16 `json:"floor"`
 	TotalFloors int16 `json:"total_floors"`
 	Furnished   bool  `json:"furnished"`
+	// "apartment", "house" or "room" — see models.ApartmentTypes.
+	ApartmentType string `json:"apartment_type"`
 
 	Status string `json:"status"`
 	// PublishedAt is when the listing went live, and absent while it has not.
@@ -266,6 +271,7 @@ func NewApartmentResponse(apartment *models.Apartment, includeOwnerContact bool)
 		Floor:         apartment.Floor,
 		TotalFloors:   apartment.TotalFloors,
 		Furnished:     apartment.Furnished,
+		ApartmentType: apartment.ApartmentType,
 		Status:        apartment.Status,
 		PublishedAt:   apartment.PublishedAt,
 		Address:       apartment.Address,

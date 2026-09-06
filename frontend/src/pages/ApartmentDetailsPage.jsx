@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Droplets,
   Flame,
+  Home,
   Refrigerator,
   Tv,
   WashingMachine,
@@ -41,6 +42,7 @@ import { useWishlist } from '../context/WishlistContext'
 import ReportListingDialog from '../components/ReportListingDialog'
 import { useRequireAuth } from '../hooks/useRequireAuth'
 import { getDistrictById, districtNameKey } from '../data/districts'
+import { APARTMENT_TYPES } from '../data/listingForm'
 import { fetchApartment, fetchApartments } from '../services/apartmentsApi'
 import { ROUTES, editListingPath } from '../routes/paths'
 import { listingDescription, listingTitle } from '../utils/listingText'
@@ -198,7 +200,14 @@ function ApartmentDetailsPage() {
   // not be on screen.
   const isOwnListing = Boolean(user?.id && apartment.owner?.id === user.id)
 
+  const apartmentTypeLabel = APARTMENT_TYPES.find(
+    (option) => option.id === apartment.apartmentType,
+  )?.labelKey
+
   const facts = [
+    ...(apartmentTypeLabel
+      ? [{ Icon: Home, label: t('listing.apartmentType'), value: t(apartmentTypeLabel) }]
+      : []),
     { Icon: BedDouble, label: t('filters.rooms'), value: apartment.rooms },
     { Icon: Ruler, label: t('filters.area'), value: `${apartment.area} m²` },
     {

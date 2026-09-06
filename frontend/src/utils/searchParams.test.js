@@ -10,7 +10,8 @@ describe('reading a search from the URL', () => {
   it('reads every filter the interface offers', () => {
     const search = readSearchParams(new URLSearchParams(
       'district=chilonzor&keyword=metro&min_price=2000000&max_price=5000000' +
-      '&rooms=2&min_area=40&max_area=90&floor=mid&furnished=true&sort=price_asc&page=3',
+      '&rooms=2&min_area=40&max_area=90&floor=mid&furnished=true&apartment_type=house' +
+      '&sort=price_asc&page=3',
     ))
 
     expect(search.districtId).toBe('chilonzor')
@@ -25,6 +26,7 @@ describe('reading a search from the URL', () => {
       maxArea: 90,
       floorRange: 'mid',
       furnished: true,
+      apartmentType: 'house',
     })
   })
 
@@ -39,11 +41,13 @@ describe('reading a search from the URL', () => {
 
   it('ignores values it does not recognise rather than passing them on', () => {
     const search = readSearchParams(new URLSearchParams(
-      'floor=basement&sort=by_vibes&page=-4&min_price=cheap&furnished=maybe',
+      'floor=basement&sort=by_vibes&page=-4&min_price=cheap&furnished=maybe' +
+      '&apartment_type=mansion',
     ))
     expect(search.filters.floorRange).toBeNull()
     expect(search.filters.minPrice).toBeNull()
     expect(search.filters.furnished).toBeNull()
+    expect(search.filters.apartmentType).toBeNull()
     expect(search.sort).toBe(DEFAULT_SORT)
     // A page below one is not a page; the first is.
     expect(search.page).toBe(1)
@@ -72,7 +76,7 @@ describe('writing a search back to the URL', () => {
       keyword: 'bunyodkor',
       filters: {
         minPrice: 3000000, maxPrice: null, rooms: 4, minArea: 50,
-        maxArea: null, floorRange: 'high', furnished: false,
+        maxArea: null, floorRange: 'high', furnished: false, apartmentType: 'room',
       },
       sort: 'expensive',
       page: 2,
@@ -114,6 +118,14 @@ describe('asking the API', () => {
     })
     expect(query.rooms).toBe(2)
     expect(query.rooms_min).toBeUndefined()
+  })
+
+  it('forwards the apartment type filter under the API name', () => {
+    const query = toApiQuery({
+      districtId: null, keyword: '', sort: DEFAULT_SORT, page: 1, limit: 20,
+      filters: { ...EMPTY_FILTERS, apartmentType: 'house' },
+    })
+    expect(query.apartment_type).toBe('house')
   })
 
   it('translates the interface sort names into the API ones', () => {

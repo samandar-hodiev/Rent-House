@@ -18,6 +18,7 @@ import { ApiError, NETWORK_ERROR } from '../services/apiClient'
 import { toApartmentPayload } from '../services/apartmentsApi'
 import {
   AMENITIES,
+  APARTMENT_TYPES,
   CURRENCIES,
   FURNISHING,
   MAX_DESCRIPTION,
@@ -269,6 +270,13 @@ function ListingForm({ id, isEditMode, existing }) {
           </FormSection>
 
           <FormSection title={t('listing.sectionApartment')}>
+            <SegmentedField
+              label={t('listing.apartmentType')}
+              options={optionsOf(APARTMENT_TYPES)}
+              value={listing.apartmentType}
+              onChange={(value) => setField('apartmentType', value)}
+            />
+
             <div className="flex flex-col gap-3">
               <SegmentedField
                 label={t('listing.rooms')}

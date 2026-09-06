@@ -254,13 +254,14 @@ type AdminListingOwner struct {
 // AdminListingDetailResponse is the whole detail card.
 type AdminListingDetailResponse struct {
 	AdminListingResponse
-	Address     string                  `json:"address"`
-	Description string                  `json:"description"`
-	TotalFloors int                     `json:"total_floors"`
-	Furnished   bool                    `json:"furnished"`
-	Images      []string                `json:"images"`
-	Owner       AdminListingOwner       `json:"owner"`
-	Stats       repository.ListingStats `json:"stats"`
+	Address       string                  `json:"address"`
+	Description   string                  `json:"description"`
+	TotalFloors   int                     `json:"total_floors"`
+	Furnished     bool                    `json:"furnished"`
+	ApartmentType string                  `json:"apartment_type"`
+	Images        []string                `json:"images"`
+	Owner         AdminListingOwner       `json:"owner"`
+	Stats         repository.ListingStats `json:"stats"`
 }
 
 // NewAdminListingDetailResponse assembles the card.
@@ -273,6 +274,7 @@ func NewAdminListingDetailResponse(
 		Description:          detail.Description,
 		TotalFloors:          detail.TotalFloors,
 		Furnished:            detail.Furnished,
+		ApartmentType:        detail.ApartmentType,
 		// Never nil: an empty gallery must arrive as [] rather than null, so the
 		// client can count it without checking.
 		Images: append([]string{}, images...),

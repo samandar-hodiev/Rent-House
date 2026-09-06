@@ -48,6 +48,15 @@ export const FURNISHING = [
   { id: 'UNFURNISHED', labelKey: 'listing.unfurnished' },
 ]
 
+// The API's own vocabulary (lower-case, matches models.ApartmentTypes), so no
+// case translation is needed at the payload boundary the way FURNISHING needs
+// one for `furnished`.
+export const APARTMENT_TYPES = [
+  { id: 'apartment', labelKey: 'listing.typeApartment' },
+  { id: 'house', labelKey: 'listing.typeHouse' },
+  { id: 'room', labelKey: 'listing.typeRoom' },
+]
+
 // Reuses the existing `amenity.*` keys where they exist; the rest are the
 // attributes a Tashkent rental listing is normally judged on.
 export const AMENITIES = [
@@ -99,6 +108,7 @@ export function createEmptyListing(currency) {
     floor: '',
     totalFloors: '',
     furnished: FURNISHING[0].id,
+    apartmentType: APARTMENT_TYPES[0].id,
     amenities: [],
     images: [],
     coverImageId: null,
@@ -230,6 +240,9 @@ export function listingToFormValues(listing, title, description) {
     floor: String(listing.floor ?? ''),
     totalFloors: String(listing.totalFloors ?? ''),
     furnished: listing.furnished ? FURNISHING[0].id : FURNISHING[1].id,
+    apartmentType: APARTMENT_TYPES.some((option) => option.id === listing.apartmentType)
+      ? listing.apartmentType
+      : APARTMENT_TYPES[0].id,
     // The catalog carries a couple of tags the form does not offer as amenities.
     amenities: (listing.amenities ?? []).filter((id) => AMENITIES.includes(id)),
     images,
@@ -268,6 +281,7 @@ export function formValuesToListing(values) {
     floor: Number(values.floor) || 0,
     totalFloors: Number(values.totalFloors) || 0,
     furnished: values.furnished === FURNISHING[0].id,
+    apartmentType: values.apartmentType,
     amenities: values.amenities,
     image: cover?.url ?? '',
     images: values.images.map((image) => image.url),

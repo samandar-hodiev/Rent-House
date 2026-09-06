@@ -10,10 +10,12 @@ const FILTER_PARAMS = {
   maxArea: 'max_area',
   floorRange: 'floor',
   furnished: 'furnished',
+  apartmentType: 'apartment_type',
 }
 
 const ROOM_VALUES = new Set([1, 2, 3, 4])
 const FLOOR_VALUES = new Set(['low', 'mid', 'high'])
+const APARTMENT_TYPE_VALUES = new Set(['apartment', 'house', 'room'])
 
 function parsePositiveNumber(raw) {
   if (raw === null) return null
@@ -37,6 +39,9 @@ export function parseMapFiltersFromParams(searchParams) {
   const rawFurnished = searchParams.get(FILTER_PARAMS.furnished)
   const furnished = rawFurnished === 'true' ? true : rawFurnished === 'false' ? false : null
 
+  const rawApartmentType = searchParams.get(FILTER_PARAMS.apartmentType)
+  const apartmentType = APARTMENT_TYPE_VALUES.has(rawApartmentType) ? rawApartmentType : null
+
   const filters = {
     minPrice: parsePositiveNumber(searchParams.get(FILTER_PARAMS.minPrice)),
     maxPrice: parsePositiveNumber(searchParams.get(FILTER_PARAMS.maxPrice)),
@@ -45,6 +50,7 @@ export function parseMapFiltersFromParams(searchParams) {
     maxArea: parsePositiveNumber(searchParams.get(FILTER_PARAMS.maxArea)),
     floorRange,
     furnished,
+    apartmentType,
   }
 
   const hasAnyValue =
