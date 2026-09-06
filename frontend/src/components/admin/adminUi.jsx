@@ -156,7 +156,7 @@ export function ViewLink({ to }) {
 // stray submit would navigate. A form's own save button passes type="submit",
 // so Enter in a field saves the way a keyboard user expects.
 export function MockButton({
-  children, tone = 'neutral', onClick, disabled = false, type = 'button',
+  children, tone = 'neutral', onClick, disabled = false, type = 'button', pressed,
 }) {
   const tones = {
     neutral:
@@ -171,6 +171,10 @@ export function MockButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
+      // Left undefined rather than false for the ordinary action buttons that
+      // make up most of this component's callers — `aria-pressed="false"` on
+      // a button that isn't a toggle would claim a state it does not have.
+      aria-pressed={pressed}
       className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 ${tones[tone]}`}
     >
       {children}

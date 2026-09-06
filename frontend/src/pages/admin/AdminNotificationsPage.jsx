@@ -137,6 +137,7 @@ function AdminNotificationsPage() {
                 setPage(1)
               }}
               tone={unreadOnly ? 'primary' : 'neutral'}
+              pressed={unreadOnly}
             >
               {t('notifications.onlyUnread')}
             </MockButton>
