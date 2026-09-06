@@ -13,6 +13,7 @@ function FormField({
   placeholder,
   autoComplete,
   inputMode,
+  disabled = false,
 }) {
   const { t } = useLocale()
   const id = useId()
@@ -37,9 +38,10 @@ function FormField({
           placeholder={placeholder}
           autoComplete={autoComplete}
           inputMode={inputMode}
+          disabled={disabled}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className={`w-full rounded-md border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+          className={`w-full rounded-md border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-not-allowed disabled:bg-surface-secondary disabled:text-text-muted ${
             isPassword ? 'pr-11' : ''
           } ${error ? 'border-error' : 'border-border'}`}
         />
@@ -48,9 +50,10 @@ function FormField({
           <button
             type="button"
             onClick={() => setIsRevealed((revealed) => !revealed)}
+            disabled={disabled}
             aria-label={isRevealed ? t('auth.hidePassword') : t('auth.showPassword')}
             title={isRevealed ? t('auth.hidePassword') : t('auth.showPassword')}
-            className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-md text-text-muted hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-md text-text-muted hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isRevealed ? (
               <EyeOff aria-hidden="true" size={16} />
