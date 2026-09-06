@@ -28,7 +28,7 @@ func TestValidateAcceptsCompleteConfig(t *testing.T) {
 	cfg := &Config{
 		AllowedOrigins: []string{"http://localhost:5173"},
 		Database:       Database{User: "postgres", Name: "renthouse"},
-		JWT:            JWT{Secret: "secret", ExpiresIn: time.Hour},
+		JWT:            JWT{Secret: "test-secret-that-is-at-least-32-characters-long", ExpiresIn: time.Hour},
 		OTP:            validOTP(),
 		RateLimit:      validRateLimit(),
 	}
@@ -84,11 +84,37 @@ func TestParseDurationRejectsGarbage(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsThePlaceholderJWTSecret(t *testing.T) {
+	cfg := &Config{
+		AllowedOrigins: []string{"http://localhost:5173"},
+		Database:       Database{User: "postgres", Name: "renthouse"},
+		JWT:            JWT{Secret: "change-me", ExpiresIn: time.Hour},
+		OTP:            validOTP(),
+		RateLimit:      validRateLimit(),
+	}
+	if err := cfg.validate(); err == nil {
+		t.Fatal("expected the .env.example placeholder secret to be rejected")
+	}
+}
+
+func TestValidateRejectsATooShortJWTSecret(t *testing.T) {
+	cfg := &Config{
+		AllowedOrigins: []string{"http://localhost:5173"},
+		Database:       Database{User: "postgres", Name: "renthouse"},
+		JWT:            JWT{Secret: "short", ExpiresIn: time.Hour},
+		OTP:            validOTP(),
+		RateLimit:      validRateLimit(),
+	}
+	if err := cfg.validate(); err == nil {
+		t.Fatal("expected a short JWT secret to be rejected")
+	}
+}
+
 func TestValidateRejectsNonPositiveExpiry(t *testing.T) {
 	cfg := &Config{
 		AllowedOrigins: []string{"http://localhost:5173"},
 		Database:       Database{User: "postgres", Name: "renthouse"},
-		JWT:            JWT{Secret: "secret", ExpiresIn: 0},
+		JWT:            JWT{Secret: "test-secret-that-is-at-least-32-characters-long", ExpiresIn: 0},
 		OTP:            validOTP(),
 		RateLimit:      validRateLimit(),
 	}
@@ -128,7 +154,7 @@ func TestValidateRejectsABadRateLimitPolicy(t *testing.T) {
 		return &Config{
 			AllowedOrigins: []string{"http://localhost:5173"},
 			Database:       Database{User: "postgres", Name: "renthouse"},
-			JWT:            JWT{Secret: "secret", ExpiresIn: time.Hour},
+			JWT:            JWT{Secret: "test-secret-that-is-at-least-32-characters-long", ExpiresIn: time.Hour},
 			OTP:            validOTP(),
 			RateLimit:      validRateLimit(),
 		}
@@ -161,7 +187,7 @@ func TestValidateRejectsABadOTPPolicy(t *testing.T) {
 		return &Config{
 			AllowedOrigins: []string{"http://localhost:5173"},
 			Database:       Database{User: "postgres", Name: "renthouse"},
-			JWT:            JWT{Secret: "secret", ExpiresIn: time.Hour},
+			JWT:            JWT{Secret: "test-secret-that-is-at-least-32-characters-long", ExpiresIn: time.Hour},
 			OTP:            validOTP(),
 			RateLimit:      validRateLimit(),
 		}

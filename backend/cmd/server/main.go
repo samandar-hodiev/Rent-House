@@ -183,6 +183,15 @@ func newRouter(
 	cfg *config.Config, db *gorm.DB, tokens *token.Service, delivery senders,
 ) (*gin.Engine, error) {
 	router := gin.New()
+	// Without this, Gin's default is to believe X-Forwarded-For from anyone —
+	// which is exactly the header the IP rate limiter (see
+	// internal/middleware/ratelimit.go) reads to tell one caller from another.
+	// Left at the default, that header is spoofable by whoever is making the
+	// request, and every register/login/password-reset throttle becomes
+	// advisory. See cfg.TrustedProxies for who is actually trusted.
+	if err := router.SetTrustedProxies(cfg.TrustedProxies); err != nil {
+		return nil, fmt.Errorf("trusted proxies: %w", err)
+	}
 	router.Use(gin.Logger(), gin.Recovery(), middleware.CORS(cfg.AllowedOrigins))
 
 	// Liveness probe: intentionally does not touch the database, so it answers

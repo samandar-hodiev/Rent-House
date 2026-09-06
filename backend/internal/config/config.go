@@ -22,6 +22,12 @@ import (
 const (
 	defaultJWTExpiry = 24 * time.Hour
 
+	// minJWTSecretLength matches what `openssl rand -base64 32` produces (44
+	// characters) rounded down to a plain byte count — short enough that a
+	// hand-typed passphrase still passes, long enough that a guessed or
+	// truncated secret does not.
+	minJWTSecretLength = 32
+
 	defaultOTPExpiry         = 5 * time.Minute
 	defaultOTPResendCooldown = 60 * time.Second
 	defaultOTPMaxAttempts    = 5
@@ -47,6 +53,11 @@ const (
 type Config struct {
 	Port           string
 	AllowedOrigins []string
+	// TrustedProxies is who may set X-Forwarded-For/X-Real-IP and be believed.
+	// See the comment on TrustedProxies's default below — this is not a list
+	// of visitors to trust, it is a list of the one reverse proxy in front of
+	// this process.
+	TrustedProxies []string
 
 	// UploadDir is where listing photographs are written; UploadPublicPath is
 	// the URL prefix that directory is served under. Both are configurable so a
@@ -180,6 +191,14 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		Port:           envOr("PORT", "8080"),
 		AllowedOrigins: splitList(envOr("ALLOWED_ORIGINS", "http://localhost:5173")),
+		// Loopback (both families — "localhost" resolves to ::1 as often as
+		// 127.0.0.1) plus Docker Compose's own default bridge range: the
+		// reverse proxy this backend expects to sit behind (see
+		// docker-compose.yml and frontend/nginx.conf) is either on the same
+		// host or another container on that network — never the public
+		// internet. Deployed behind a different proxy (a cloud load balancer,
+		// say), TRUSTED_PROXIES names its address instead.
+		TrustedProxies: splitList(envOr("TRUSTED_PROXIES", "127.0.0.1,::1,172.16.0.0/12")),
 		Database: Database{
 			Host:     envOr("DB_HOST", "localhost"),
 			Port:     envOr("DB_PORT", "5432"),
@@ -344,6 +363,21 @@ func (c *Config) validate() error {
 	}
 	if len(c.AllowedOrigins) == 0 {
 		return errors.New("ALLOWED_ORIGINS must list at least one origin")
+	}
+	// Every token in the marketplace — a visitor's, an administrator's — is
+	// signed with this one value; anyone who has it can forge either. The
+	// example file ships a placeholder rather than no value at all so a first
+	// `go run` doesn't stumble on a missing-variable error before anyone has
+	// had a chance to read the comment above it — but that same forgiving
+	// default is worthless if it is still what gets deployed. Checked here,
+	// not just documented, because a comment is not a guarantee.
+	if c.JWT.Secret == "change-me" {
+		return errors.New("JWT_SECRET is still the placeholder from .env.example — " +
+			"generate a real one with: openssl rand -base64 32")
+	}
+	if len(c.JWT.Secret) < minJWTSecretLength {
+		return fmt.Errorf("JWT_SECRET must be at least %d characters — generate one with: openssl rand -base64 32",
+			minJWTSecretLength)
 	}
 	if c.JWT.ExpiresIn <= 0 {
 		return errors.New("JWT_EXPIRES_IN must be a positive duration, for example 24h")
