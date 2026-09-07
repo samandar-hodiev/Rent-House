@@ -85,7 +85,7 @@ func newAdminSessionHarness(t *testing.T) *adminSessionHarness {
 
 	settings := service.NewSettingsService(repository.NewSettingsRepository(transaction))
 	adminService := service.NewAdminService(
-		repository.NewAdminRepository(transaction), tokens, settings,
+		repository.NewAdminRepository(transaction), tokens, settings, nil,
 		repository.NewRefreshTokenRepository(transaction), repository.NewAdminRefreshTokenRepository(transaction),
 	)
 	notifications := service.NewNotificationService(repository.NewNotificationRepository(transaction), settings)
@@ -96,7 +96,7 @@ func newAdminSessionHarness(t *testing.T) *adminSessionHarness {
 			repository.NewAdminListingRepository(transaction), repository.NewApartmentRepository(transaction),
 			settings, notifications,
 		),
-		settings, nil, "/uploads", "",
+		settings, nil, "",
 	)
 
 	// Mirrors cmd/server's grouping exactly: login, refresh and logout are
@@ -293,7 +293,7 @@ func TestAdminSessionEndsWhenSuspended(t *testing.T) {
 	// SetStatus is what is under test here, not the raw SQL it issues: it is
 	// what is supposed to revoke the session as a side effect of suspending.
 	adminService := service.NewAdminService(
-		repository.NewAdminRepository(h.tx), nil, nil, nil,
+		repository.NewAdminRepository(h.tx), nil, nil, nil, nil,
 		repository.NewAdminRefreshTokenRepository(h.tx),
 	)
 	owner := &models.Admin{Role: models.AdminRoleOwner}

@@ -76,7 +76,7 @@ func newAdminHarness(t *testing.T) *adminHarness {
 		repository.NewNotificationRepository(tx), settings)
 	adminRepo := repository.NewAdminRepository(tx)
 	admins := service.NewAdminService(
-		adminRepo, tokens, settings,
+		adminRepo, tokens, settings, nil,
 		repository.NewRefreshTokenRepository(tx), repository.NewAdminRefreshTokenRepository(tx),
 	)
 
@@ -88,7 +88,7 @@ func newAdminHarness(t *testing.T) *adminHarness {
 			settings, notifications,
 		),
 		settings,
-		nil, "/uploads", "",
+		nil, "",
 	)
 
 	// The same chain cmd/server builds: authenticate, then require the owner on

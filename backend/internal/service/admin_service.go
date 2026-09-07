@@ -86,14 +86,21 @@ type AdminService struct {
 	// Optional: a nil settings service falls back to the built-in minimum, so
 	// the admin bootstrap command can build this service without one.
 	settings *SettingsService
+	// Failed sign-ins toward a lockout, the same table AuthService uses —
+	// identifiers are namespaced (see loginAttemptKey) so an admin email and a
+	// marketplace email that happen to match cannot lock each other out.
+	// Optional, for the same reason the two session repositories above are:
+	// the admin bootstrap command signs nobody in.
+	attempts *repository.LoginAttemptRepository
 }
 
 func NewAdminService(
 	admins *repository.AdminRepository, tokens *token.Service, settings *SettingsService,
+	attempts *repository.LoginAttemptRepository,
 	userSessions *repository.RefreshTokenRepository, adminSessions *repository.AdminRefreshTokenRepository,
 ) *AdminService {
 	return &AdminService{
-		admins: admins, tokens: tokens, settings: settings,
+		admins: admins, tokens: tokens, settings: settings, attempts: attempts,
 		userSessions: userSessions, adminSessions: adminSessions,
 	}
 }
@@ -139,17 +146,40 @@ type Session struct {
 // to reject than a wrong password, and that timing difference is the same
 // account enumeration the shared error message exists to prevent.
 func (s *AdminService) Login(ctx context.Context, email, password string) (*Session, error) {
-	admin, err := s.admins.FindByEmail(ctx, normalizeAdminEmail(email))
+	now := time.Now()
+	normalized := normalizeAdminEmail(email)
+	key := loginAttemptKey(normalized)
+	site := Defaults()
+	if s.settings != nil {
+		site = s.settings.MustGet(ctx)
+	}
+
+	// Checked before the account is even looked up, and keyed on what was
+	// typed rather than on the account it names — the highest-privilege
+	// accounts in the system otherwise have no defense against unlimited
+	// password-guessing beyond bcrypt's own cost.
+	if s.attempts != nil {
+		until, err := s.attempts.LockedUntil(ctx, key, now)
+		if err != nil {
+			return nil, fmt.Errorf("admin login: %w", err)
+		}
+		if !until.IsZero() {
+			return nil, fmt.Errorf("%w: try again in %d minute(s)",
+				ErrAccountLocked, minutesUntil(until, now))
+		}
+	}
+
+	admin, err := s.admins.FindByEmail(ctx, normalized)
 	if err != nil {
 		if errors.Is(err, repository.ErrAdminNotFound) {
 			compareAgainstDummy(password)
-			return nil, ErrAdminCredentials
+			return nil, s.recordAdminLoginFailure(ctx, key, site, now)
 		}
 		return nil, fmt.Errorf("admin login: %w", err)
 	}
 
 	if bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(password)) != nil {
-		return nil, ErrAdminCredentials
+		return nil, s.recordAdminLoginFailure(ctx, key, site, now)
 	}
 
 	// Status is checked only after the password matches. Reporting "suspended"
@@ -161,6 +191,14 @@ func (s *AdminService) Login(ctx context.Context, email, password string) (*Sess
 		return nil, ErrAdminSuspended
 	default:
 		return nil, ErrAdminInactive
+	}
+
+	// The streak ends with a correct password on an account that may actually
+	// sign in.
+	if s.attempts != nil {
+		if err := s.attempts.Succeed(ctx, key); err != nil {
+			logger.Errorf("clear admin login attempts: %v", err)
+		}
 	}
 
 	signed, expiresAt, err := s.tokens.GenerateScoped(admin.ID, token.ScopeAdmin, adminSessionTTL)
@@ -188,6 +226,39 @@ func (s *AdminService) Login(ctx context.Context, email, password string) (*Sess
 	}
 
 	return session, nil
+}
+
+// loginAttemptKey namespaces an admin identifier before it touches the
+// login_attempts table — the same table AuthService counts marketplace
+// failures in, keyed only on the identifier string. Without a prefix, an
+// admin and a marketplace account that happen to share an email would each
+// be able to lock the other out.
+func loginAttemptKey(normalizedEmail string) string {
+	return "admin:" + normalizedEmail
+}
+
+// recordAdminLoginFailure counts one wrong answer and reports what the caller
+// is told. Mirrors AuthService.recordFailure.
+func (s *AdminService) recordAdminLoginFailure(
+	ctx context.Context, key string, site *Settings, now time.Time,
+) error {
+	if s.attempts == nil {
+		return ErrAdminCredentials
+	}
+	until, err := s.attempts.Fail(
+		ctx, key, site.LoginMaxAttempts,
+		time.Duration(site.LoginLockMinutes)*time.Minute, now,
+	)
+	if err != nil {
+		// A counter that cannot be written must not stop somebody signing in.
+		logger.Errorf("record failed admin login: %v", err)
+		return ErrAdminCredentials
+	}
+	if !until.IsZero() {
+		return fmt.Errorf("%w: try again in %d minute(s)",
+			ErrAccountLocked, minutesUntil(until, now))
+	}
+	return ErrAdminCredentials
 }
 
 // newAdminRefreshToken returns the secret to hand out and the row to store.
@@ -794,7 +865,25 @@ func (s *AdminService) UpdateProfile(
 		return nil, ErrNameRequired
 	}
 
-	if err := s.admins.UpdateProfile(ctx, actor.ID, trimmed, avatarURL); err != nil {
+	cleanedAvatar := avatarURL
+	if avatarURL != nil && *avatarURL != "" {
+		// Stored as a path, never as the absolute URL the upload endpoint hands
+		// back — the same reasoning as AuthService.UpdateProfile's own avatar
+		// handling. An administrator's picture is rendered in every other
+		// administrator's browser (the dashboard header, the audit log, user
+		// tables), so a value naming another origin would make each of them
+		// fetch an image from a server of this account's choosing — a tracking
+		// pixel with an audience. Keeping only the path makes that impossible
+		// to express, and the client resolves it against the API origin it
+		// already knows.
+		cleaned, err := uploadPath(*avatarURL)
+		if err != nil {
+			return nil, ErrInvalidAvatar
+		}
+		cleanedAvatar = &cleaned
+	}
+
+	if err := s.admins.UpdateProfile(ctx, actor.ID, trimmed, cleanedAvatar); err != nil {
 		if errors.Is(err, repository.ErrAdminNotFound) {
 			return nil, ErrAdminNotFound
 		}

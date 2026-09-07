@@ -28,9 +28,6 @@ type AdminHandler struct {
 	listings *service.AdminListingService
 	settings *service.SettingsService
 	files    storage.Storage
-	// Where this server's uploads live, so an avatar can be checked to be one
-	// of them rather than an address the client made up.
-	uploadPath string
 	// The public origin uploads are reachable at. Empty means "work it out from
 	// the request", which is what development wants.
 	baseURL string
@@ -39,16 +36,15 @@ type AdminHandler struct {
 func NewAdminHandler(
 	admins *service.AdminService, stats *service.AdminStatsService,
 	listings *service.AdminListingService, settings *service.SettingsService,
-	files storage.Storage, uploadPath, baseURL string,
+	files storage.Storage, baseURL string,
 ) *AdminHandler {
 	return &AdminHandler{
-		admins:     admins,
-		stats:      stats,
-		listings:   listings,
-		settings:   settings,
-		files:      files,
-		uploadPath: uploadPath,
-		baseURL:    strings.TrimRight(baseURL, "/"),
+		admins:   admins,
+		stats:    stats,
+		listings: listings,
+		settings: settings,
+		files:    files,
+		baseURL:  strings.TrimRight(baseURL, "/"),
 	}
 }
 
@@ -139,6 +135,10 @@ func (h *AdminHandler) Login(c *gin.Context) {
 			// One message for a wrong password and for an unknown address.
 			response.Error(c, http.StatusUnauthorized, "invalid_credentials",
 				"Invalid credentials")
+		case errors.Is(err, service.ErrAccountLocked):
+			// 429: the credentials were not judged at all, the caller is being
+			// asked to wait. The message carries the wait.
+			response.Error(c, http.StatusTooManyRequests, "account_locked", err.Error())
 		case errors.Is(err, service.ErrAdminSuspended):
 			response.Error(c, http.StatusForbidden, "account_suspended",
 				"This account is suspended")
@@ -854,20 +854,19 @@ func (h *AdminHandler) UpdateProfile(c *gin.Context) {
 	}
 	req.Normalize()
 
-	// A picture must be one this server stored. Without the check, a client
-	// could point the avatar at any address on the internet and every viewer's
-	// browser would fetch it — a tracking pixel with an audience.
-	if req.AvatarURL != nil && *req.AvatarURL != "" && !h.isOwnUpload(*req.AvatarURL) {
-		response.Error(c, http.StatusBadRequest, "invalid_avatar",
-			"Upload the image first, then save the profile")
-		return
-	}
-
+	// A picture must be one this server stored — checked, and reduced to a
+	// bare path, in AdminService.UpdateProfile. Without that, a client could
+	// point the avatar at any address on the internet and every other
+	// administrator's browser would fetch it — a tracking pixel with an
+	// audience.
 	admin, err := h.admins.UpdateProfile(c.Request.Context(), actor, req.Name, req.AvatarURL)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrNameRequired):
 			response.Error(c, http.StatusBadRequest, "validation_failed", "Name cannot be empty")
+		case errors.Is(err, service.ErrInvalidAvatar):
+			response.Error(c, http.StatusBadRequest, "invalid_avatar",
+				"Upload the image first, then save the profile")
 		case errors.Is(err, service.ErrAdminNotFound):
 			response.Error(c, http.StatusUnauthorized, "invalid_token", "Invalid token")
 		default:
@@ -881,23 +880,6 @@ func (h *AdminHandler) UpdateProfile(c *gin.Context) {
 		models.AuditProfileUpdated, admin.Email, c.ClientIP(), models.AuditSuccess)
 
 	response.OK(c, "Profile updated", dto.NewAdminResponse(admin))
-}
-
-// isOwnUpload reports whether a URL points at a file this server stored.
-//
-// Both forms are accepted: the absolute URL the uploader hands back, and the
-// bare path, which is what an older record may hold. Anything else is somebody
-// else's address.
-func (h *AdminHandler) isOwnUpload(url string) bool {
-	if strings.HasPrefix(url, h.uploadPath) {
-		return true
-	}
-	marker := h.uploadPath + "/"
-	if index := strings.Index(url, marker); index > 0 {
-		// Only after a scheme and host, never as a suffix of another path.
-		return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
-	}
-	return false
 }
 
 // actorAndTarget pulls the caller and the :id out of a request, reporting the

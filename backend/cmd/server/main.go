@@ -238,13 +238,18 @@ func newRouter(
 	users := repository.NewUserRepository(db)
 	verifications := repository.NewVerificationRepository(db)
 
+	// Shared with the admin dashboard's own login below — the failure count is
+	// namespaced per identifier (see loginAttemptKey), so one table safely
+	// tracks both without either system's lockouts affecting the other.
+	loginAttempts := repository.NewLoginAttemptRepository(db)
+
 	// Which providers these are is decided by configuration in buildSenders;
 	// the service only knows the interface.
 	authService := service.NewAuthService(
 		users, verifications, tokens,
 		delivery.sms, delivery.email,
 		cfg.OTP, settingsService,
-		repository.NewLoginAttemptRepository(db),
+		loginAttempts,
 		repository.NewRefreshTokenRepository(db),
 		notificationService,
 		repository.NewApartmentRepository(db),
@@ -410,7 +415,7 @@ func newRouter(
 	// marketplace. Sharing one account table would mean the public registration
 	// endpoint writes rows the admin authorization has to be careful about.
 	adminService := service.NewAdminService(
-		repository.NewAdminRepository(db), tokens, settingsService,
+		repository.NewAdminRepository(db), tokens, settingsService, loginAttempts,
 		repository.NewRefreshTokenRepository(db), repository.NewAdminRefreshTokenRepository(db),
 	)
 	// Every figure the dashboard shows is counted by PostgreSQL; this service
@@ -435,7 +440,7 @@ func newRouter(
 
 	adminHandler := handler.NewAdminHandler(
 		adminService, adminStats, adminListings, settingsService,
-		files, cfg.UploadPublicPath, cfg.PublicBaseURL,
+		files, cfg.PublicBaseURL,
 	)
 
 	admin := v1.Group("/admin")
@@ -443,7 +448,16 @@ func newRouter(
 		// Public: somebody signing in has no token to present. There is no
 		// registration endpoint — the owner creates every other account, and
 		// the owner itself is created by `cmd/admin`.
-		admin.POST("/auth/login", adminHandler.Login)
+		//
+		// Rate-limited like the marketplace's own login: the account-level
+		// lockout above catches one address being guessed at, and the IP
+		// limit alongside it catches one caller sweeping through several
+		// addresses, none of which alone trips a lock. These are the
+		// highest-privilege accounts in the system, so this is not optional
+		// the way it might be elsewhere.
+		admin.POST("/auth/login",
+			middleware.RateLimit(cfg.RateLimit.LoginMax, cfg.RateLimit.LoginWindow),
+			adminHandler.Login)
 		// Renewing and ending a session, mirroring the marketplace's own:
 		// public, because both carry the refresh token in the body, which is
 		// the only credential either needs — an access token that has already
