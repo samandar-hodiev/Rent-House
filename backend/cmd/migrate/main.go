@@ -10,7 +10,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
@@ -22,15 +21,27 @@ import (
 )
 
 func main() {
-	confirm := flag.Bool("confirm", false, "required by `down`, which drops tables")
-	flag.Parse()
-
-	command := flag.Arg(0)
+	// Not the standard `flag` package: it stops parsing at the first
+	// non-flag argument, so the documented `migrate down --confirm` — the
+	// subcommand before the flag — would silently leave confirm unset. This
+	// scans the whole argument list instead, so both orderings work.
+	var command string
+	var confirm bool
+	for _, arg := range os.Args[1:] {
+		switch arg {
+		case "--confirm", "-confirm":
+			confirm = true
+		default:
+			if command == "" {
+				command = arg
+			}
+		}
+	}
 	if command == "" {
 		command = "up"
 	}
 
-	if err := run(command, *confirm); err != nil {
+	if err := run(command, confirm); err != nil {
 		logger.Fatalf("migrate: %v", err)
 	}
 }

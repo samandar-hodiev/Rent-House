@@ -86,10 +86,21 @@ services:
       # still matters for anyone hitting the published port directly, and for
       # deploying to a real domain instead of localhost.
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      # Debug mode dumps every route and a verbose per-request log on stdout —
+      # meant for `go run`, not for a container left running in production.
+      GIN_MODE: release
     volumes:
       - uploads_data:/app/uploads
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      # Bound to loopback only: reachable at http://localhost:8080 from this
+      # machine for debugging (see README), but never from the network. A
+      # caller reaching the backend from outside must go through nginx, which
+      # is the only hop TRUSTED_PROXIES (backend/.env.example) is meant to
+      # trust — published on every interface, this port would let an external
+      # caller inside the trusted range on some Docker network configurations
+      # (the bridge gateway relayed through the userland-proxy) and spoof the
+      # X-Forwarded-For header the rate limiter keys on.
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 10s
