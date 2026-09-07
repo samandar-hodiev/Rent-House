@@ -78,16 +78,29 @@ function MapPage() {
   // pins come from the same rows the listing pages render — nothing here is
   // positioned by hand.
   const [catalog, setCatalog] = useState([])
+  // A failed fetch used to leave `catalog` empty with no indication why — on
+  // a map, that reads exactly like "no listings match your filters" rather
+  // than "the server could not be reached". Kept apart so this page can say
+  // which one actually happened.
+  const [catalogError, setCatalogError] = useState(false)
 
-  useEffect(() => {
+  const loadCatalog = useCallback(() => {
     const controller = new AbortController()
+    setCatalogError(false)
     fetchApartments({ signal: controller.signal, limit: 60 })
       .then((page) => setCatalog(page.items))
       .catch((error) => {
-        if (error?.name !== 'AbortError') setCatalog([])
+        if (error?.name === 'AbortError') return
+        setCatalog([])
+        setCatalogError(true)
       })
-    return () => controller.abort()
+    return controller
   }, [])
+
+  useEffect(() => {
+    const controller = loadCatalog()
+    return () => controller.abort()
+  }, [loadCatalog])
 
   // Map MVP: district + filters only, no keyword search (kept disabled in
   // the header — see SearchBar.jsx).
@@ -166,6 +179,22 @@ function MapPage() {
             />
           </div>
         </div>
+
+        {catalogError ? (
+          <span
+            role="alert"
+            className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/50 bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-600 shadow-[0_2px_10px_rgba(15,23,42,0.10)] backdrop-blur-md"
+          >
+            {t('map.loadFailed')}
+            <button
+              type="button"
+              onClick={loadCatalog}
+              className="font-semibold text-primary hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {t('listing.retry')}
+            </button>
+          </span>
+        ) : null}
 
         {locationStatusText ? (
           <span

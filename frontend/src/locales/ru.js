@@ -755,6 +755,7 @@ export default {
 
 
   'map.pageTitle': 'Карта',
+  'map.loadFailed': 'Не удалось загрузить объявления.',
   'map.viewDetails': 'Подробнее',
   'map.locateMe': 'Показать моё местоположение',
   'map.layers': 'Слои карты',

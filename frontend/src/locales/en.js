@@ -753,6 +753,7 @@ export default {
 
 
   'map.pageTitle': 'Map',
+  'map.loadFailed': 'Could not load the listings.',
   'map.viewDetails': 'View details',
   'map.locateMe': 'Show my location',
   'map.layers': 'Map layers',

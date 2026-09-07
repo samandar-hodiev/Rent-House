@@ -52,12 +52,12 @@ export function useConversation(conversationId, apartmentId = null) {
 
   // First page. Replaces whatever was there: switching threads must not leave
   // the previous one's messages on screen.
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!conversationId || !token) {
       setMessages([])
       setApartments({})
       setStatus('idle')
-      return undefined
+      return new AbortController()
     }
 
     const controller = new AbortController()
@@ -79,8 +79,13 @@ export function useConversation(conversationId, apartmentId = null) {
         setStatus('error')
       })
 
-    return () => controller.abort()
+    return controller
   }, [conversationId, token])
+
+  useEffect(() => {
+    const controller = load()
+    return () => controller.abort()
+  }, [load])
 
   // Opening a thread reads it. The server decides which messages actually
   // changed and tells the sender, so their ticks turn double without either
@@ -360,6 +365,7 @@ export function useConversation(conversationId, apartmentId = null) {
     myId,
     status,
     isLoading: status === 'loading',
+    retry: load,
     hasMore,
     loadingOlder,
     loadOlder,

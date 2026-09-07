@@ -107,6 +107,7 @@ function ChatThread({
     myId,
     isLoading,
     status,
+    retry,
     hasMore,
     loadingOlder,
     loadOlder,
@@ -350,9 +351,18 @@ function ChatThread({
             {t('chat.loading')}
           </p>
         ) : status === 'error' ? (
-          <p role="alert" className="m-auto py-8 text-center text-sm text-error">
-            {t('chat.loadFailed')}
-          </p>
+          <div className="m-auto flex flex-col items-center gap-2 py-8">
+            <p role="alert" className="text-center text-sm text-error">
+              {t('chat.loadFailed')}
+            </p>
+            <button
+              type="button"
+              onClick={() => retry()}
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {t('chat.retry')}
+            </button>
+          </div>
         ) : messages.length === 0 ? (
           <p className="m-auto py-8 text-center text-sm text-text-muted">{t('chat.empty')}</p>
         ) : (

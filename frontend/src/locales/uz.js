@@ -754,6 +754,7 @@ export default {
 
 
   'map.pageTitle': 'Xarita',
+  'map.loadFailed': "E'lonlarni yuklab bo'lmadi.",
   'map.viewDetails': "Batafsil ko'rish",
   'map.locateMe': "Joylashuvimni ko'rsatish",
   'map.layers': 'Xarita qatlamlari',

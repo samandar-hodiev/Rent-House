@@ -30,6 +30,7 @@ function ChatConversationList({ activeId, onSelect, showArchive = false }) {
     removeConversation,
     setBlocked,
     drafts,
+    reload,
   } = useChat()
 
   const [query, setQuery] = useState('')
@@ -119,9 +120,18 @@ function ChatConversationList({ activeId, onSelect, showArchive = false }) {
 
     if (listStatus === 'error' && source.length === 0) {
       return (
-        <p role="alert" className="p-4 text-sm text-error">
-          {t('chat.loadFailed')}
-        </p>
+        <div className="flex flex-col items-start gap-2 p-4">
+          <p role="alert" className="text-sm text-error">
+            {t('chat.loadFailed')}
+          </p>
+          <button
+            type="button"
+            onClick={() => reload()}
+            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {t('chat.retry')}
+          </button>
+        </div>
       )
     }
 
