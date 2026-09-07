@@ -474,7 +474,11 @@ func newRouter(
 			// and nothing else. The role and the status are not editable here
 			// by anyone, including themselves.
 			authed.PATCH("/profile", adminHandler.UpdateProfile)
-			authed.POST("/profile/avatar", adminHandler.UploadAvatar)
+			// Rate-limited like the marketplace's own upload endpoint below:
+			// writing a file to disk has no volume cap of its own.
+			authed.POST("/profile/avatar",
+				middleware.RateLimit(cfg.RateLimit.UploadMax, cfg.RateLimit.UploadWindow),
+				adminHandler.UploadAvatar)
 
 			// Listings, behind the section the owner can withdraw.
 			marketplaceListings := authed.Group("/listings",
@@ -656,8 +660,14 @@ func newRouter(
 	// pictures are public by definition. Chat attachments are not here — they
 	// go through the authorized endpoint above.
 	router.Static(files.PublicPath(), files.Dir())
+	// Rate-limited: a signed-in account calling this in a loop would otherwise
+	// write to disk without limit — the per-listing image count only bounds
+	// what ends up attached to a listing, not how many times this can be
+	// called.
 	v1.POST("/uploads/images",
-		middleware.Auth(tokens), handler.NewUploadHandler(files, settingsService, cfg.PublicBaseURL).UploadImage)
+		middleware.Auth(tokens),
+		middleware.RateLimit(cfg.RateLimit.UploadMax, cfg.RateLimit.UploadWindow),
+		handler.NewUploadHandler(files, settingsService, cfg.PublicBaseURL).UploadImage)
 
 	return router, nil
 }

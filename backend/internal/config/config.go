@@ -47,6 +47,13 @@ const (
 	defaultRateLimitLoginWindow      = 5 * time.Minute
 	defaultRateLimitListingMax       = 20
 	defaultRateLimitListingWindow    = time.Hour
+	// Uploading writes a file to disk with no volume cap of its own — a
+	// listing's own image count is bounded once attached, but nothing stopped
+	// an account from calling the upload endpoint in a loop before that. 60/h
+	// covers a real session (several listings' worth of photos) with room to
+	// spare.
+	defaultRateLimitUploadMax    = 60
+	defaultRateLimitUploadWindow = time.Hour
 )
 
 // Config holds every setting the server needs to start.
@@ -86,6 +93,8 @@ type RateLimit struct {
 	LoginWindow      time.Duration
 	ListingMax       int
 	ListingWindow    time.Duration
+	UploadMax        int
+	UploadWindow     time.Duration
 }
 
 // validate confirms every pair describes an actual limit — a max of zero or
@@ -101,6 +110,7 @@ func (r RateLimit) validate() error {
 		{"RATE_LIMIT_PASSWORD_RESET", r.PasswordResetMax, r.PasswordReset},
 		{"RATE_LIMIT_LOGIN", r.LoginMax, r.LoginWindow},
 		{"RATE_LIMIT_LISTING", r.ListingMax, r.ListingWindow},
+		{"RATE_LIMIT_UPLOAD", r.UploadMax, r.UploadWindow},
 	} {
 		if pair.max <= 0 {
 			return fmt.Errorf("%s_MAX must be at least 1", pair.name)
@@ -332,6 +342,15 @@ func loadRateLimit() (RateLimit, error) {
 	if err != nil {
 		return RateLimit{}, err
 	}
+	uploadMax, err := parseInt(os.Getenv("RATE_LIMIT_UPLOAD_MAX"), defaultRateLimitUploadMax, "RATE_LIMIT_UPLOAD_MAX")
+	if err != nil {
+		return RateLimit{}, err
+	}
+	uploadWindow, err := parseDuration(
+		os.Getenv("RATE_LIMIT_UPLOAD_WINDOW"), defaultRateLimitUploadWindow, "RATE_LIMIT_UPLOAD_WINDOW")
+	if err != nil {
+		return RateLimit{}, err
+	}
 
 	return RateLimit{
 		RegisterMax:      registerMax,
@@ -342,6 +361,8 @@ func loadRateLimit() (RateLimit, error) {
 		LoginWindow:      loginWindow,
 		ListingMax:       listingMax,
 		ListingWindow:    listingWindow,
+		UploadMax:        uploadMax,
+		UploadWindow:     uploadWindow,
 	}, nil
 }
 

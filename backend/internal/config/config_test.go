@@ -146,6 +146,8 @@ func validRateLimit() RateLimit {
 		LoginWindow:      5 * time.Minute,
 		ListingMax:       20,
 		ListingWindow:    time.Hour,
+		UploadMax:        60,
+		UploadWindow:     time.Hour,
 	}
 }
 
@@ -169,6 +171,8 @@ func TestValidateRejectsABadRateLimitPolicy(t *testing.T) {
 		"negative login window": func(c *Config) { c.RateLimit.LoginWindow = -time.Second },
 		"zero listing max":      func(c *Config) { c.RateLimit.ListingMax = 0 },
 		"zero listing window":   func(c *Config) { c.RateLimit.ListingWindow = 0 },
+		"zero upload max":       func(c *Config) { c.RateLimit.UploadMax = 0 },
+		"zero upload window":    func(c *Config) { c.RateLimit.UploadWindow = 0 },
 	}
 
 	for name, mutate := range cases {
