@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heart, Home } from 'lucide-react'
 import ApartmentCard from '../components/ApartmentCard'
@@ -46,35 +46,72 @@ function WishlistPage() {
   // still published.
   const [savedApartments, setSavedApartments] = useState([])
   const [loading, setLoading] = useState(true)
+  // A failed request used to be folded into "0 saved" — indistinguishable
+  // from an empty wishlist on the one page whose entire job is showing it.
+  // Kept apart so a dropped connection reads as "could not load" rather than
+  // "you have saved nothing."
+  const [loadError, setLoadError] = useState(false)
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!token) {
       setSavedApartments([])
       setLoading(false)
-      return undefined
+      setLoadError(false)
+      return new AbortController()
     }
 
     const controller = new AbortController()
     setLoading(true)
+    setLoadError(false)
     fetchFavorites({ token, signal: controller.signal })
       .then((saved) => {
         if (!controller.signal.aborted) setSavedApartments(saved.items)
       })
-      .catch(() => {
-        if (!controller.signal.aborted) setSavedApartments([])
+      .catch((error) => {
+        if (controller.signal.aborted || error?.name === 'AbortError') return
+        setSavedApartments([])
+        setLoadError(true)
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false)
       })
+    return controller
+  }, [token])
 
+  useEffect(() => {
+    const controller = load()
     return () => controller.abort()
-    // `savedCount` re-runs this after a heart is toggled elsewhere on the page,
-    // so unsaving a listing removes its card rather than leaving it behind.
-  }, [token, savedCount])
+    // `savedCount` is not read inside `load` — it re-runs this after a heart
+    // is toggled elsewhere on the page, so unsaving a listing removes its
+    // card rather than leaving it behind.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load, savedCount])
 
   // No filtering and no sorting: the server returns them in the order they
   // were saved, which is the order somebody expects their own list in.
   const apartments = savedApartments
+
+  if (!loading && loadError) {
+    return (
+      <section className="flex flex-col gap-4">
+        <h1 className="text-xl font-semibold text-text-primary sm:text-2xl">
+          {t('header.wishlistNav')}
+        </h1>
+        <p role="alert" className="text-sm text-error">
+          {t('wishlist.loadFailed')}
+        </p>
+        <div>
+          <button
+            type="button"
+            onClick={load}
+            className="rounded-md border border-border px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {t('listing.retry')}
+          </button>
+        </div>
+      </section>
+    )
+  }
 
   if (!loading && savedApartments.length === 0) {
     return (

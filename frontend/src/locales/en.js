@@ -558,6 +558,7 @@ export default {
   'emptyState.action': 'Clear filters',
 
   'wishlist.resultCount': '{count} saved homes',
+  'wishlist.loadFailed': 'Could not load your saved apartments.',
   'wishlist.emptyTitle': 'No saved apartments yet',
   'wishlist.emptyDescription': 'Your saved apartments will appear here.',
   'wishlist.emptyAction': 'Search apartments',

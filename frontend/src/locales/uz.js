@@ -559,6 +559,7 @@ export default {
   'emptyState.action': 'Filtrlarni tozalash',
 
   'wishlist.resultCount': '{count} ta uy saqlangan',
+  'wishlist.loadFailed': "Saqlangan uylarni yuklab bo'lmadi.",
   'wishlist.emptyTitle': "Hali saqlangan uylar yo'q",
   'wishlist.emptyDescription': "Saqlangan uylar shu yerda ko'rinadi.",
   'wishlist.emptyAction': 'Uylarni qidirish',

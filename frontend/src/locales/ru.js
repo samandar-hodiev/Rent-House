@@ -560,6 +560,7 @@ export default {
   'emptyState.action': 'Сбросить фильтры',
 
   'wishlist.resultCount': 'Сохранено {count} квартир',
+  'wishlist.loadFailed': 'Не удалось загрузить сохранённые квартиры.',
   'wishlist.emptyTitle': 'Пока нет сохранённых квартир',
   'wishlist.emptyDescription': 'Сохранённые квартиры появятся здесь.',
   'wishlist.emptyAction': 'Искать квартиры',
