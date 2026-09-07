@@ -10,6 +10,7 @@
  * The parameter names are the API's own, so what the address bar shows and what
  * the server is asked are the same words.
  */
+import { APARTMENT_TYPES } from '../data/listingForm'
 
 export const DEFAULT_SORT = 'newest'
 
@@ -40,7 +41,7 @@ export const EMPTY_FILTERS = {
 }
 
 const FLOOR_BANDS = ['low', 'mid', 'high']
-const APARTMENT_TYPE_VALUES = new Set(['apartment', 'house', 'room'])
+const APARTMENT_TYPE_VALUES = new Set(APARTMENT_TYPES.map((option) => option.id))
 
 function toNumber(value) {
   if (value === null || value === '') return null

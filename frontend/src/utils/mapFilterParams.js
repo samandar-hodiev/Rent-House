@@ -2,6 +2,8 @@
 // query params, so the active selection survives a reload, browser
 // back/forward, and copy/paste of the URL. Kept isolated from MapPage so
 // the parsing/serialization rules live in one place.
+import { APARTMENT_TYPES } from '../data/listingForm'
+
 const FILTER_PARAMS = {
   minPrice: 'min_price',
   maxPrice: 'max_price',
@@ -15,7 +17,7 @@ const FILTER_PARAMS = {
 
 const ROOM_VALUES = new Set([1, 2, 3, 4])
 const FLOOR_VALUES = new Set(['low', 'mid', 'high'])
-const APARTMENT_TYPE_VALUES = new Set(['apartment', 'house', 'room'])
+const APARTMENT_TYPE_VALUES = new Set(APARTMENT_TYPES.map((option) => option.id))
 
 function parsePositiveNumber(raw) {
   if (raw === null) return null

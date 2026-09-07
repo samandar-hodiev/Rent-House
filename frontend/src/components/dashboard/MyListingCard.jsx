@@ -35,7 +35,6 @@ function MyListingCard({ listing, compact = false }) {
   const [pendingTarget, setPendingTarget] = useState(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState(null)
-  const [deleteError, setDeleteError] = useState(null)
 
   const confirmStatusChange = async () => {
     if (busy) return
@@ -166,7 +165,6 @@ function MyListingCard({ listing, compact = false }) {
               type="button"
               onClick={() => {
                 setActionError(null)
-                setDeleteError(null)
                 setPendingTarget(LISTING_STATUS.deleted)
               }}
               disabled={busy}
@@ -186,12 +184,6 @@ function MyListingCard({ listing, compact = false }) {
             onCancel={() => (busy ? undefined : setPendingTarget(null))}
             onConfirm={confirmStatusChange}
           />
-        ) : null}
-
-        {deleteError ? (
-          <p role="alert" className="text-xs text-error">
-            {deleteError}
-          </p>
         ) : null}
       </div>
 
