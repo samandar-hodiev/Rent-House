@@ -51,6 +51,7 @@ func newListingHarness(t *testing.T) *listingHarness {
 			apartments,
 			service.NewSettingsService(repository.NewSettingsRepository(h.db)),
 			service.NewNotificationService(repository.NewNotificationRepository(h.db), nil),
+			nil,
 		),
 		analyticsService,
 	)

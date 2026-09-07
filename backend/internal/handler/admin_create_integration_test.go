@@ -137,7 +137,7 @@ func (h *adminHarness) publicRouter(t *testing.T) *gin.Engine {
 		apartments,
 	)
 	apartmentHandler := NewApartmentHandler(
-		service.NewApartmentService(apartments, h.settings, h.notifications), analytics)
+		service.NewApartmentService(apartments, h.settings, h.notifications, nil), analytics)
 	authHandler := NewAuthHandler(authService, "http://localhost:5173")
 
 	router := gin.New()

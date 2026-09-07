@@ -342,6 +342,22 @@ func (r *ApartmentRepository) Update(
 	return nil
 }
 
+// ImageURLs returns a listing's current gallery, cover first — what the
+// service compares an edit's incoming gallery against, so a photo dropped
+// from it can be deleted from storage rather than left an orphan on disk.
+func (r *ApartmentRepository) ImageURLs(ctx context.Context, apartmentID uuid.UUID) ([]string, error) {
+	var urls []string
+	err := r.db.WithContext(ctx).
+		Model(&models.ApartmentImage{}).
+		Where("apartment_id = ?", apartmentID).
+		Order("is_primary DESC, sort_order ASC").
+		Pluck("url", &urls).Error
+	if err != nil {
+		return nil, fmt.Errorf("read apartment image urls: %w", err)
+	}
+	return urls, nil
+}
+
 // Delete removes a listing. Images and amenity links go with it through the
 // ON DELETE CASCADE declared in the migration.
 func (r *ApartmentRepository) Delete(ctx context.Context, id uuid.UUID) error {

@@ -298,6 +298,14 @@ func newRouter(
 		auth.POST("/password/reset", authHandler.ResetPassword)
 	}
 
+	// Uploaded files: listing photographs and chat attachments share one store.
+	// Declared before the listings below, which need it to clean up a photo
+	// dropped from an edited gallery.
+	files, err := storage.NewLocalStorage(cfg.UploadDir, cfg.UploadPublicPath)
+	if err != nil {
+		return nil, fmt.Errorf("storage: %w", err)
+	}
+
 	// Listings. Same layering as auth: handler -> service -> repository -> db.
 	apartments := repository.NewApartmentRepository(db)
 
@@ -313,7 +321,7 @@ func newRouter(
 	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
 
 	apartmentHandler := handler.NewApartmentHandler(
-		service.NewApartmentService(apartments, settingsService, notificationService),
+		service.NewApartmentService(apartments, settingsService, notificationService, files),
 		analyticsService,
 	)
 
@@ -401,12 +409,6 @@ func newRouter(
 	// only when something is there to sweep; the setting is off by default, so
 	// this costs one query an hour until an owner turns it on.
 	go service.NewListingExpiry(apartments, settingsService).Run(context.Background())
-
-	// Uploaded files: listing photographs and chat attachments share one store.
-	files, err := storage.NewLocalStorage(cfg.UploadDir, cfg.UploadPublicPath)
-	if err != nil {
-		return nil, fmt.Errorf("storage: %w", err)
-	}
 
 	// The dashboard, which is a separate system with separate accounts.
 	//

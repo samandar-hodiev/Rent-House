@@ -12,6 +12,8 @@ import (
 	"github.com/samandar-hodiev/Rent-House/backend/internal/dto"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/models"
 	"github.com/samandar-hodiev/Rent-House/backend/internal/repository"
+	"github.com/samandar-hodiev/Rent-House/backend/internal/storage"
+	"github.com/samandar-hodiev/Rent-House/backend/pkg/logger"
 )
 
 // Errors the apartment service reports. Each maps to one HTTP status in the
@@ -78,14 +80,22 @@ type ApartmentService struct {
 	// read once at start-up, so switching moderation on takes effect on the
 	// next listing instead of on the next deployment.
 	settings *SettingsService
+	// Where photographs live, so a photo dropped from an edited gallery is
+	// deleted rather than left an orphan on disk. Optional: without it an edit
+	// still replaces the database rows correctly, it just cannot also clean up
+	// after itself — the only cost of a nil value is disk space, never
+	// correctness, which is why every other caller of this constructor may
+	// leave it out.
+	files storage.Storage
 }
 
 func NewApartmentService(
 	apartments *repository.ApartmentRepository, settings *SettingsService,
-	notifications *NotificationService,
+	notifications *NotificationService, files storage.Storage,
 ) *ApartmentService {
 	return &ApartmentService{
 		apartments: apartments, settings: settings, notifications: notifications,
+		files: files,
 	}
 }
 
@@ -291,6 +301,19 @@ func (s *ApartmentService) Update(
 		return nil, err
 	}
 
+	// Read before the gallery is replaced, so a photo the owner just dropped
+	// can be told apart from one they kept — repository.Update overwrites the
+	// rows either way, and by the time it returns there is no record left of
+	// which URLs used to be here.
+	var previousImageURLs []string
+	if s.files != nil && apartment.Images != nil {
+		previousImageURLs, err = s.apartments.ImageURLs(ctx, id)
+		if err != nil {
+			logger.Errorf("read previous apartment images: %v", err)
+			previousImageURLs = nil
+		}
+	}
+
 	// An explicit column list. owner_id, views_count and created_at are absent,
 	// so an edit cannot reassign a listing, reset its popularity or rewrite its
 	// history. Status is set from `publish`, which is the only transition the
@@ -326,7 +349,35 @@ func (s *ApartmentService) Update(
 		return nil, err
 	}
 
+	if len(previousImageURLs) > 0 {
+		s.deleteDroppedImages(ctx, previousImageURLs, apartment.Images)
+	}
+
 	return s.get(ctx, id, true)
+}
+
+// deleteDroppedImages removes from storage whatever photo used to be on a
+// listing and is not in its new gallery.
+//
+// Best effort, after the database has already committed the edit: a file that
+// fails to delete is disk space wasted, not a listing left in a broken state,
+// so it is logged rather than turned into an error the owner would see after
+// their edit already succeeded.
+func (s *ApartmentService) deleteDroppedImages(
+	ctx context.Context, previous []string, kept []models.ApartmentImage,
+) {
+	keptURLs := make(map[string]bool, len(kept))
+	for _, image := range kept {
+		keptURLs[image.URL] = true
+	}
+	for _, url := range previous {
+		if keptURLs[url] {
+			continue
+		}
+		if err := s.files.Delete(ctx, url); err != nil {
+			logger.Errorf("delete dropped apartment image %q: %v", url, err)
+		}
+	}
 }
 
 // ChangeStatus moves a listing through its lifecycle.

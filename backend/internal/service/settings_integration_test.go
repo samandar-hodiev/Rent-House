@@ -84,6 +84,7 @@ func TestSettingsGovernListingWrites(t *testing.T) {
 	apartments := service.NewApartmentService(
 		repository.NewApartmentRepository(tx), settings,
 		service.NewNotificationService(repository.NewNotificationRepository(tx), settings),
+		nil,
 	)
 
 	// Any real account: owning a listing is not a role on this marketplace,
